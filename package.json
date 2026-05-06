@@ -1,0 +1,31 @@
+{
+  "name": "scv-backend",
+  "version": "1.0.0",
+  "description": "Sistema de Control de Viaticos",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mateomerino14/SCV-Backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mateomerino14/SCV-Backend/issues"
+  },
+  "homepage": "https://github.com/mateomerino14/SCV-Backend#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
