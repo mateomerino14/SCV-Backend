@@ -1,0 +1,32 @@
+const palabrasProhibidas = [
+    'idiota', 'tonto', 'tonta', 'tontos', 'tontas', 'mierda', 'mierdas', 'emierda', 'mierdera', 'mierdero',
+    'imbecil', 'imbeciles', 'imbécil', 'imbéciles', 'estupido', 'estupida', 'estupidos', 'estupidas',
+    'pendejo', 'pendeja', 'pendejos', 'pendejas', 'cabron', 'cabrona', 'cabrones', 'cabronas',
+    'hijodeputa', 'hijueputa', 'hijueputas', 'hijodeputas', 'puta', 'putas', 'puto', 'putos',
+    'cojudo', 'cojuda', 'cojudos', 'cojudas', 'boludo', 'boluda', 'boludos', 'boludas', 'gil', 'giles',
+    'gilipollas', 'capullo', 'capulla', 'capullos', 'subnormal', 'subnormales', 'retrasado', 'retrasada',
+    'retrasados', 'tarado', 'tarada', 'tarados', 'taradas', 'mongo', 'mongolo', 'mongolica', 'mongolico',
+    'deficiente', 'deficientes', 'anormal', 'anormales', 'carajo', 'carajos', 'carajito', 'conchesumadre',
+    'conchetumadre', 'ctm', 'pichula', 'pichulas', 'pichulazo', 'chucha', 'chuchas', 'chuchazo',
+    'chupapico', 'chupapija', 'comepico', 'comepija', 'verga', 'vergas', 'vergon', 'pene', 'penes',
+    'cipote', 'cipotes', 'majadero', 'majadera', 'majaderos', 'bruto', 'bruta', 'brutos', 'brutas',
+    'necio', 'necia', 'necios', 'necias', 'ignorante', 'ignorantes', 'analfabeto', 'analfabeta',
+    'mentecato', 'mentecata', 'zoquete', 'zoquetes', 'burro', 'burra', 'burros', 'burras', 'asno', 'asna',
+    'asnos', 'bestia', 'bestias', 'abombado', 'abombada', 'zorra', 'zorras', 'perra', 'perras',
+    'prostituta', 'prostitutas', 'ramera', 'rameras', 'putero', 'putera', 'culiao', 'culiada', 'culiado',
+    'chinga', 'chingada', 'chingadera', 'chingar', 'chingas', 'concha', 'concha tu madre', 'panocha',
+    'panochas', 'teta', 'tetas', 'tetona', 'basura', 'basuras', 'escoria', 'escorias', 'desecho',
+    'desechos', 'malparido', 'malparida', 'malnacido', 'malnacida', 'maldito', 'maldita', 'inservible',
+    'inservibles', 'inutil', 'inutiles', 'inútil', 'inútiles', 'estorbo', 'estorbos', 'estorbosa',
+    'estorboso', 'huachafo', 'huachafa', 'cholo', 'chola', 'cholaje', 'indio', 'india', 'indios', 'indias',
+    'longo', 'longa', 'colla', 'collas', 'cambita', 'cambas', 'sureño', 'sureña', 'matar', 'matenlo',
+    'matenla', 'asesino', 'degollar', 'apuñalar', 'muerete', 'morite', 'morite pues', 'ojala te mueras',
+    'ojalá te mueras', '1d1ota', '1mb3c1l', '3stup1do', 'p3nd3jo', 'm13rda', 'c0judo', 'v3rga', 'xuxa',
+    'xuta', 'chuxa', 'kks', 'kka', 'kk', 'kgar', 'kgao', 'pedazo de mierda', 'cagada', 'cagadas',
+    'cagadero', 'cagaste', 'cagaron', 'cagué', 'me cago en', 'te cago', 'la concha de tu madre',
+    'la conchetumare', 'la puta madre', 'la puta que te parió', 'la reputa madre', 'reputa',
+    'me importa una mierda', 'me vale mierda', 'mierda santa', 'puta mierda', 'cara de pija',
+    'cara de verga', 'cara de mierda', 'hueco', 'hueca', 'huecos', 'huecas'
+];
+
+module.exports = palabrasProhibidas;
