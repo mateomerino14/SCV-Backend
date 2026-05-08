@@ -1,10 +1,12 @@
 const express=  require('express');
 const router= express.Router();
 const supabase = require('../config/supabase');
+const authMiddleware = require('../middleware/auth');
+
+//CON SEGURIDAD JWT, SOLO USUARIOS AUTENTICADOS PUEDEN ACCEDER A ESTAS RUTAS
 
 
-
-router.get('/',async(req,res)=>{
+router.get('/',authMiddleware,async(req,res)=>{
     const {data,error}=await supabase.from('Factura').select('*');
     if(error){
         return res.status(500).json({error: error.message});
@@ -12,7 +14,7 @@ router.get('/',async(req,res)=>{
     return res.json(data);
 });
 
-router.put('/:id',async(req,res)=>{
+router.put('/:id',authMiddleware,async(req,res)=>{
     const {data,error}=await supabase.from('Factura').update(req.body).eq('id_factura',req.params.id).select();
     if(error){
         return res.status(500).json({error: error.message});
@@ -20,7 +22,7 @@ router.put('/:id',async(req,res)=>{
     return res.json(data);
 });
 
-router.post('/',async(req,res)=>{
+router.post('/',authMiddleware,async(req,res)=>{
     const {data,error}=await supabase.from('Factura').insert(req.body).select();
     if(error){
         return res.status(500).json({error: error.message});
@@ -28,7 +30,7 @@ router.post('/',async(req,res)=>{
     return res.json(data);
 });
 
-router.delete('/:id',async(req,res)=>{
+router.delete('/:id',authMiddleware,async(req,res)=>{
     const {data,error}=await supabase.from('Factura').delete().eq('id_factura',req.params.id).select();
     if(error){
         return res.status(500).json({error: error.message});

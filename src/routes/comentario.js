@@ -1,6 +1,11 @@
 const express= require('express');
 const router=express.Router();
 const supabase=require('../config/supabase');
+const authMiddleware = require('../middleware/auth');
+const roleMiddleware = require('../middleware/revisar');
+
+
+
 
 //FUNCIONES AUXILIARES 
 
@@ -18,7 +23,7 @@ function contieneMalasPalabras(texto){
 
 
 //ENDPOINTS
-router.get('/',async(req,res)=>{
+router.get('/',authMiddleware,async(req,res)=>{
     const{data,error}=await supabase.from('Comentario').select('*');
     if(error){
         return res.status(500).json({error: error.message});
@@ -27,7 +32,7 @@ router.get('/',async(req,res)=>{
 });
 
 //ACTUALIZAR UN COMENTARIO
-router.put('/:id',async(req,res)=>{
+router.put('/:id',authMiddleware,roleMiddleware(['SUPERVISOR', 'ADMINISTRADOR']),async(req,res)=>{
     const descripcion = req.body.descripcion;
     const comentarioActualizado={
         descripcion:descripcion,
@@ -46,7 +51,7 @@ router.put('/:id',async(req,res)=>{
 
 
 //REGISTRAR UN COMENTARIO
-router.post('/',async(req,res)=>{
+router.post('/',authMiddleware,roleMiddleware(['SUPERVISOR', 'ADMINISTRADOR']),async(req,res)=>{
     const comentarioNuevo={
      descripcion:req.body.descripcion,
      fecha:new Date().toISOString(),
@@ -63,7 +68,7 @@ router.post('/',async(req,res)=>{
     return res.json(data);
 });
 
-router.delete('/:id',async(req,res)=>{
+router.delete('/:id',authMiddleware,roleMiddleware(['SUPERVISOR', 'ADMINISTRADOR']),async(req,res)=>{
     const{data,error}=await supabase.from('Comentario').delete().eq('id_comentario',req.params.id).select();
     if(error){
         return res.status(500).json({error: error.message});
