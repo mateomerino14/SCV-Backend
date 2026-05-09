@@ -1,7 +1,8 @@
 const express= require('express');  
 const router= express.Router();
 const supabase = require('../config/supabase');
-const authMiddleware = require('../middleware/auth');
+const authMiddleware = require('../middlewares/auth');
+const roleMiddleware = require('../middlewares/roleAuth');
 
 
 //CON SEGURIDAD JWT, SOLO USUARIOS AUTENTICADOS PUEDEN ACCEDER A ESTAS RUTAS

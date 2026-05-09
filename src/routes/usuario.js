@@ -3,12 +3,12 @@ const router = express.Router();
 const supabase = require('../config/supabase');
 const bcrypt = require('bcrypt');
 const saltRounds = 10;
-const authMiddleware = require('../middleware/auth');
-const revisarRol = require('../middleware/revisarRol');
+const authMiddleware = require('../middlewares/auth');
+const roleMiddleware = require('../middlewares/roleAuth');
 
 //CON SEGURIDAD, SOLO ADMIN PUEDE HACER ESTAS OPERACIONES, SE DEBE INICIAR SESION PARA OBTENER EL TOKEN Y EN
-
-router.get('/',authMiddleware,revisarRol(['ADMINISTRADOR']),async(req,res)=>{
+//authMiddleware,roleMiddleware(['ADMINISTRADOR'])
+router.get('/',authMiddleware,roleMiddleware(['ADMINISTRADOR']),async(req,res)=>{
     const {data,error}=await supabase.from('Usuario').select('*');
     if(error){
         return res.status(500).json({error: error.message});
@@ -16,7 +16,7 @@ router.get('/',authMiddleware,revisarRol(['ADMINISTRADOR']),async(req,res)=>{
     return res.json(data);
 });
 
-router.put('/:id',authMiddleware,revisarRol(['ADMINISTRADOR']),async(req,res)=>{
+router.put('/:id',authMiddleware,roleMiddleware(['ADMINISTRADOR']),async(req,res)=>{
     if(req.body.contrasenia){
         req.body.contrasenia=bcrypt.hashSync(req.body.contrasenia,saltRounds);
     }
@@ -28,7 +28,7 @@ router.put('/:id',authMiddleware,revisarRol(['ADMINISTRADOR']),async(req,res)=>{
 });
 
 
-router.post('/',authMiddleware,revisarRol(['ADMINISTRADOR']),async(req,res)=>{
+router.post('/',authMiddleware,roleMiddleware(['ADMINISTRADOR']),async(req,res)=>{
     if(req.body.contrasenia){
         req.body.contrasenia=bcrypt.hashSync(req.body.contrasenia,saltRounds);
     }
@@ -40,7 +40,7 @@ router.post('/',authMiddleware,revisarRol(['ADMINISTRADOR']),async(req,res)=>{
 });
 
 
-router.delete('/:id',authMiddleware,revisarRol(['ADMINISTRADOR']),async(req,res)=>{
+router.delete('/:id',authMiddleware,roleMiddleware(['ADMINISTRADOR']),async(req,res)=>{
     const{data,error}=await supabase.from('Usuario').delete().eq('id_usuario',req.params.id).select();
     if(error){
         return res.status(500).json({error: error.message});

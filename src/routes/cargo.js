@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const supabase = require('../config/supabase');
-const authMiddleware = require('../middleware/authMiddleware');
-const roleMiddleware = require('../middleware/roleMiddleware');
+const authMiddleware = require('../middlewares/auth');
+const roleMiddleware = require('../middlewares/roleAuth');
 
 //CON SEGURIDAD JWT Y ROLES, SOLO USUARIOS AUTENTICADOS CON ROL DE ADMINISTRADOR PUEDEN ACCEDER A ESTAS RUTAS
 

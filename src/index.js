@@ -48,6 +48,11 @@ app.use("/usuario",usuarioRoute);
 const viajeRoute=require('./routes/viaje');
 app.use("/viaje",viajeRoute);
 
+const authRoute=require('./routes/auth');
+app.use("/login",authRoute);
+
+
+
 app.listen(PORT,()=>{
     console.log(`Server is running on port ${PORT}`);
 }); 
