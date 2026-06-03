@@ -39,6 +39,9 @@ app.use('/imagen',imagenRoute);
 const impuestoRoute=require('./routes/impuesto');
 app.use("/impuesto",impuestoRoute);
 
+const revisionRoutes = require('./routes/revision')
+app.use('/revision', revisionRoutes)
+
 const proveedorRoute=require('./routes/proveedor');
 app.use("/proveedor",proveedorRoute);
 
@@ -51,6 +54,11 @@ app.use("/viaje",viajeRoute);
 const authRoute=require('./routes/auth');
 app.use("/login",authRoute);
 
+const adminRoutes = require('./routes/admin')
+app.use('/admin', adminRoutes)
+
+const revisorRoutes = require('./routes/revisor')
+app.use('/revisor', revisorRoutes)
 
 
 app.listen(PORT,()=>{
