@@ -39,4 +39,26 @@ router.delete('/:id',authMiddleware,roleMiddleware(['ADMINISTRADOR']),async(req,
     return res.json(data);
 });
 
+router.patch('/:id/suspender', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (req, res) => {
+  const { data, error } = await supabase
+    .from('Cargo')
+    .update({ activo: false })
+    .eq('id_cargo', req.params.id)
+    .select()
+
+  if (error) return res.status(500).json({ error: error.message })
+  return res.json(data)
+})
+
+router.patch('/:id/activar', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (req, res) => {
+  const { data, error } = await supabase
+    .from('Cargo')
+    .update({ activo: true })
+    .eq('id_cargo', req.params.id)
+    .select()
+
+  if (error) return res.status(500).json({ error: error.message })
+  return res.json(data)
+})
+
 module.exports=router;
