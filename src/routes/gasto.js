@@ -21,7 +21,10 @@ router.get('/:id_gasto/detalle', authMiddleware, async (req, res) => {
           numero_factura,
           fecha_emision,
           monto_parcial,
-          Detalle_Factura(nombre_producto, cantidad, precio)
+          Detalle_Factura(nombre_producto, cantidad, precio),
+          Factura_Impuestos(
+            Impuesto(porcentaje, nombre)
+          )
         ),
         Imagen(url_archivo)
       `)

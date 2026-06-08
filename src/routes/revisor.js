@@ -70,9 +70,17 @@ router.post('/:id_viaje/bloquear', authMiddleware, roleMiddleware(['REVISOR']), 
 
   const { data: viaje } = await supabase
     .from('Viaje')
-    .select('en_revision_por, en_revision_desde')
+    .select('en_revision_por, en_revision_desde, estado, id_usuario')
     .eq('id_viaje', id_viaje)
     .single()
+
+  if (viaje?.estado !== 'APROBADO_SUPERVISOR') {
+    return res.json({ message: 'Viaje no requiere bloqueo' })
+  }
+
+  if (viaje?.id_usuario === id_usuario) {
+    return res.json({ message: 'Propietario del viaje' })
+  }
 
   if (viaje?.en_revision_por && viaje.en_revision_por !== id_usuario) {
     const minutosTranscurridos = (Date.now() - new Date(viaje.en_revision_desde).getTime()) / 60000
@@ -158,7 +166,6 @@ router.post('/:id_viaje/aprobar', authMiddleware, roleMiddleware(['REVISOR']), a
 
 router.post('/:id_viaje/rechazar', authMiddleware, roleMiddleware(['REVISOR']), async (req, res) => {
   const { id_viaje } = req.params
-  const { observaciones } = req.body
   const id_usuario = req.user.id_usuario
 
   const { data: viaje } = await supabase
@@ -168,26 +175,20 @@ router.post('/:id_viaje/rechazar', authMiddleware, roleMiddleware(['REVISOR']), 
     return res.status(403).json({ error: 'No puedes rechazar tu propio viaje' })
   }
 
-  if (!observaciones || observaciones.length === 0) {
-    return res.status(400).json({ error: 'Las observaciones son requeridas para rechazar' })
-  }
-  for (const obs of observaciones) {
-    if (contieneMalasPalabras(obs)) return res.status(400).json({ error: 'Las observaciones contienen palabras inapropiadas' })
+  const { data: obsExistentes } = await supabase
+    .from('Comentario')
+    .select('id_comentario')
+    .eq('id_viaje', id_viaje)
+    .eq('tipo', 'OBSERVACION')
+
+  if (!obsExistentes || obsExistentes.length === 0) {
+    return res.status(400).json({ error: 'Debes agregar al menos una observación antes de rechazar' })
   }
 
   const { error: updateError } = await supabase
     .from('Viaje').update({ estado: 'RECHAZADO' }).eq('id_viaje', id_viaje)
   if (updateError) return res.status(500).json({ error: updateError.message })
 
-  for (const obs of observaciones) {
-    await supabase.from('Comentario').insert({
-      descripcion: obs,
-      fecha: new Date().toISOString(),
-      id_usuario,
-      id_viaje: parseInt(id_viaje),
-      tipo: 'OBSERVACION',
-    })
-  }
   return res.json({ message: 'Viaje rechazado correctamente' })
 })
 

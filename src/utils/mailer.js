@@ -1,20 +1,15 @@
-const nodemailer = require('nodemailer')
+const SibApiV3Sdk = require('sib-api-v3-sdk')
 
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS
-  }
-})
+const defaultClient = SibApiV3Sdk.ApiClient.instance
+defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY
 
 const sendVerificationCode = async (toEmail, nombre, code) => {
-  await transporter.sendMail({
-    from: `"Flujo de Viajes" <${process.env.GMAIL_USER}>`,
-    to: toEmail,
+  const api = new SibApiV3Sdk.TransactionalEmailsApi()
+  await api.sendTransacEmail({
+    sender: { name: 'Flujo de Viajes', email: 'mateomerino988@gmail.com' },
+    to: [{ email: toEmail }],
     subject: 'Código de verificación',
-    html: `
+    htmlContent: `
       <div style="font-family: Inter, sans-serif; max-width: 400px; margin: 0 auto; padding: 24px;">
         <h2 style="color: #870002;">Flujo de Viajes</h2>
         <p>Hola <strong>${nombre}</strong>,</p>

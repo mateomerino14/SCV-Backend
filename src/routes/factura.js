@@ -159,7 +159,7 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
       console.warn('Error alcohol:', e.message)
     }
 
-    if (datos.iva && datos.iva > 0) {
+    if (datos.iva && parseFloat(datos.iva) > 0) {
       const porcentaje = datos.monto > 0 ? parseFloat(((datos.iva / datos.monto) * 100).toFixed(2)) : 0
       const nombreIva = `IVA ${porcentaje}%`
       let id_impuesto = null
@@ -248,6 +248,28 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
           id_factura: facturaExistente.id_factura,
         }))
         await supabase.from('Detalle_Factura').insert(detalles)
+      }
+
+      await supabase.from('Factura_Impuestos').delete().eq('id_factura', facturaExistente.id_factura)
+
+      if (datos.iva && parseFloat(datos.iva) > 0) {
+        const monto = parseFloat(datos.monto || 0)
+        const iva = parseFloat(datos.iva)
+        const porcentaje = monto > 0 ? parseFloat(((iva / monto) * 100).toFixed(2)) : 0
+        const nombreIva = `IVA ${porcentaje}%`
+        let id_impuesto = null
+
+        const { data: impuestoExistente } = await supabase.from('Impuesto').select('id_impuesto').eq('porcentaje', porcentaje).single()
+        if (impuestoExistente) {
+          id_impuesto = impuestoExistente.id_impuesto
+        } else {
+          const { data: nuevoImpuesto } = await supabase.from('Impuesto').insert({ nombre: nombreIva, porcentaje }).select().single()
+          if (nuevoImpuesto) id_impuesto = nuevoImpuesto.id_impuesto
+        }
+
+        if (id_impuesto) {
+          await supabase.from('Factura_Impuestos').insert({ id_factura: facturaExistente.id_factura, id_impuesto })
+        }
       }
     }
 
