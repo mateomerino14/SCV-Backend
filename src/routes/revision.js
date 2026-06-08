@@ -64,6 +64,51 @@ router.get('/historial', authMiddleware, roleMiddleware(['SUPERVISOR']), async (
   })))
 })
 
+router.post('/:id_viaje/bloquear', authMiddleware, roleMiddleware(['SUPERVISOR']), async (req, res) => {
+  const { id_viaje } = req.params
+  const id_usuario = req.user.id_usuario
+
+  const { data: viaje } = await supabase
+    .from('Viaje')
+    .select('en_revision_por, en_revision_desde')
+    .eq('id_viaje', id_viaje)
+    .single()
+
+  if (viaje?.en_revision_por && viaje.en_revision_por !== id_usuario) {
+    const minutosTranscurridos = (Date.now() - new Date(viaje.en_revision_desde).getTime()) / 60000
+    if (minutosTranscurridos < 10) {
+      const { data: revisor } = await supabase
+        .from('Usuario')
+        .select('nombre, apellido_paterno')
+        .eq('id_usuario', viaje.en_revision_por)
+        .single()
+      return res.status(409).json({
+        error: `Este viaje está siendo revisado por ${revisor?.nombre} ${revisor?.apellido_paterno}`,
+      })
+    }
+  }
+
+  await supabase
+    .from('Viaje')
+    .update({ en_revision_por: id_usuario, en_revision_desde: new Date().toISOString() })
+    .eq('id_viaje', id_viaje)
+
+  return res.json({ message: 'Viaje bloqueado correctamente' })
+})
+
+router.post('/:id_viaje/liberar', authMiddleware, roleMiddleware(['SUPERVISOR']), async (req, res) => {
+  const { id_viaje } = req.params
+  const id_usuario = req.user.id_usuario
+
+  await supabase
+    .from('Viaje')
+    .update({ en_revision_por: null, en_revision_desde: null })
+    .eq('en_revision_por', id_usuario)
+    .eq('id_viaje', id_viaje)
+
+  return res.json({ message: 'Viaje liberado correctamente' })
+})
+
 router.get('/:id_viaje', authMiddleware, roleMiddleware(['SUPERVISOR']), async (req, res) => {
   const { id_viaje } = req.params
 
@@ -97,7 +142,17 @@ router.get('/:id_viaje', authMiddleware, roleMiddleware(['SUPERVISOR']), async (
 
 router.post('/:id_viaje/aprobar', authMiddleware, roleMiddleware(['SUPERVISOR']), async (req, res) => {
   const { id_viaje } = req.params
-  const { error } = await supabase.from('Viaje').update({ estado: 'APROBADO_SUPERVISOR' }).eq('id_viaje', id_viaje)
+  const id_usuario = req.user.id_usuario
+
+  const { data: viaje } = await supabase
+    .from('Viaje').select('id_usuario').eq('id_viaje', id_viaje).single()
+
+  if (viaje?.id_usuario === id_usuario) {
+    return res.status(403).json({ error: 'No puedes aprobar tu propio viaje' })
+  }
+
+  const { error } = await supabase
+    .from('Viaje').update({ estado: 'APROBADO_SUPERVISOR' }).eq('id_viaje', id_viaje)
   if (error) return res.status(500).json({ error: error.message })
   return res.json({ message: 'Viaje aprobado correctamente' })
 })
@@ -106,14 +161,33 @@ router.post('/:id_viaje/rechazar', authMiddleware, roleMiddleware(['SUPERVISOR']
   const { id_viaje } = req.params
   const { observaciones } = req.body
   const id_usuario = req.user.id_usuario
-  if (!observaciones || observaciones.length === 0) return res.status(400).json({ error: 'Las observaciones son requeridas para rechazar' })
+
+  const { data: viaje } = await supabase
+    .from('Viaje').select('id_usuario').eq('id_viaje', id_viaje).single()
+
+  if (viaje?.id_usuario === id_usuario) {
+    return res.status(403).json({ error: 'No puedes rechazar tu propio viaje' })
+  }
+
+  if (!observaciones || observaciones.length === 0) {
+    return res.status(400).json({ error: 'Las observaciones son requeridas para rechazar' })
+  }
   for (const obs of observaciones) {
     if (contieneMalasPalabras(obs)) return res.status(400).json({ error: 'Las observaciones contienen palabras inapropiadas' })
   }
-  const { error: updateError } = await supabase.from('Viaje').update({ estado: 'RECHAZADO' }).eq('id_viaje', id_viaje)
+
+  const { error: updateError } = await supabase
+    .from('Viaje').update({ estado: 'RECHAZADO' }).eq('id_viaje', id_viaje)
   if (updateError) return res.status(500).json({ error: updateError.message })
+
   for (const obs of observaciones) {
-    await supabase.from('Comentario').insert({ descripcion: obs, fecha: new Date().toISOString(), id_usuario, id_viaje: parseInt(id_viaje), tipo: 'OBSERVACION' })
+    await supabase.from('Comentario').insert({
+      descripcion: obs,
+      fecha: new Date().toISOString(),
+      id_usuario,
+      id_viaje: parseInt(id_viaje),
+      tipo: 'OBSERVACION',
+    })
   }
   return res.json({ message: 'Viaje rechazado correctamente' })
 })
@@ -125,7 +199,13 @@ router.post('/:id_viaje/comentario', authMiddleware, roleMiddleware(['SUPERVISOR
   if (!descripcion || descripcion.trim() === '') return res.status(400).json({ error: 'La descripción es requerida' })
   if (descripcion.length > 300) return res.status(400).json({ error: 'El comentario no puede superar los 300 caracteres' })
   if (contieneMalasPalabras(descripcion)) return res.status(400).json({ error: 'El comentario contiene palabras inapropiadas' })
-  const { error } = await supabase.from('Comentario').insert({ descripcion: descripcion.trim(), fecha: new Date().toISOString(), id_usuario, id_viaje: parseInt(id_viaje), tipo: 'OBSERVACION' })
+  const { error } = await supabase.from('Comentario').insert({
+    descripcion: descripcion.trim(),
+    fecha: new Date().toISOString(),
+    id_usuario,
+    id_viaje: parseInt(id_viaje),
+    tipo: 'OBSERVACION',
+  })
   if (error) return res.status(500).json({ error: error.message })
   return res.json({ message: 'Comentario agregado correctamente' })
 })
