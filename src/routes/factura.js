@@ -6,6 +6,7 @@ const multer = require('multer')
 const FormData = require('form-data')
 const axios = require('axios')
 const Groq = require('groq-sdk')
+const { actualizarAlcoholEnViaje } = require('../utils/alcoholUtils')
 
 const upload = multer({ storage: multer.memoryStorage() })
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
@@ -20,59 +21,6 @@ const detectarTipoDoc = (nit) => {
   return 'NIT'
 }
 
-const analizarAlcohol = async (detalles) => {
-  if (!detalles || detalles.length === 0) return false
-  try {
-    const productos = detalles.map((d) => d.nombre_producto).join(', ')
-    const completion = await groq.chat.completions.create({
-      messages: [{
-        role: 'user',
-        content: `Analiza esta lista de productos y responde SOLO con "true" si alguno es una bebida alcohólica o podría serlo, incluyendo: cervezas (Casa Real, Huari, Paceña, Ducal, Corona, Heineken, etc), vinos, whisky, ron, vodka, tequila, champagne, licor, singani, chicha, alcohol, o cualquier marca conocida de bebida alcohólica. Responde "false" si no hay ninguna. Lista: ${productos}`
-      }],
-      model: 'llama-3.3-70b-versatile',
-      max_tokens: 10,
-    })
-    const respuesta = completion.choices[0]?.message?.content?.trim().toLowerCase()
-    return respuesta === 'true'
-  } catch (e) {
-    console.warn('Groq error al analizar alcohol:', e.message)
-    return false
-  }
-}
-
-const actualizarAlcoholEnViaje = async (id_viaje) => {
-  const { data: gastos } = await supabase
-    .from('Gasto')
-    .select('id_gasto')
-    .eq('id_viaje', id_viaje)
-
-  if (!gastos || gastos.length === 0) return false
-
-  const idsGastos = gastos.map((g) => g.id_gasto)
-
-  const { data: facturas } = await supabase
-    .from('Factura')
-    .select('id_factura')
-    .in('id_gasto', idsGastos)
-
-  if (!facturas || facturas.length === 0) return false
-
-  const idsFacturas = facturas.map((f) => f.id_factura)
-
-  const { data: detalles } = await supabase
-    .from('Detalle_Factura')
-    .select('nombre_producto')
-    .in('id_factura', idsFacturas)
-
-  if (!detalles || detalles.length === 0) return false
-
-  const resultado = await analizarAlcohol(detalles)
-
-  await supabase.from('Viaje').update({ tiene_alcohol: resultado }).eq('id_viaje', id_viaje)
-
-  return resultado
-}
-
 router.post('/extraer', authMiddleware, upload.single('factura'), async (req, res) => {
   try {
     const formData = new FormData()
@@ -85,7 +33,7 @@ router.post('/extraer', authMiddleware, upload.single('factura'), async (req, re
     formData.append('OCREngine', '2')
 
     const ocrResponse = await axios.post('https://api.ocr.space/parse/image', formData, {
-      headers: { ...formData.getHeaders(), apikey: process.env.OCR_SPACE_API_KEY }
+      headers: { ...formData.getHeaders(), apikey: process.env.OCR_SPACE_API_KEY },
     })
 
     const texto = ocrResponse.data?.ParsedResults?.[0]?.ParsedText || ''
@@ -130,7 +78,6 @@ ${texto}`
       tipo_doc: datos.tipo_doc || 'F',
       detalle: datos.detalle || [],
     })
-
   } catch (error) {
     console.log('Error extrayendo factura:', error)
     return res.status(500).json({ error: 'Error al procesar la factura' })
@@ -204,12 +151,12 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
         await supabase.from('Gasto').delete().eq('id_gasto', gasto.id_gasto)
         return res.status(500).json({ error: detalleError.message })
       }
+    }
 
-      try {
-        await actualizarAlcoholEnViaje(datos.id_viaje)
-      } catch (e) {
-        console.warn('Error analizando alcohol:', e.message)
-      }
+    try {
+      await actualizarAlcoholEnViaje(datos.id_viaje)
+    } catch (e) {
+      console.warn('Error alcohol:', e.message)
     }
 
     if (datos.iva && datos.iva > 0) {
@@ -239,7 +186,6 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
     }
 
     return res.json({ message: 'Factura guardada correctamente', gasto })
-
   } catch (error) {
     console.log('Error guardando factura:', error.message)
     return res.status(500).json({ error: error.message || 'Error al guardar la factura' })
@@ -289,28 +235,27 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
       await supabase.from('Factura').update({
         numero_factura: datos.numero_factura,
         fecha_emision: datos.fecha_emision,
-        monto_parcial: datos.monto
+        monto_parcial: datos.monto,
       }).eq('id_factura', facturaExistente.id_factura)
 
-      if (datos.detalle && datos.detalle.length > 0) {
-        await supabase.from('Detalle_Factura').delete().eq('id_factura', facturaExistente.id_factura)
+      await supabase.from('Detalle_Factura').delete().eq('id_factura', facturaExistente.id_factura)
 
+      if (datos.detalle && datos.detalle.length > 0) {
         const detalles = datos.detalle.map((d) => ({
           nombre_producto: d.nombre_producto,
           cantidad: d.cantidad,
           precio: d.precio,
           id_factura: facturaExistente.id_factura,
         }))
-
         await supabase.from('Detalle_Factura').insert(detalles)
+      }
+    }
 
-        if (datos.id_viaje) {
-          try {
-            await actualizarAlcoholEnViaje(datos.id_viaje)
-          } catch (e) {
-            console.warn('Error analizando alcohol:', e.message)
-          }
-        }
+    if (datos.id_viaje) {
+      try {
+        await actualizarAlcoholEnViaje(datos.id_viaje)
+      } catch (e) {
+        console.warn('Error alcohol:', e.message)
       }
     }
 
@@ -326,7 +271,6 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
     }
 
     return res.json({ message: 'Factura actualizada correctamente' })
-
   } catch (error) {
     console.log('Error actualizando factura:', error.message)
     return res.status(500).json({ error: error.message || 'Error al actualizar la factura' })

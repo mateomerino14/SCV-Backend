@@ -82,11 +82,28 @@ router.get('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (req, r
 })
 
 router.put('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (req, res) => {
-  if (req.body.contrasenia) {
-    req.body.contrasenia = bcrypt.hashSync(req.body.contrasenia, saltRounds)
+  const id_usuario = req.params.id
+
+  const { data: usuarioActual } = await supabase
+    .from('Usuario')
+    .select('id_rol, activo')
+    .eq('id_usuario', id_usuario)
+    .single()
+
+  const payload = { ...req.body }
+  if (payload.contrasenia) {
+    payload.contrasenia = bcrypt.hashSync(payload.contrasenia, saltRounds)
   }
+
+  const rolCambio = usuarioActual && payload.id_rol && payload.id_rol !== usuarioActual.id_rol
+  const suspendido = usuarioActual && payload.activo === false && usuarioActual.activo === true
+
+  if (rolCambio || suspendido) {
+    payload.refresh_token_invalido_desde = new Date().toISOString()
+  }
+
   const { data, error } = await supabase
-    .from('Usuario').update(req.body).eq('id_usuario', req.params.id).select()
+    .from('Usuario').update(payload).eq('id_usuario', id_usuario).select()
   if (error) return res.status(500).json({ error: error.message })
   return res.json(data)
 })
@@ -141,7 +158,13 @@ router.patch('/:id/activar', authMiddleware, roleMiddleware(['ADMINISTRADOR']), 
 
 router.patch('/:id/suspender', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (req, res) => {
   const { data, error } = await supabase
-    .from('Usuario').update({ activo: false }).eq('id_usuario', req.params.id).select()
+    .from('Usuario')
+    .update({
+      activo: false,
+      refresh_token_invalido_desde: new Date().toISOString(),
+    })
+    .eq('id_usuario', req.params.id)
+    .select()
   if (error) return res.status(500).json({ error: error.message })
   return res.json(data)
 })

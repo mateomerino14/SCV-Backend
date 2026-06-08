@@ -23,7 +23,10 @@ async function authMiddleware(req, res, next) {
     req.user = decoded
     next()
   } catch (error) {
-    return res.status(400).json({ error: 'Token inválido' })
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expirado' })
+    }
+    return res.status(401).json({ error: 'Token inválido' })
   }
 }
 
