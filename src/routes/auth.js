@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken')
 const bcrypt = require('bcrypt')
 const router = require('express').Router()
 const supabase = require('../config/supabase')
-const { sendVerificationCode } = require('../utils/mailer')
+const { sendVerificationCode, validateEmailExists } = require('../utils/mailer')
 
 const generarAccessToken = (usuario, contraseniavencida = false) => {
   return jwt.sign(
@@ -47,7 +47,9 @@ router.post('/', async (req, res) => {
 
   const ahora = new Date()
   const ultimoCambio = new Date(data.ultima_cambio_contrasenia || ahora)
-  const diasTranscurridos = Math.floor((ahora - ultimoCambio) / (1000 * 60 * 60 * 24))
+  const ahoraFecha = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate())
+  const ultimoCambioFecha = new Date(ultimoCambio.getFullYear(), ultimoCambio.getMonth(), ultimoCambio.getDate())
+  const diasTranscurridos = Math.floor((ahoraFecha - ultimoCambioFecha) / (1000 * 60 * 60 * 24))
   const contraseniavencida = diasTranscurridos >= 90
 
   await supabase
@@ -91,7 +93,9 @@ router.post('/refresh', async (req, res) => {
 
     const ahora = new Date()
     const ultimoCambio = new Date(usuario.ultima_cambio_contrasenia || ahora)
-    const diasTranscurridos = Math.floor((ahora - ultimoCambio) / (1000 * 60 * 60 * 24))
+    const ahoraFecha = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate())
+    const ultimoCambioFecha = new Date(ultimoCambio.getFullYear(), ultimoCambio.getMonth(), ultimoCambio.getDate())
+    const diasTranscurridos = Math.floor((ahoraFecha - ultimoCambioFecha) / (1000 * 60 * 60 * 24))
     const contraseniavencida = diasTranscurridos >= 90
 
     const nuevoAccessToken = generarAccessToken(usuario, contraseniavencida)
@@ -117,9 +121,20 @@ router.post('/send-code', async (req, res) => {
       .eq('email_corporativo', email_corporativo)
       .single()
 
-    if (userError || !usuario) return res.status(404).json({ error: 'Usuario no encontrado' })
+    if (userError || !usuario) {
+      return res.status(404).json({ error: 'Usuario no encontrado' })
+    }
 
-    await supabase.from('Codigo_Verificacion').update({ activo: false }).eq('id_usuario', usuario.id_usuario)
+    const { valid, reason } = await validateEmailExists(email_corporativo)
+
+    if (!valid) {
+      return res.status(400).json({ error: reason || 'El correo no existe o no puede recibir mensajes' })
+    }
+
+    await supabase
+      .from('Codigo_Verificacion')
+      .update({ activo: false })
+      .eq('id_usuario', usuario.id_usuario)
 
     const generateUniqueCode = async () => {
       let unique = false
@@ -127,7 +142,11 @@ router.post('/send-code', async (req, res) => {
       while (!unique) {
         code = Math.floor(1000000 + Math.random() * 9000000).toString()
         const { data: existing } = await supabase
-          .from('Codigo_Verificacion').select('id_codigo').eq('codigo', code).eq('activo', true).single()
+          .from('Codigo_Verificacion')
+          .select('id_codigo')
+          .eq('codigo', code)
+          .eq('activo', true)
+          .single()
         if (!existing) unique = true
       }
       return code
@@ -154,12 +173,19 @@ router.post('/verify-code', async (req, res) => {
   const { email_corporativo, codigo } = req.body
 
   const { data: usuario, error: userError } = await supabase
-    .from('Usuario').select('id_usuario').eq('email_corporativo', email_corporativo).single()
+    .from('Usuario')
+    .select('id_usuario')
+    .eq('email_corporativo', email_corporativo)
+    .single()
 
   if (userError || !usuario) return res.status(404).json({ error: 'Usuario no encontrado' })
 
   const { data: codeData, error: codeError } = await supabase
-    .from('Codigo_Verificacion').select('*').eq('id_usuario', usuario.id_usuario).eq('activo', true).single()
+    .from('Codigo_Verificacion')
+    .select('*')
+    .eq('id_usuario', usuario.id_usuario)
+    .eq('activo', true)
+    .single()
 
   if (codeError || !codeData) return res.status(400).json({ error: 'Código no encontrado' })
 
@@ -173,7 +199,10 @@ router.post('/verify-code', async (req, res) => {
   await supabase.from('Codigo_Verificacion').update({ activo: false }).eq('id_codigo', codeData.id_codigo)
 
   const { data: usuarioCompleto } = await supabase
-    .from('Usuario').select('*').eq('id_usuario', usuario.id_usuario).single()
+    .from('Usuario')
+    .select('*')
+    .eq('id_usuario', usuario.id_usuario)
+    .single()
 
   await supabase
     .from('Usuario')

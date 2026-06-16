@@ -1,7 +1,39 @@
 const SibApiV3Sdk = require('sib-api-v3-sdk')
+const axios = require('axios')
 
 const defaultClient = SibApiV3Sdk.ApiClient.instance
 defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY
+
+const validateEmailExists = async (email) => {
+  try {
+    console.log('API KEY:', process.env.ABSTRACT_EMAIL_API_KEY)
+    const res = await axios.get('https://emailreputation.abstractapi.com/v1/', {
+      params: {
+        api_key: process.env.ABSTRACT_EMAIL_API_KEY,
+        email,
+      },
+    })
+
+    const { email_deliverability } = res.data
+
+    if (!email_deliverability?.is_format_valid) {
+      return { valid: false, reason: 'Formato de correo inválido' }
+    }
+
+    if (!email_deliverability?.is_mx_valid) {
+      return { valid: false, reason: 'El dominio del correo no existe' }
+    }
+
+    if (email_deliverability?.status === 'undeliverable') {
+      return { valid: false, reason: 'El correo no existe o no puede recibir mensajes' }
+    }
+
+    return { valid: true }
+  } catch (error) {
+    console.warn('Email validation error:', error.message)
+    return { valid: true }
+  }
+}
 
 const sendVerificationCode = async (toEmail, nombre, code) => {
   const api = new SibApiV3Sdk.TransactionalEmailsApi()
@@ -25,4 +57,4 @@ const sendVerificationCode = async (toEmail, nombre, code) => {
   })
 }
 
-module.exports = { sendVerificationCode }
+module.exports = { sendVerificationCode, validateEmailExists }

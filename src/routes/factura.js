@@ -96,15 +96,26 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
     if (!datos.id_viaje) return res.status(400).json({ error: 'El viaje asociado es requerido' })
 
     let id_proveedor = null
-    const { data: proveedorExistente } = await supabase.from('Proveedor').select('id_proveedor').eq('nombre', datos.proveedor).single()
+    const { data: proveedorExistente } = await supabase
+      .from('Proveedor')
+      .select('id_proveedor')
+      .eq('nombre', datos.proveedor)
+      .single()
 
     if (proveedorExistente) {
       id_proveedor = proveedorExistente.id_proveedor
       if (datos.nit) {
-        await supabase.from('Proveedor').update({ numero_doc_fiscal: datos.nit, tipo_doc_fiscal: detectarTipoDoc(datos.nit) }).eq('id_proveedor', proveedorExistente.id_proveedor)
+        await supabase
+          .from('Proveedor')
+          .update({ numero_doc_fiscal: datos.nit, tipo_doc_fiscal: detectarTipoDoc(datos.nit) })
+          .eq('id_proveedor', proveedorExistente.id_proveedor)
       }
     } else {
-      const { data: nuevoProv, error: provError } = await supabase.from('Proveedor').insert({ nombre: datos.proveedor, numero_doc_fiscal: datos.nit || null, tipo_doc_fiscal: detectarTipoDoc(datos.nit) }).select().single()
+      const { data: nuevoProv, error: provError } = await supabase
+        .from('Proveedor')
+        .insert({ nombre: datos.proveedor, numero_doc_fiscal: datos.nit || null, tipo_doc_fiscal: detectarTipoDoc(datos.nit) })
+        .select()
+        .single()
       if (provError) return res.status(500).json({ error: provError.message })
       id_proveedor = nuevoProv?.id_proveedor
     }
@@ -127,13 +138,21 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
 
     const { data: facturaData, error: facturaError } = await supabase
       .from('Factura')
-      .insert({ numero_factura: datos.numero_factura, fecha_emision: datos.fecha_emision, monto_parcial: datos.monto, id_gasto: gasto.id_gasto })
+      .insert({
+        numero_factura: datos.numero_factura,
+        fecha_emision: datos.fecha_emision,
+        monto_parcial: datos.monto,
+        id_gasto: gasto.id_gasto,
+        id_proveedor,
+      })
       .select()
       .single()
 
     if (facturaError) {
       await supabase.from('Gasto').delete().eq('id_gasto', gasto.id_gasto)
-      if (facturaError.code === '23505') return res.status(400).json({ error: `La factura número ${datos.numero_factura} ya fue registrada anteriormente` })
+      if (facturaError.code === '23505') {
+        return res.status(400).json({ error: `La factura número ${datos.numero_factura} de este proveedor ya fue registrada para esta fecha` })
+      }
       return res.status(500).json({ error: facturaError.message })
     }
 
@@ -164,21 +183,34 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
       const nombreIva = `IVA ${porcentaje}%`
       let id_impuesto = null
 
-      const { data: impuestoExistente } = await supabase.from('Impuesto').select('id_impuesto').eq('porcentaje', porcentaje).single()
+      const { data: impuestoExistente } = await supabase
+        .from('Impuesto')
+        .select('id_impuesto')
+        .eq('porcentaje', porcentaje)
+        .single()
+
       if (impuestoExistente) {
         id_impuesto = impuestoExistente.id_impuesto
       } else {
-        const { data: nuevoImpuesto, error: impuestoError } = await supabase.from('Impuesto').insert({ nombre: nombreIva, porcentaje }).select().single()
+        const { data: nuevoImpuesto, error: impuestoError } = await supabase
+          .from('Impuesto')
+          .insert({ nombre: nombreIva, porcentaje })
+          .select()
+          .single()
         if (!impuestoError) id_impuesto = nuevoImpuesto.id_impuesto
       }
 
-      if (id_impuesto) await supabase.from('Factura_Impuestos').insert({ id_factura: facturaData.id_factura, id_impuesto })
+      if (id_impuesto) {
+        await supabase.from('Factura_Impuestos').insert({ id_factura: facturaData.id_factura, id_impuesto })
+      }
     }
 
     if (req.file) {
       const extension = req.file.originalname.split('.').pop()
       const fileName = `facturas/${gasto.id_gasto}_${Date.now()}.${extension}`
-      const { error: storageError } = await supabase.storage.from('facturas').upload(fileName, req.file.buffer, { contentType: req.file.mimetype })
+      const { error: storageError } = await supabase.storage
+        .from('facturas')
+        .upload(fileName, req.file.buffer, { contentType: req.file.mimetype })
       if (!storageError) {
         const { data: urlData } = supabase.storage.from('facturas').getPublicUrl(fileName)
         await supabase.from('Imagen').insert({ url_archivo: urlData.publicUrl, id_gasto: gasto.id_gasto })
@@ -202,15 +234,26 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
     if (!datos.monto_total || isNaN(parseFloat(datos.monto_total))) return res.status(400).json({ error: 'El monto total es requerido' })
 
     let id_proveedor = null
-    const { data: proveedorExistente } = await supabase.from('Proveedor').select('id_proveedor').eq('nombre', datos.proveedor).single()
+    const { data: proveedorExistente } = await supabase
+      .from('Proveedor')
+      .select('id_proveedor')
+      .eq('nombre', datos.proveedor)
+      .single()
 
     if (proveedorExistente) {
       id_proveedor = proveedorExistente.id_proveedor
       if (datos.nit) {
-        await supabase.from('Proveedor').update({ numero_doc_fiscal: datos.nit, tipo_doc_fiscal: detectarTipoDoc(datos.nit) }).eq('id_proveedor', proveedorExistente.id_proveedor)
+        await supabase
+          .from('Proveedor')
+          .update({ numero_doc_fiscal: datos.nit, tipo_doc_fiscal: detectarTipoDoc(datos.nit) })
+          .eq('id_proveedor', proveedorExistente.id_proveedor)
       }
     } else {
-      const { data: nuevoProv, error: provError } = await supabase.from('Proveedor').insert({ nombre: datos.proveedor, numero_doc_fiscal: datos.nit || null, tipo_doc_fiscal: detectarTipoDoc(datos.nit) }).select().single()
+      const { data: nuevoProv, error: provError } = await supabase
+        .from('Proveedor')
+        .insert({ nombre: datos.proveedor, numero_doc_fiscal: datos.nit || null, tipo_doc_fiscal: detectarTipoDoc(datos.nit) })
+        .select()
+        .single()
       if (provError) return res.status(500).json({ error: provError.message })
       id_proveedor = nuevoProv?.id_proveedor
     }
@@ -229,14 +272,29 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
 
     if (gastoError) return res.status(500).json({ error: gastoError.message })
 
-    const { data: facturaExistente } = await supabase.from('Factura').select('id_factura').eq('id_gasto', id_gasto).single()
+    const { data: facturaExistente } = await supabase
+      .from('Factura')
+      .select('id_factura')
+      .eq('id_gasto', id_gasto)
+      .single()
 
     if (facturaExistente) {
-      await supabase.from('Factura').update({
-        numero_factura: datos.numero_factura,
-        fecha_emision: datos.fecha_emision,
-        monto_parcial: datos.monto,
-      }).eq('id_factura', facturaExistente.id_factura)
+      const { error: facturaUpdateError } = await supabase
+        .from('Factura')
+        .update({
+          numero_factura: datos.numero_factura,
+          fecha_emision: datos.fecha_emision,
+          monto_parcial: datos.monto,
+          id_proveedor,
+        })
+        .eq('id_factura', facturaExistente.id_factura)
+
+      if (facturaUpdateError) {
+        if (facturaUpdateError.code === '23505') {
+          return res.status(400).json({ error: `La factura número ${datos.numero_factura} de este proveedor ya fue registrada para esta fecha` })
+        }
+        return res.status(500).json({ error: facturaUpdateError.message })
+      }
 
       await supabase.from('Detalle_Factura').delete().eq('id_factura', facturaExistente.id_factura)
 
@@ -259,11 +317,20 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
         const nombreIva = `IVA ${porcentaje}%`
         let id_impuesto = null
 
-        const { data: impuestoExistente } = await supabase.from('Impuesto').select('id_impuesto').eq('porcentaje', porcentaje).single()
+        const { data: impuestoExistente } = await supabase
+          .from('Impuesto')
+          .select('id_impuesto')
+          .eq('porcentaje', porcentaje)
+          .single()
+
         if (impuestoExistente) {
           id_impuesto = impuestoExistente.id_impuesto
         } else {
-          const { data: nuevoImpuesto } = await supabase.from('Impuesto').insert({ nombre: nombreIva, porcentaje }).select().single()
+          const { data: nuevoImpuesto } = await supabase
+            .from('Impuesto')
+            .insert({ nombre: nombreIva, porcentaje })
+            .select()
+            .single()
           if (nuevoImpuesto) id_impuesto = nuevoImpuesto.id_impuesto
         }
 
@@ -285,7 +352,9 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
       await supabase.from('Imagen').delete().eq('id_gasto', id_gasto)
       const extension = req.file.originalname.split('.').pop()
       const fileName = `facturas/${id_gasto}_${Date.now()}.${extension}`
-      const { error: storageError } = await supabase.storage.from('facturas').upload(fileName, req.file.buffer, { contentType: req.file.mimetype })
+      const { error: storageError } = await supabase.storage
+        .from('facturas')
+        .upload(fileName, req.file.buffer, { contentType: req.file.mimetype })
       if (!storageError) {
         const { data: urlData } = supabase.storage.from('facturas').getPublicUrl(fileName)
         await supabase.from('Imagen').insert({ url_archivo: urlData.publicUrl, id_gasto })
