@@ -22,6 +22,7 @@ router.get('/pendientes', authMiddleware, roleMiddleware(['SUPERVISOR']), async 
     .from('Viaje')
     .select(`*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre)), Gasto(monto_total)`)
     .eq('estado', 'EN_REVISION')
+    .is('id_supervisor_asignado', null)
     .neq('id_usuario', id_supervisor)
 
   if (fecha_inicio) query = query.gte('fecha_inicio', fecha_inicio)
@@ -41,15 +42,14 @@ router.get('/pendientes', authMiddleware, roleMiddleware(['SUPERVISOR']), async 
   }))
 })
 
-router.get('/historial', authMiddleware, roleMiddleware(['SUPERVISOR']), async (req, res) => {
+router.get('/mis-revisiones', authMiddleware, roleMiddleware(['SUPERVISOR']), async (req, res) => {
   const id_supervisor = req.user.id_usuario
   const { fecha_inicio, fecha_fin, id_empleado } = req.query
 
   let query = supabase
     .from('Viaje')
     .select(`*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre)), Gasto(monto_total), Comentario(*)`)
-    .in('estado', ['APROBADO_SUPERVISOR', 'APROBADO_FINAL', 'RECHAZADO'])
-    .neq('id_usuario', id_supervisor)
+    .eq('id_supervisor_asignado', id_supervisor)
 
   if (fecha_inicio) query = query.gte('fecha_inicio', fecha_inicio)
   if (fecha_fin) query = query.lte('fecha_fin', fecha_fin)
@@ -58,14 +58,66 @@ router.get('/historial', authMiddleware, roleMiddleware(['SUPERVISOR']), async (
   const { data, error } = await query.order('fecha_inicio', { ascending: false })
   if (error) return res.status(500).json({ error: error.message })
 
-  return res.json((data || []).map((viaje) => ({
-    ...viaje,
-    gastoAcumulado: (viaje.Gasto || []).reduce((sum, g) => sum + parseFloat(g.monto_total || 0), 0),
-  })))
+  return res.json((data || []).map((viaje) => {
+    const gastoAcumulado = (viaje.Gasto || []).reduce((sum, g) => sum + parseFloat(g.monto_total || 0), 0)
+    const excedePresupuesto = gastoAcumulado > parseFloat(viaje.monto_asignado)
+    const alertas = []
+    if (excedePresupuesto) alertas.push('EXCESO_PRESUPUESTO')
+    if (viaje.tiene_alcohol === true) alertas.push('ALCOHOL')
+    return { ...viaje, gastoAcumulado, excedePresupuesto, alertas, estadoRevision: alertas.length > 0 ? 'OBSERVADO' : 'CONFORME' }
+  }))
+})
+
+router.post('/:id_viaje/tomar', authMiddleware, roleMiddleware(['SUPERVISOR']), async (req, res) => {
+  const { id_viaje } = req.params
+  const id_supervisor = req.user.id_usuario
+
+  const { data: viaje } = await supabase
+    .from('Viaje')
+    .select('estado, id_usuario, id_supervisor_asignado')
+    .eq('id_viaje', id_viaje)
+    .single()
+
+  if (!viaje) return res.status(404).json({ error: 'Viaje no encontrado' })
+  if (viaje.estado !== 'EN_REVISION') return res.status(400).json({ error: 'Este viaje no está en revisión' })
+  if (viaje.id_usuario === id_supervisor) return res.status(403).json({ error: 'No puedes revisar tu propio viaje' })
+  if (viaje.id_supervisor_asignado) return res.status(409).json({ error: 'Este viaje ya fue tomado por otro supervisor' })
+
+  const { error } = await supabase
+    .from('Viaje')
+    .update({ id_supervisor_asignado: id_supervisor })
+    .eq('id_viaje', id_viaje)
+
+  if (error) return res.status(500).json({ error: error.message })
+  return res.json({ message: 'Viaje tomado correctamente' })
+})
+
+router.post('/:id_viaje/devolver', authMiddleware, roleMiddleware(['SUPERVISOR']), async (req, res) => {
+  const { id_viaje } = req.params
+  const id_supervisor = req.user.id_usuario
+
+  const { data: viaje } = await supabase
+    .from('Viaje')
+    .select('id_supervisor_asignado, estado')
+    .eq('id_viaje', id_viaje)
+    .single()
+
+  if (!viaje) return res.status(404).json({ error: 'Viaje no encontrado' })
+  if (viaje.id_supervisor_asignado !== id_supervisor) return res.status(403).json({ error: 'No puedes devolver un viaje que no tomaste' })
+  if (viaje.estado !== 'EN_REVISION') return res.status(400).json({ error: 'No puedes devolver un viaje ya procesado' })
+
+  const { error } = await supabase
+    .from('Viaje')
+    .update({ id_supervisor_asignado: null })
+    .eq('id_viaje', id_viaje)
+
+  if (error) return res.status(500).json({ error: error.message })
+  return res.json({ message: 'Viaje devuelto correctamente' })
 })
 
 router.get('/:id_viaje', authMiddleware, roleMiddleware(['SUPERVISOR']), async (req, res) => {
   const { id_viaje } = req.params
+  const id_supervisor = req.user.id_usuario
 
   const { data: viaje, error: viajeError } = await supabase
     .from('Viaje')
@@ -74,6 +126,16 @@ router.get('/:id_viaje', authMiddleware, roleMiddleware(['SUPERVISOR']), async (
     .single()
 
   if (viajeError) return res.status(500).json({ error: viajeError.message })
+  if (!viaje) return res.status(404).json({ error: 'Viaje no encontrado' })
+
+  if (viaje.id_supervisor_asignado && viaje.id_supervisor_asignado !== id_supervisor) {
+    const { data: supervisor } = await supabase
+      .from('Usuario')
+      .select('nombre, apellido_paterno')
+      .eq('id_usuario', viaje.id_supervisor_asignado)
+      .single()
+    return res.status(403).json({ error: `Este viaje está siendo revisado por ${supervisor?.nombre} ${supervisor?.apellido_paterno}` })
+  }
 
   const { data: gastos } = await supabase
     .from('Gasto')
@@ -84,6 +146,7 @@ router.get('/:id_viaje', authMiddleware, roleMiddleware(['SUPERVISOR']), async (
     .from('Comentario')
     .select('*')
     .eq('id_viaje', id_viaje)
+    .eq('id_usuario', id_supervisor)
     .order('fecha', { ascending: false })
 
   const gastoAcumulado = (gastos || []).reduce((sum, g) => sum + parseFloat(g.monto_total || 0), 0)
@@ -97,24 +160,44 @@ router.get('/:id_viaje', authMiddleware, roleMiddleware(['SUPERVISOR']), async (
 
 router.post('/:id_viaje/aprobar', authMiddleware, roleMiddleware(['SUPERVISOR']), async (req, res) => {
   const { id_viaje } = req.params
-  const { error } = await supabase.from('Viaje').update({ estado: 'APROBADO_SUPERVISOR' }).eq('id_viaje', id_viaje)
+  const id_supervisor = req.user.id_usuario
+
+  const { data: viaje } = await supabase
+    .from('Viaje').select('id_usuario, id_supervisor_asignado').eq('id_viaje', id_viaje).single()
+
+  if (viaje?.id_usuario === id_supervisor) return res.status(403).json({ error: 'No puedes aprobar tu propio viaje' })
+  if (viaje?.id_supervisor_asignado !== id_supervisor) return res.status(403).json({ error: 'No tienes permiso para aprobar este viaje' })
+
+  const { error } = await supabase
+    .from('Viaje').update({ estado: 'APROBADO_SUPERVISOR' }).eq('id_viaje', id_viaje)
   if (error) return res.status(500).json({ error: error.message })
   return res.json({ message: 'Viaje aprobado correctamente' })
 })
 
 router.post('/:id_viaje/rechazar', authMiddleware, roleMiddleware(['SUPERVISOR']), async (req, res) => {
   const { id_viaje } = req.params
-  const { observaciones } = req.body
-  const id_usuario = req.user.id_usuario
-  if (!observaciones || observaciones.length === 0) return res.status(400).json({ error: 'Las observaciones son requeridas para rechazar' })
-  for (const obs of observaciones) {
-    if (contieneMalasPalabras(obs)) return res.status(400).json({ error: 'Las observaciones contienen palabras inapropiadas' })
+  const id_supervisor = req.user.id_usuario
+
+  const { data: viaje } = await supabase
+    .from('Viaje').select('id_usuario, id_supervisor_asignado').eq('id_viaje', id_viaje).single()
+
+  if (viaje?.id_usuario === id_supervisor) return res.status(403).json({ error: 'No puedes rechazar tu propio viaje' })
+  if (viaje?.id_supervisor_asignado !== id_supervisor) return res.status(403).json({ error: 'No tienes permiso para rechazar este viaje' })
+
+  const { data: obsExistentes } = await supabase
+    .from('Comentario')
+    .select('id_comentario')
+    .eq('id_viaje', id_viaje)
+    .eq('id_usuario', id_supervisor)
+    .eq('tipo', 'OBSERVACION')
+
+  if (!obsExistentes || obsExistentes.length === 0) {
+    return res.status(400).json({ error: 'Debes agregar al menos una observación antes de rechazar' })
   }
-  const { error: updateError } = await supabase.from('Viaje').update({ estado: 'RECHAZADO' }).eq('id_viaje', id_viaje)
+
+  const { error: updateError } = await supabase
+    .from('Viaje').update({ estado: 'RECHAZADO', id_supervisor_asignado: null }).eq('id_viaje', id_viaje)
   if (updateError) return res.status(500).json({ error: updateError.message })
-  for (const obs of observaciones) {
-    await supabase.from('Comentario').insert({ descripcion: obs, fecha: new Date().toISOString(), id_usuario, id_viaje: parseInt(id_viaje), tipo: 'OBSERVACION' })
-  }
   return res.json({ message: 'Viaje rechazado correctamente' })
 })
 
@@ -125,7 +208,13 @@ router.post('/:id_viaje/comentario', authMiddleware, roleMiddleware(['SUPERVISOR
   if (!descripcion || descripcion.trim() === '') return res.status(400).json({ error: 'La descripción es requerida' })
   if (descripcion.length > 300) return res.status(400).json({ error: 'El comentario no puede superar los 300 caracteres' })
   if (contieneMalasPalabras(descripcion)) return res.status(400).json({ error: 'El comentario contiene palabras inapropiadas' })
-  const { error } = await supabase.from('Comentario').insert({ descripcion: descripcion.trim(), fecha: new Date().toISOString(), id_usuario, id_viaje: parseInt(id_viaje), tipo: 'OBSERVACION' })
+  const { error } = await supabase.from('Comentario').insert({
+    descripcion: descripcion.trim(),
+    fecha: new Date().toISOString(),
+    id_usuario,
+    id_viaje: parseInt(id_viaje),
+    tipo: 'OBSERVACION',
+  })
   if (error) return res.status(500).json({ error: error.message })
   return res.json({ message: 'Comentario agregado correctamente' })
 })
