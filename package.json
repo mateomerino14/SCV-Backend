@@ -4,7 +4,7 @@
   "description": "Sistema de Control de Viaticos",
   "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js"
   },
@@ -32,7 +32,6 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "form-data": "^4.0.5",
-    "fs": "^0.0.1-security",
     "groq-sdk": "^1.2.0",
     "html-pdf-node": "^1.0.8",
     "jimp": "^0.22.12",
@@ -46,6 +45,8 @@
     "sib-api-v3-sdk": "^8.5.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2"
   }
 }
