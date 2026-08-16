@@ -13,9 +13,15 @@ router.get('/dashboard', authMiddleware, roleMiddleware(['ADMINISTRADOR']), asyn
   const usuariosActivos = usuarios?.filter((u) => u.activo).length || 0
   const totalCargos = cargos?.length || 0
   const cargosActivos = cargos?.filter((c) => c.activo).length || 0
+
+  const viajesEnRevisionViaje = viajes?.filter((v) => v.estado === 'EN_REVISION_VIAJE').length || 0
+  const viajesAprViaje = viajes?.filter((v) => v.estado === 'APROBADO_VIAJE').length || 0
+  const viajesEnRevisionTesorero = viajes?.filter((v) => v.estado === 'EN_REVISION_TESORERO').length || 0
   const viajesEnCurso = viajes?.filter((v) => v.estado === 'EN_CURSO').length || 0
   const viajesEnRevision = viajes?.filter((v) => v.estado === 'EN_REVISION').length || 0
-  const viajesAprobados = viajes?.filter((v) => v.estado === 'APROBADO').length || 0
+  const viajesAprSupervisor = viajes?.filter((v) => v.estado === 'APROBADO_SUPERVISOR').length || 0
+  const viajesAprAprobador = viajes?.filter((v) => v.estado === 'APROBADO_APROBADOR').length || 0
+  const viajesAprobados = viajes?.filter((v) => v.estado === 'APROBADO_FINAL').length || 0
   const viajesRechazados = viajes?.filter((v) => v.estado === 'RECHAZADO').length || 0
 
   const rolCount = {}
@@ -30,8 +36,13 @@ router.get('/dashboard', authMiddleware, roleMiddleware(['ADMINISTRADOR']), asyn
     usuariosActivos,
     totalCargos,
     cargosActivos,
+    viajesEnRevisionViaje,
+    viajesAprViaje,
+    viajesEnRevisionTesorero,
     viajesEnCurso,
     viajesEnRevision,
+    viajesAprSupervisor,
+    viajesAprAprobador,
     viajesAprobados,
     viajesRechazados,
     usuariosPorRol,

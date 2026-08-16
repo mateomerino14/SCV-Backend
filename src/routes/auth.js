@@ -13,7 +13,7 @@ const generarAccessToken = (usuario, contraseniavencida = false) => {
       contraseniavencida,
     },
     process.env.JWT_SECRET,
-    { expiresIn: '15m' }
+    { expiresIn: '15m' } //15m de produccion, corregir en el use menu
   )
 }
 

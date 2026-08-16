@@ -5,11 +5,17 @@ const authMiddleware = require('../middlewares/auth')
 const multer = require('multer')
 const FormData = require('form-data')
 const axios = require('axios')
+const cheerio = require('cheerio')
 const Groq = require('groq-sdk')
+const Jimp = require('jimp')
+const QrCode = require('qrcode-reader')
 const { actualizarAlcoholEnViaje } = require('../utils/alcoholUtils')
+const { validarPlazoViaje } = require('../utils/tolerancia')
 
 const upload = multer({ storage: multer.memoryStorage() })
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+
+const IVA_PORCENTAJE_BOLIVIA = 13
 
 const detectarTipoDoc = (nit) => {
   if (!nit || nit === 'No Especificado') return null
@@ -21,8 +27,179 @@ const detectarTipoDoc = (nit) => {
   return 'NIT'
 }
 
+const leerQRDesdeBuffer = async (buffer) => {
+  try {
+    const imagen = await Jimp.read(buffer)
+    const qr = new QrCode()
+    return await new Promise((resolve) => {
+      qr.callback = (err, value) => {
+        if (err || !value?.result) resolve(null)
+        else resolve(value.result)
+      }
+      qr.decode(imagen.bitmap)
+    })
+  } catch {
+    return null
+  }
+}
+
+const limpiarTexto = (t) => (t || '').replace(/\s+/g, ' ').trim()
+
+const obtenerDatosDesdeQRSiat = async (urlQR) => {
+  try {
+    const { data: html } = await axios.get(urlQR, {
+      timeout: 8000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+    })
+    const $ = cheerio.load(html)
+
+    const pares = {}
+    $('table tr').each((_, tr) => {
+      const celdas = $(tr).find('td, th')
+      if (celdas.length === 2) {
+        const label = limpiarTexto($(celdas[0]).text())
+        const valor = limpiarTexto($(celdas[1]).text())
+        if (label && label.endsWith(':')) {
+          pares[label.replace(':', '').toLowerCase()] = valor
+        }
+      }
+    })
+
+    const numeroFactura = pares['número de factura'] || pares['numero de factura'] || null
+    const cuf = pares['cuf'] || null
+    const fechaEmisionRaw = pares['fecha emisión'] || pares['fecha emision'] || null
+    const montoTotalRaw = pares['monto total'] || null
+    const nitEmisor = pares['nit emisor'] || null
+    const razonSocial = pares['razón social'] || pares['razon social'] || null
+
+    let fechaEmision = ''
+    if (fechaEmisionRaw) {
+      const soloFecha = fechaEmisionRaw.split(' ')[0]
+      const [d, m, y] = soloFecha.split('/')
+      if (d && m && y) fechaEmision = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+    }
+
+    const montoTotal = montoTotalRaw ? parseFloat(montoTotalRaw.replace(/[^\d.]/g, '')) || 0 : 0
+
+    const detalle = []
+    $('table').each((_, table) => {
+      const headerTxt = limpiarTexto($(table).find('tr').first().text()).toLowerCase()
+      if (headerTxt.includes('código') || headerTxt.includes('codigo')) {
+        $(table).find('tr').slice(1).each((_, tr) => {
+          const celdas = $(tr).find('td')
+          if (celdas.length >= 5) {
+            const nombre_producto = limpiarTexto($(celdas[1]).text())
+            const cantidad = parseFloat(limpiarTexto($(celdas[2]).text()).replace(',', '.')) || 1
+            const precioTxt = limpiarTexto($(celdas[3]).text())
+            const precio = parseFloat(precioTxt.replace(/[^\d.]/g, '')) || 0
+            if (nombre_producto) detalle.push({ nombre_producto, cantidad, precio })
+          }
+        })
+      }
+    })
+
+    if (!numeroFactura && !cuf && detalle.length === 0) return null
+
+    return {
+      proveedor: razonSocial || 'No Especificado',
+      numero_factura: numeroFactura || 'No Especificado',
+      nit: nitEmisor || null,
+      fecha_emision: fechaEmision,
+      iva: 0,
+      monto: montoTotal,
+      monto_total: montoTotal,
+      tipo_doc: 'F',
+      detalle,
+      extraido_por_qr: true,
+    }
+  } catch (e) {
+    console.warn('Error consultando QR SIAT:', e.message)
+    return null
+  }
+}
+
+const parsearQRSIAT = (qrText) => {
+  try {
+    let params = {}
+
+    if (qrText.includes('http')) {
+      const url = new URL(qrText)
+      params = Object.fromEntries(url.searchParams.entries())
+    } else if (qrText.includes('|')) {
+      const partes = qrText.split('|')
+      if (partes.length >= 4) {
+        params = {
+          nit: partes[0],
+          numeroFactura: partes[1],
+          fechaEmision: partes[2],
+          montoTotal: partes[3],
+          codigoControl: partes[4] || '',
+        }
+      }
+    } else {
+      return null
+    }
+
+    let fechaNormalizada = params.fechaEmision || params.fechaFactura || ''
+    if (fechaNormalizada.includes('/')) {
+      const [d, m, y] = fechaNormalizada.split('/')
+      fechaNormalizada = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+    }
+
+    const nit = params.nit || params.nitEmisor || null
+    const numeroFactura = params.numeroFactura || params.nroFactura || null
+    const montoTotal = parseFloat(params.montoTotal || params.monto || 0)
+
+    if (!nit && !numeroFactura && !montoTotal) return null
+
+    return {
+      nit: nit?.toString() || null,
+      numero_factura: numeroFactura?.toString() || 'No Especificado',
+      fecha_emision: fechaNormalizada || '',
+      monto_total: montoTotal,
+      monto: montoTotal,
+      iva: 0,
+      proveedor: 'No Especificado',
+      tipo_doc: 'F',
+      detalle: [],
+      extraido_por_qr: true,
+    }
+  } catch {
+    return null
+  }
+}
+
 router.post('/extraer', authMiddleware, upload.single('factura'), async (req, res) => {
   try {
+    const qrTexto = await leerQRDesdeBuffer(req.file.buffer)
+
+    if (qrTexto) {
+      let datosQR = null
+
+      if (qrTexto.includes('siat.impuestos.gob.bo')) {
+        datosQR = await obtenerDatosDesdeQRSiat(qrTexto)
+      }
+
+      if (!datosQR) {
+        datosQR = parsearQRSIAT(qrTexto)
+      }
+
+      if (datosQR) {
+        return res.json({
+          proveedor: datosQR.proveedor,
+          numero_factura: datosQR.numero_factura,
+          nit: datosQR.nit,
+          fecha_emision: datosQR.fecha_emision,
+          iva: datosQR.iva,
+          monto: datosQR.monto,
+          monto_total: datosQR.monto_total,
+          tipo_doc: datosQR.tipo_doc,
+          detalle: datosQR.detalle,
+          extraido_por_qr: true,
+        })
+      }
+    }
+
     const formData = new FormData()
     formData.append('file', req.file.buffer, {
       filename: req.file.originalname,
@@ -77,6 +254,7 @@ ${texto}`
       monto_total: datos.monto_total || 0,
       tipo_doc: datos.tipo_doc || 'F',
       detalle: datos.detalle || [],
+      extraido_por_qr: false,
     })
   } catch (error) {
     console.log('Error extrayendo factura:', error)
@@ -95,12 +273,20 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
     if (!datos.tipo_doc || !['F', 'R'].includes(datos.tipo_doc)) return res.status(400).json({ error: 'El tipo de documento debe ser Factura (F) o Recibo (R)' })
     if (!datos.id_viaje) return res.status(400).json({ error: 'El viaje asociado es requerido' })
 
+    const validacion = await validarPlazoViaje(datos.id_viaje, datos.fecha_emision)
+    if (!validacion.valido) {
+      return res.status(400).json({ error: validacion.error, requiereAutorizacion: !!validacion.requiereAutorizacion })
+    }
+
+    const nombreProveedor = datos.proveedor.trim()
+
     let id_proveedor = null
     const { data: proveedorExistente } = await supabase
       .from('Proveedor')
       .select('id_proveedor')
-      .eq('nombre', datos.proveedor)
-      .single()
+      .ilike('nombre', nombreProveedor)
+      .limit(1)
+      .maybeSingle()
 
     if (proveedorExistente) {
       id_proveedor = proveedorExistente.id_proveedor
@@ -113,7 +299,7 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
     } else {
       const { data: nuevoProv, error: provError } = await supabase
         .from('Proveedor')
-        .insert({ nombre: datos.proveedor, numero_doc_fiscal: datos.nit || null, tipo_doc_fiscal: detectarTipoDoc(datos.nit) })
+        .insert({ nombre: nombreProveedor, numero_doc_fiscal: datos.nit || null, tipo_doc_fiscal: detectarTipoDoc(datos.nit) })
         .select()
         .single()
       if (provError) return res.status(500).json({ error: provError.message })
@@ -125,7 +311,7 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
       .insert({
         monto_total: datos.monto_total,
         fecha_gasto: datos.fecha_emision,
-        descripcion: `Factura ${datos.numero_factura} - ${datos.proveedor}`,
+        descripcion: `Factura ${datos.numero_factura} - ${nombreProveedor}`,
         tipo: datos.tipo_doc,
         modificado: datos.modificado_manualmente ? true : false,
         id_viaje: datos.id_viaje,
@@ -163,7 +349,6 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
         precio: d.precio,
         id_factura: facturaData.id_factura,
       }))
-
       const { error: detalleError } = await supabase.from('Detalle_Factura').insert(detalles)
       if (detalleError) {
         await supabase.from('Factura').delete().eq('id_factura', facturaData.id_factura)
@@ -179,14 +364,13 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
     }
 
     if (datos.iva && parseFloat(datos.iva) > 0) {
-      const porcentaje = datos.monto > 0 ? parseFloat(((datos.iva / datos.monto) * 100).toFixed(2)) : 0
-      const nombreIva = `IVA ${porcentaje}%`
+      const nombreIva = `IVA ${IVA_PORCENTAJE_BOLIVIA}%`
       let id_impuesto = null
 
       const { data: impuestoExistente } = await supabase
         .from('Impuesto')
         .select('id_impuesto')
-        .eq('porcentaje', porcentaje)
+        .eq('porcentaje', IVA_PORCENTAJE_BOLIVIA)
         .single()
 
       if (impuestoExistente) {
@@ -194,7 +378,7 @@ router.post('/guardar', authMiddleware, upload.single('imagen'), async (req, res
       } else {
         const { data: nuevoImpuesto, error: impuestoError } = await supabase
           .from('Impuesto')
-          .insert({ nombre: nombreIva, porcentaje })
+          .insert({ nombre: nombreIva, porcentaje: IVA_PORCENTAJE_BOLIVIA })
           .select()
           .single()
         if (!impuestoError) id_impuesto = nuevoImpuesto.id_impuesto
@@ -233,12 +417,22 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
     if (!datos.fecha_emision) return res.status(400).json({ error: 'La fecha de emisión es requerida' })
     if (!datos.monto_total || isNaN(parseFloat(datos.monto_total))) return res.status(400).json({ error: 'El monto total es requerido' })
 
+    if (datos.id_viaje) {
+      const validacion = await validarPlazoViaje(datos.id_viaje, datos.fecha_emision)
+      if (!validacion.valido) {
+        return res.status(400).json({ error: validacion.error, requiereAutorizacion: !!validacion.requiereAutorizacion })
+      }
+    }
+
+    const nombreProveedor = datos.proveedor.trim()
+
     let id_proveedor = null
     const { data: proveedorExistente } = await supabase
       .from('Proveedor')
       .select('id_proveedor')
-      .eq('nombre', datos.proveedor)
-      .single()
+      .ilike('nombre', nombreProveedor)
+      .limit(1)
+      .maybeSingle()
 
     if (proveedorExistente) {
       id_proveedor = proveedorExistente.id_proveedor
@@ -251,7 +445,7 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
     } else {
       const { data: nuevoProv, error: provError } = await supabase
         .from('Proveedor')
-        .insert({ nombre: datos.proveedor, numero_doc_fiscal: datos.nit || null, tipo_doc_fiscal: detectarTipoDoc(datos.nit) })
+        .insert({ nombre: nombreProveedor, numero_doc_fiscal: datos.nit || null, tipo_doc_fiscal: detectarTipoDoc(datos.nit) })
         .select()
         .single()
       if (provError) return res.status(500).json({ error: provError.message })
@@ -263,7 +457,7 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
       .update({
         monto_total: parseFloat(datos.monto_total),
         fecha_gasto: datos.fecha_emision,
-        descripcion: `Factura ${datos.numero_factura} - ${datos.proveedor}`,
+        descripcion: `Factura ${datos.numero_factura} - ${nombreProveedor}`,
         tipo: datos.tipo_doc,
         modificado: true,
         id_proveedor,
@@ -311,16 +505,13 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
       await supabase.from('Factura_Impuestos').delete().eq('id_factura', facturaExistente.id_factura)
 
       if (datos.iva && parseFloat(datos.iva) > 0) {
-        const monto = parseFloat(datos.monto || 0)
-        const iva = parseFloat(datos.iva)
-        const porcentaje = monto > 0 ? parseFloat(((iva / monto) * 100).toFixed(2)) : 0
-        const nombreIva = `IVA ${porcentaje}%`
+        const nombreIva = `IVA ${IVA_PORCENTAJE_BOLIVIA}%`
         let id_impuesto = null
 
         const { data: impuestoExistente } = await supabase
           .from('Impuesto')
           .select('id_impuesto')
-          .eq('porcentaje', porcentaje)
+          .eq('porcentaje', IVA_PORCENTAJE_BOLIVIA)
           .single()
 
         if (impuestoExistente) {
@@ -328,7 +519,7 @@ router.put('/:id_gasto/actualizar', authMiddleware, upload.single('imagen'), asy
         } else {
           const { data: nuevoImpuesto } = await supabase
             .from('Impuesto')
-            .insert({ nombre: nombreIva, porcentaje })
+            .insert({ nombre: nombreIva, porcentaje: IVA_PORCENTAJE_BOLIVIA })
             .select()
             .single()
           if (nuevoImpuesto) id_impuesto = nuevoImpuesto.id_impuesto

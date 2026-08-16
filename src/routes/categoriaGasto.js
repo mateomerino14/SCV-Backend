@@ -14,7 +14,7 @@ router.get('/',authMiddleware,async(req,res)=>{
     return res.json(data);
 });
 
-router.post('/',authMiddleware,roleMiddleware(['ADMINISTRADOR,SUPERVISOR']),async(req,res)=>{  
+router.post('/',authMiddleware,roleMiddleware(['ADMINISTRADOR', 'SUPERVISOR']),async(req,res)=>{
     const {data,error}=await supabase.from('Categoria_Gasto').insert(req.body).select();
     if(error){
         return res.status(500).json({error: error.message});

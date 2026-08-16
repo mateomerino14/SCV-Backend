@@ -9,10 +9,79 @@ const roleMiddleware = require('../middlewares/roleAuth')
 
 const upload = multer({ storage: multer.memoryStorage() })
 
+const ROL_APROBADOR = 5
+const ROL_REVISOR = 4
+
+const ROLES_UNICOS = [
+  { id: ROL_APROBADOR, nombre: 'Aprobador' },
+  { id: ROL_REVISOR, nombre: 'Revisor' },
+]
+
+const CARGOS_UNICOS = [
+  'Asistente Administrativo de Seguros y Servicios',
+  'Asistente Administrativo - Cargo y Descargo de Cta. Documentada',
+  'Asistente de Caja y Tesorería',
+  'Gerente RRHH',
+  'Jefe de Recursos Humanos',
+]
+
+const normalizarCargoTexto = (nombre) =>
+  (nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+
+const CARGOS_UNICOS_NORM = CARGOS_UNICOS.map(normalizarCargoTexto)
+
+async function validarRolUnico(id_rol, id_usuario_excluir) {
+  const rolInfo = ROLES_UNICOS.find(r => r.id === parseInt(id_rol))
+  if (!rolInfo) return null
+  let query = supabase.from('Usuario').select('id_usuario').eq('id_rol', rolInfo.id).eq('activo', true)
+  if (id_usuario_excluir) query = query.neq('id_usuario', id_usuario_excluir)
+  const { data } = await query
+  if (data && data.length > 0) return `Ya existe un usuario activo con el rol de ${rolInfo.nombre}. Solo puede haber uno en el sistema.`
+  return null
+}
+
+async function validarCargoUnico(id_cargo, id_usuario_excluir) {
+  if (!id_cargo) return null
+  const { data: cargo } = await supabase.from('Cargo').select('nombre').eq('id_cargo', id_cargo).single()
+  if (!cargo) return null
+
+  const cargoNorm = normalizarCargoTexto(cargo.nombre)
+  if (!CARGOS_UNICOS_NORM.includes(cargoNorm)) return null
+
+  let query = supabase.from('Usuario').select('id_usuario, Cargo(nombre)').eq('activo', true)
+  if (id_usuario_excluir) query = query.neq('id_usuario', id_usuario_excluir)
+  const { data } = await query
+  const yaExiste = (data || []).some(u => normalizarCargoTexto(u.Cargo?.nombre) === cargoNorm)
+  if (yaExiste) return `Ya existe un usuario activo con el cargo de "${cargo.nombre}". Solo puede haber uno en el sistema.`
+  return null
+}
+
+async function liberarViajesAsignados(id_usuario) {
+  await supabase.from('Viaje')
+    .update({ id_supervisor_asignado: null })
+    .eq('id_supervisor_asignado', id_usuario)
+    .in('estado', ['EN_REVISION_VIAJE', 'EN_REVISION'])
+
+  await supabase.from('Viaje')
+    .update({ id_aprobador_asignado: null })
+    .eq('id_aprobador_asignado', id_usuario)
+    .eq('estado', 'APROBADO_VIAJE')
+
+  await supabase.from('Viaje')
+    .update({ id_revisor_asignado: null })
+    .eq('id_revisor_asignado', id_usuario)
+    .eq('estado', 'APROBADO_SUPERVISOR')
+
+  await supabase.from('Viaje')
+    .update({ id_tesorero_asignado: null })
+    .eq('id_tesorero_asignado', id_usuario)
+    .eq('estado', 'EN_REVISION_TESORERO')
+}
+
 router.get('/me', authMiddleware, async (req, res) => {
   const { data, error } = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario), Rol(nombre)')
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd), Rol(nombre)')
     .eq('id_usuario', req.user.id_usuario)
     .single()
   if (error) return res.status(500).json({ error: error.message })
@@ -23,14 +92,14 @@ router.put('/me/actualizar', authMiddleware, async (req, res) => {
   const id_usuario = req.user.id_usuario
   const { telefono, email_corporativo, foto_perfil } = req.body
   const camposActualizar = {}
-  if (telefono !== undefined) camposActualizar.telefono = telefono
+  if (telefono !== undefined) camposActualizar.telefono = telefono?.trim() || null
   if (email_corporativo !== undefined) camposActualizar.email_corporativo = email_corporativo
   if (foto_perfil !== undefined) camposActualizar.foto_perfil = foto_perfil
   const { data, error } = await supabase
     .from('Usuario')
     .update(camposActualizar)
     .eq('id_usuario', id_usuario)
-    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario)')
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd)')
     .single()
   if (error) return res.status(500).json({ error: error.message })
   return res.json(data)
@@ -50,7 +119,7 @@ router.put('/me/foto', authMiddleware, upload.single('foto'), async (req, res) =
     .from('Usuario')
     .update({ foto_perfil: urlData.publicUrl })
     .eq('id_usuario', id_usuario)
-    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario)')
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd)')
     .single()
   if (error) return res.status(500).json({ error: error.message })
   return res.json(data)
@@ -86,13 +155,30 @@ router.put('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (req
 
   const { data: usuarioActual } = await supabase
     .from('Usuario')
-    .select('id_rol, activo')
+    .select('id_rol, id_cargo, activo')
     .eq('id_usuario', id_usuario)
     .single()
 
   const payload = { ...req.body }
+
+  if (payload.telefono !== undefined) {
+    payload.telefono = payload.telefono?.trim() || null
+  }
+
   if (payload.contrasenia) {
     payload.contrasenia = bcrypt.hashSync(payload.contrasenia, saltRounds)
+  }
+
+  const rolACambiar = payload.id_rol !== undefined ? payload.id_rol : usuarioActual?.id_rol
+  const cargoACambiar = payload.id_cargo !== undefined ? payload.id_cargo : usuarioActual?.id_cargo
+  const quedaraActivo = payload.activo !== undefined ? payload.activo : usuarioActual?.activo
+
+  if (quedaraActivo) {
+    const errorRol = await validarRolUnico(rolACambiar, id_usuario)
+    if (errorRol) return res.status(400).json({ error: errorRol })
+
+    const errorCargo = await validarCargoUnico(cargoACambiar, id_usuario)
+    if (errorCargo) return res.status(400).json({ error: errorCargo })
   }
 
   const rolCambio = usuarioActual && payload.id_rol && payload.id_rol !== usuarioActual.id_rol
@@ -100,6 +186,7 @@ router.put('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (req
 
   if (rolCambio || suspendido) {
     payload.refresh_token_invalido_desde = new Date().toISOString()
+    await liberarViajesAsignados(id_usuario)
   }
 
   const { data, error } = await supabase
@@ -109,10 +196,23 @@ router.put('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (req
 })
 
 router.post('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (req, res) => {
-  if (req.body.contrasenia) {
-    req.body.contrasenia = bcrypt.hashSync(req.body.contrasenia, saltRounds)
+  const body = { ...req.body }
+
+  if (body.telefono !== undefined) {
+    body.telefono = body.telefono?.trim() || null
   }
-  const { data, error } = await supabase.from('Usuario').insert(req.body).select()
+
+  if (body.contrasenia) {
+    body.contrasenia = bcrypt.hashSync(body.contrasenia, saltRounds)
+  }
+
+  const errorRol = await validarRolUnico(body.id_rol, null)
+  if (errorRol) return res.status(400).json({ error: errorRol })
+
+  const errorCargo = await validarCargoUnico(body.id_cargo, null)
+  if (errorCargo) return res.status(400).json({ error: errorCargo })
+
+  const { data, error } = await supabase.from('Usuario').insert(body).select()
   if (error) return res.status(500).json({ error: error.message })
   return res.json(data)
 })
@@ -131,7 +231,7 @@ router.post('/check-email', async (req, res) => {
   return res.json({ exists: !!data && !error })
 })
 
-router.get('/empleados', authMiddleware, roleMiddleware(['SUPERVISOR', 'ADMINISTRADOR', 'REVISOR']), async (req, res) => {
+router.get('/empleados', authMiddleware, roleMiddleware(['SUPERVISOR', 'ADMINISTRADOR', 'REVISOR', 'APROBADOR']), async (req, res) => {
   const { data, error } = await supabase
     .from('Usuario')
     .select('id_usuario, nombre, apellido_paterno, foto_perfil')
@@ -150,6 +250,19 @@ router.get('/todos', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (r
 })
 
 router.patch('/:id/activar', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (req, res) => {
+  const id_usuario = req.params.id
+
+  const { data: usuario } = await supabase
+    .from('Usuario').select('id_rol, id_cargo').eq('id_usuario', id_usuario).single()
+
+  if (usuario) {
+    const errorRol = await validarRolUnico(usuario.id_rol, id_usuario)
+    if (errorRol) return res.status(400).json({ error: errorRol })
+
+    const errorCargo = await validarCargoUnico(usuario.id_cargo, id_usuario)
+    if (errorCargo) return res.status(400).json({ error: errorCargo })
+  }
+
   const { data, error } = await supabase
     .from('Usuario').update({ activo: true }).eq('id_usuario', req.params.id).select()
   if (error) return res.status(500).json({ error: error.message })
@@ -157,6 +270,7 @@ router.patch('/:id/activar', authMiddleware, roleMiddleware(['ADMINISTRADOR']), 
 })
 
 router.patch('/:id/suspender', authMiddleware, roleMiddleware(['ADMINISTRADOR']), async (req, res) => {
+  await liberarViajesAsignados(req.params.id)
   const { data, error } = await supabase
     .from('Usuario')
     .update({
@@ -167,6 +281,16 @@ router.patch('/:id/suspender', authMiddleware, roleMiddleware(['ADMINISTRADOR'])
     .select()
   if (error) return res.status(500).json({ error: error.message })
   return res.json(data)
+})
+
+router.get('/mi-cargo', authMiddleware, async (req, res) => {
+  const { data, error } = await supabase
+    .from('Usuario')
+    .select('Cargo(nombre)')
+    .eq('id_usuario', req.user.id_usuario)
+    .single()
+  if (error) return res.status(500).json({ error: error.message })
+  return res.json({ cargo: data?.Cargo?.nombre || null })
 })
 
 module.exports = router;
