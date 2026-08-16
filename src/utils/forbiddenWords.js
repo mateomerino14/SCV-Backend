@@ -1,4 +1,4 @@
-const palabrasProhibidas = [
+const forbiddenWords = [
   'idiota', 'tonto', 'tonta', 'tontos', 'tontas',
   'mierda', 'mierdas', 'emierda', 'mierdera', 'mierdero',
   'imbecil', 'imbeciles', 'imbécil', 'imbéciles',
@@ -156,6 +156,6 @@ const palabrasProhibidas = [
   'farsante', 'farsantes',
   'impostor', 'impostora', 'impostores', 'impostoras',
   'charlatán', 'charlatan', 'charlatanes',
-]
+];
 
-module.exports = palabrasProhibidas;
+module.exports = forbiddenWords;
