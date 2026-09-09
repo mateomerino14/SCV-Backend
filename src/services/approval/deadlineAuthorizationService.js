@@ -2,11 +2,54 @@ const supabase = require('../../config/supabase')
 const emailService = require('../shared/emailService')
 
 const toleranceDays = 4
+const boliviaOffsetHours = -4
 
 // Formatea una fecha ISO a formato dia/mes/anio
 const formatDate = (isoString) => {
   const [year, month, day] = isoString.split('-')
   return `${day}/${month}/${year}`
+};
+
+// Obtiene la fecha calendario actual en Bolivia
+const getBoliviaToday = () => {
+  const now = new Date()
+  const boliviaTime = new Date(now.getTime() + boliviaOffsetHours * 60 * 60 * 1000)
+  return boliviaTime.toISOString().split('T')[0]
+};
+
+// Convierte un timestamp UTC a la fecha calendario en Bolivia
+const toBoliviaDate = (isoString) => {
+  const date = new Date(isoString)
+  const boliviaTime = new Date(date.getTime() + boliviaOffsetHours * 60 * 60 * 1000)
+  return boliviaTime.toISOString().split('T')[0]
+};
+
+// Suma dias a una fecha en formato YYYY-MM-DD
+const addDaysToDate = (dateStr, days) => {
+  const date = new Date(`${dateStr}T00:00:00`)
+  date.setDate(date.getDate() + days)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+};
+
+// Construye el contenido HTML base de los correos del sistema
+const buildEmailLayout = (title, accentColor, bodyContent) => {
+  return `
+    <div style="font-family: Inter, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff;">
+      <div style="border-bottom: 3px solid ${accentColor}; padding-bottom: 16px; margin-bottom: 24px;">
+        <h1 style="color: ${accentColor}; font-size: 20px; margin: 0; font-weight: bold;">Sistema de Viáticos</h1>
+        <p style="color: #475569; font-size: 13px; margin: 4px 0 0 0;">${title}</p>
+      </div>
+      ${bodyContent}
+      <div style="border-top: 1px solid #DEE2F0; margin-top: 28px; padding-top: 16px;">
+        <p style="color: #94a3b8; font-size: 11px; margin: 0; text-align: center;">
+          Este es un mensaje automático del Sistema de Control de Viáticos. Por favor no respondas a este correo.
+        </p>
+      </div>
+    </div>
+  `
 };
 
 // Obtiene los revisores activos con correo corporativo
@@ -63,12 +106,22 @@ const createRequest = async (tripId, employeeId, reason) => {
   try {
     const reviewers = await getActiveReviewers()
     const to = reviewers.map((reviewer) => ({email: reviewer.email_corporativo, name: `${reviewer.nombre} ${reviewer.apellido_paterno}`}))
-    const html = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:32px;color:#000;">
-      <h2 style="font-size:16pt;margin-bottom:12px;">Solicitud de Autorización de Plazo</h2>
-      <p style="margin-bottom:8px;">${trip.Usuario?.nombre} ${trip.Usuario?.apellido_paterno} solicita autorización para seguir registrando gastos del viaje "${trip.motivo}" fuera del plazo de tolerancia.</p>
-      <p style="margin-bottom:8px;"><strong>Motivo:</strong> ${reason.trim()}</p>
-      <p style="font-size:10pt;color:#666;margin-top:16px;">Ingresa al sistema para aprobar o rechazar esta solicitud.</p>
-    </div>`
+    const employeeName = `${trip.Usuario?.nombre} ${trip.Usuario?.apellido_paterno}`
+    const body = `
+      <p style="color: #2e2827; font-size: 14px; margin: 0 0 16px 0;">
+        <strong>${employeeName}</strong> solicita autorización para seguir registrando gastos fuera del plazo de tolerancia.
+      </p>
+      <div style="background-color: #F3F6FF; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        <p style="color: #475569; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 4px 0;">Viaje</p>
+        <p style="color: #2e2827; font-size: 14px; margin: 0 0 12px 0;">${trip.motivo}</p>
+        <p style="color: #475569; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 4px 0;">Motivo del retraso</p>
+        <p style="color: #2e2827; font-size: 14px; margin: 0;">${reason.trim()}</p>
+      </div>
+      <p style="color: #475569; font-size: 13px; margin: 0;">
+        Ingresa al sistema para aprobar o rechazar esta solicitud.
+      </p>
+    `
+    const html = buildEmailLayout('Nueva solicitud de plazo', '#870002', body)
     await emailService.sendEmail(to, `Solicitud de Autorización de Plazo — Viaje de ${trip.Usuario?.nombre}`, html)
   }
   catch (error) {
@@ -97,10 +150,9 @@ const getRequestStatus = async (tripId, employeeId) => {
     return {error: error.message, status: 500}
   }
   if (data && data.estado === 'APROBADA' && data.fecha_respuesta) {
-    const extendedLimit = new Date(data.fecha_respuesta)
-    extendedLimit.setDate(extendedLimit.getDate() + toleranceDays)
-    const today = new Date().toISOString().split('T')[0]
-    const extendedLimitStr = extendedLimit.toISOString().split('T')[0]
+    const approvalDate = toBoliviaDate(data.fecha_respuesta)
+    const extendedLimitStr = addDaysToDate(approvalDate, toleranceDays)
+    const today = getBoliviaToday()
     data.extension_vencida = today > extendedLimitStr
     data.limite_extendido = extendedLimitStr
   }
@@ -161,15 +213,26 @@ const approveRequest = async (requestId, reviewerId) => {
   try {
     const employee = request.Viaje?.Usuario
     if (employee?.email_corporativo) {
-      const startDateStr = formatDate(responseDate.toISOString().split('T')[0])
-      const extendedLimit = new Date(responseDate)
-      extendedLimit.setDate(extendedLimit.getDate() + toleranceDays)
-      const limitStr = formatDate(extendedLimit.toISOString().split('T')[0])
-      const html = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:32px;color:#000;">
-        <h2 style="font-size:16pt;margin-bottom:12px;">Autorización Aprobada</h2>
-        <p style="margin-bottom:8px;">Tu solicitud para seguir registrando gastos del viaje "${request.Viaje?.motivo}" fuera del plazo ha sido aprobada.</p>
-        <p style="margin-bottom:8px;">Ya puedes continuar registrando tus gastos. Tu nuevo plazo es del <strong>${startDateStr}</strong> al <strong>${limitStr}</strong> para completar tus registros. Si necesitas más tiempo después de esa fecha, deberás solicitar una nueva autorización.</p>
-      </div>`
+      const approvalDate = toBoliviaDate(responseDate.toISOString())
+      const startDateStr = formatDate(approvalDate)
+      const limitStr = formatDate(addDaysToDate(approvalDate, toleranceDays))
+      const body = `
+        <p style="color: #2e2827; font-size: 14px; margin: 0 0 16px 0;">
+          Tu solicitud para seguir registrando gastos fuera del plazo ha sido <strong style="color: #155724;">aprobada</strong>.
+        </p>
+        <div style="background-color: #F3F6FF; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+          <p style="color: #475569; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 4px 0;">Viaje</p>
+          <p style="color: #2e2827; font-size: 14px; margin: 0;">${request.Viaje?.motivo}</p>
+        </div>
+        <div style="background-color: #d4edda; border-radius: 12px; padding: 16px; margin-bottom: 16px; text-align: center;">
+          <p style="color: #155724; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 6px 0;">Nuevo plazo para registrar</p>
+          <p style="color: #155724; font-size: 18px; font-weight: bold; margin: 0;">${startDateStr} — ${limitStr}</p>
+        </div>
+        <p style="color: #475569; font-size: 13px; margin: 0;">
+          Ya puedes continuar registrando tus gastos. Si necesitas más tiempo después de esa fecha, deberás solicitar una nueva autorización.
+        </p>
+      `
+      const html = buildEmailLayout('Autorización de plazo aprobada', '#155724', body)
       await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Autorización Aprobada — ${request.Viaje?.motivo}`, html)
     }
   }
@@ -208,11 +271,23 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   try {
     const employee = request.Viaje?.Usuario
     if (employee?.email_corporativo) {
-      const html = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:32px;color:#000;">
-        <h2 style="font-size:16pt;margin-bottom:12px;">Autorización Rechazada</h2>
-        <p style="margin-bottom:8px;">Tu solicitud para el viaje "${request.Viaje?.motivo}" fue rechazada.</p>
-        <p style="margin-bottom:8px;"><strong>Motivo:</strong> ${observation.trim()}</p>
-      </div>`
+      const body = `
+        <p style="color: #2e2827; font-size: 14px; margin: 0 0 16px 0;">
+          Tu solicitud de autorización de plazo fue <strong style="color: #500203;">rechazada</strong>.
+        </p>
+        <div style="background-color: #F3F6FF; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+          <p style="color: #475569; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 4px 0;">Viaje</p>
+          <p style="color: #2e2827; font-size: 14px; margin: 0;">${request.Viaje?.motivo}</p>
+        </div>
+        <div style="background-color: #fde9e9; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+          <p style="color: #500203; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 6px 0;">Motivo del rechazo</p>
+          <p style="color: #500203; font-size: 14px; margin: 0;">${observation.trim()}</p>
+        </div>
+        <p style="color: #475569; font-size: 13px; margin: 0;">
+          Si consideras que hubo un error, comunícate con tu revisor asignado.
+        </p>
+      `
+      const html = buildEmailLayout('Autorización de plazo rechazada', '#D20F12', body)
       await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Autorización Rechazada — ${request.Viaje?.motivo}`, html)
     }
   }

@@ -1,15 +1,16 @@
-const FormData = require('form-data')
 const axios = require('axios')
 const cheerio = require('cheerio')
-const Groq = require('groq-sdk')
 const Jimp = require('jimp')
 const QrCode = require('qrcode-reader')
-const groqClient = new Groq({apiKey: process.env.GROQ_API_KEY})
+const {GoogleGenerativeAI} = require('@google/generative-ai')
+
+const geminiClient = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+const geminiModel = geminiClient.getGenerativeModel({model: 'gemini-3.6-flash'})
 
 // Limpia un texto quitando espacios extra
 const cleanText = (text) => {
   return (text || '').replace(/\s+/g, ' ').trim()
-};
+}
 
 // Lee el contenido de un codigo QR desde un buffer de imagen
 const readQrFromBuffer = async (buffer) => {
@@ -31,7 +32,7 @@ const readQrFromBuffer = async (buffer) => {
   catch (error) {
     return null
   }
-};
+}
 
 // Obtiene los datos de una factura consultando la pagina del QR del SIAT
 const getDataFromSiatQr = async (qrUrl) => {
@@ -91,26 +92,24 @@ const getDataFromSiatQr = async (qrUrl) => {
     if (!invoiceNumber && !cuf && details.length === 0) {
       return null
     }
-    else {
-      return {
-        proveedor: businessName || 'No Especificado',
-        numero_factura: invoiceNumber || 'No Especificado',
-        nit: issuerTaxId || null,
-        fecha_emision: issueDate,
-        iva: 0,
-        monto: totalAmount,
-        monto_total: totalAmount,
-        tipo_doc: 'F',
-        detalle: details,
-        extraido_por_qr: true,
-      }
+    return {
+      proveedor: businessName || 'No Especificado',
+      numero_factura: invoiceNumber || 'No Especificado',
+      nit: issuerTaxId || null,
+      fecha_emision: issueDate,
+      iva: 0,
+      monto: totalAmount,
+      monto_total: totalAmount,
+      tipo_doc: 'F',
+      detalle: details,
+      extraido_por_qr: true,
     }
   }
   catch (error) {
     console.warn('Error consultando QR SIAT:', error.message)
     return null
   }
-};
+}
 
 // Extrae datos de facturas cuyo QR no apunta a la pagina del SIAT
 const parseGenericQr = (qrText) => {
@@ -146,82 +145,82 @@ const parseGenericQr = (qrText) => {
     if (!taxId && !invoiceNumber && !totalAmount) {
       return null
     }
-    else {
-      return {
-        nit: taxId?.toString() || null,
-        numero_factura: invoiceNumber?.toString() || 'No Especificado',
-        fecha_emision: normalizedDate || '',
-        monto_total: totalAmount,
-        monto: totalAmount,
-        iva: 0,
-        proveedor: 'No Especificado',
-        tipo_doc: 'F',
-        detalle: [],
-        extraido_por_qr: true,
-      }
+    return {
+      nit: taxId?.toString() || null,
+      numero_factura: invoiceNumber?.toString() || 'No Especificado',
+      fecha_emision: normalizedDate || '',
+      monto_total: totalAmount,
+      monto: totalAmount,
+      iva: 0,
+      proveedor: 'No Especificado',
+      tipo_doc: 'F',
+      detalle: [],
+      extraido_por_qr: true,
     }
   }
   catch (error) {
     return null
   }
-};
-
-// Extrae los datos de una factura usando OCR y un modelo de IA
-const extractInvoiceWithOcr = async (fileBuffer, originalName, mimeType) => {
-  const formData = new FormData()
-  formData.append('file', fileBuffer, {
-    filename: originalName,
-    contentType: mimeType,
-  })
-  formData.append('language', 'spa')
-  formData.append('isOverlayRequired', 'false')
-  formData.append('OCREngine', '2')
-  const ocrResponse = await axios.post('https://api.ocr.space/parse/image', formData, {
-    headers: {...formData.getHeaders(), apikey: process.env.OCR_SPACE_API_KEY},
-  })
-  const extractedText = ocrResponse.data?.ParsedResults?.[0]?.ParsedText || ''
-  const chatResponse = await groqClient.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
-    messages: [{
-      role: 'user',
-      content: `Analiza este texto extraído de una factura y devuelve SOLO un JSON sin texto adicional ni backticks con esta estructura exacta:
-{
-  "proveedor": "nombre del proveedor o empresa emisora",
-  "numero_factura": "número de factura",
-  "nit": "NIT o CI del proveedor (solo números, máximo 10 dígitos)",
-  "fecha_emision": "fecha en formato YYYY-MM-DD",
-  "iva": monto_numerico_del_impuesto_en_dinero_NO_el_porcentaje,
-  "monto": monto_numerico_sin_impuestos,
-  "monto_total": monto_numerico_total_con_impuestos,
-  "tipo_doc": "F si tiene IVA o impuesto, R si es recibo sin impuesto",
-  "detalle": [
-    { "nombre_producto": "descripcion del producto", "cantidad": numero, "precio": numero_decimal }
-  ]
 }
 
-IMPORTANTE: El campo iva debe ser el MONTO EN DINERO del impuesto, no el porcentaje.
-
-Texto de la factura:
-${extractedText}`
-    }]
-  })
-  const responseText = chatResponse.choices[0]?.message?.content?.trim() || ''
-  const parsedData = JSON.parse(responseText)
-  return {
-    proveedor: parsedData.proveedor || 'No Especificado',
-    numero_factura: parsedData.numero_factura || 'No Especificado',
-    nit: parsedData.nit || null,
-    fecha_emision: parsedData.fecha_emision || '',
-    iva: parsedData.iva || 0,
-    monto: parsedData.monto || 0,
-    monto_total: parsedData.monto_total || 0,
-    tipo_doc: parsedData.tipo_doc || 'F',
-    detalle: parsedData.detalle || [],
-    extraido_por_qr: false,
+// Extrae los datos de una factura enviando la imagen directamente a Gemini con vision
+const extractInvoiceWithGemini = async (fileBuffer, mimeType, attempt = 1) => {
+  try {
+    const imageBase64 = fileBuffer.toString('base64')
+    const prompt = `Analiza esta imagen de una factura o recibo boliviano y devuelve SOLO un JSON sin texto adicional ni backticks con esta estructura exacta:
+  {
+    "proveedor": "nombre del proveedor o empresa emisora",
+    "numero_factura": "número de factura",
+    "nit": "NIT o CI del proveedor (solo números, máximo 10 dígitos)",
+    "fecha_emision": "fecha en formato YYYY-MM-DD",
+    "iva": monto_numerico_del_impuesto_en_dinero_NO_el_porcentaje,
+    "monto": monto_numerico_sin_impuestos,
+    "monto_total": monto_numerico_total_con_impuestos,
+    "tipo_doc": "F si tiene IVA o impuesto, R si es recibo sin impuesto",
+    "detalle": [
+      { "nombre_producto": "descripcion del producto o servicio", "cantidad": numero, "precio": numero_decimal }
+    ]
   }
-};
 
-// Intenta extraer los datos de una factura, primero por QR y luego por OCR
+  IMPORTANTE:
+  - El campo iva debe ser el MONTO EN DINERO del impuesto, no el porcentaje
+  - En facturas bolivianas "Importe" generalmente es el monto total con IVA incluido — úsalo como monto_total
+  - El IVA boliviano es del 13% sobre el subtotal — si no aparece explícito, calcúlalo como monto_total / 1.13 * 0.13
+  - Si no encuentras algún dato, usa null para números y "No Especificado" para textos
+  - La fecha debe estar en formato YYYY-MM-DD obligatoriamente
+  - Devuelve SOLO el JSON, sin explicaciones ni texto adicional`
+
+    const result = await geminiModel.generateContent([
+      {inlineData: {data: imageBase64, mimeType}},
+      prompt,
+    ])
+    const responseText = result.response.text().trim()
+    const cleanJson = responseText.replace(/```json|```/g, '').trim()
+    const parsedData = JSON.parse(cleanJson)
+    return {
+      proveedor: parsedData.proveedor || 'No Especificado',
+      numero_factura: parsedData.numero_factura || 'No Especificado',
+      nit: parsedData.nit || null,
+      fecha_emision: parsedData.fecha_emision || '',
+      iva: parsedData.iva || 0,
+      monto: parsedData.monto || 0,
+      monto_total: parsedData.monto_total || 0,
+      tipo_doc: parsedData.tipo_doc || 'F',
+      detalle: parsedData.detalle || [],
+      extraido_por_qr: false,
+    }
+  }
+  catch (error) {
+    if (attempt < 3) {
+      console.warn(`Intento ${attempt} fallido al extraer factura, reintentando...`, error.message)
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
+      return extractInvoiceWithGemini(fileBuffer, mimeType, attempt + 1)
+    }
+    throw error
+  }
+}
+
+// Intenta extraer los datos de una factura, primero por QR y luego por vision con Gemini
 const extractInvoiceData = async (file) => {
   const qrText = await readQrFromBuffer(file.buffer)
   if (qrText) {
@@ -236,7 +235,7 @@ const extractInvoiceData = async (file) => {
       return qrData
     }
   }
-  return await extractInvoiceWithOcr(file.buffer, file.originalname, file.mimetype)
-};
+  return await extractInvoiceWithGemini(file.buffer, file.mimetype)
+}
 
 module.exports = {extractInvoiceData};

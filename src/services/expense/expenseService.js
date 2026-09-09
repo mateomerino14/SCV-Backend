@@ -32,7 +32,6 @@ const calculateAmountFromSubitems = (subItems) => {
   return parseFloat(subItems.reduce((sum, item) => sum + parseFloat(item.monto || 0), 0).toFixed(2))
 };
 
-
 // Crea un gasto nuevo, con sus tramos de moneda, subitems e imagen asociada
 const createExpense = async (expenseData, file) => {
   if (!expenseData.id_viaje) {

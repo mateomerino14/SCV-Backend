@@ -1,10 +1,25 @@
 const supabase = require('../../config/supabase')
 const toleranceDays = 4
+const boliviaOffsetHours = -4
 
 // Formatea una fecha ISO a formato dia/mes/anio
 const formatDate = (isoString) => {
   const [year, month, day] = isoString.split('-')
   return `${day}/${month}/${year}`
+};
+
+// Obtiene la fecha actual en Bolivia en formato YYYY-MM-DD
+const getBoliviaToday = () => {
+  const now = new Date()
+  const boliviaTime = new Date(now.getTime() + boliviaOffsetHours * 60 * 60 * 1000)
+  return boliviaTime.toISOString().split('T')[0]
+};
+
+// Convierte un timestamp UTC a la fecha calendario en Bolivia
+const toBoliviaDate = (isoString) => {
+  const date = new Date(isoString)
+  const boliviaTime = new Date(date.getTime() + boliviaOffsetHours * 60 * 60 * 1000)
+  return boliviaTime.toISOString().split('T')[0]
 };
 
 // Suma una cantidad de dias a una fecha ISO
@@ -24,7 +39,7 @@ async function validateTripDeadline(tripId, eventDate) {
   if (!trip) {
     return {valid: false, error: 'Viaje no encontrado'}
   }
-  const today = new Date().toISOString().split('T')[0]
+  const today = getBoliviaToday()
   const toleranceEndDate = addDays(trip.fecha_fin, toleranceDays)
   const toleranceEndDateStr = toleranceEndDate.toISOString().split('T')[0]
   if (today > toleranceEndDateStr) {
@@ -38,7 +53,8 @@ async function validateTripDeadline(tripId, eventDate) {
       .maybeSingle()
     let withinExtension = false
     if (approvedRequest?.fecha_respuesta) {
-      const extendedLimit = addDays(approvedRequest.fecha_respuesta.split('T')[0], toleranceDays)
+      const approvalDate = toBoliviaDate(approvedRequest.fecha_respuesta)
+      const extendedLimit = addDays(approvalDate, toleranceDays)
       const extendedLimitStr = extendedLimit.toISOString().split('T')[0]
       withinExtension = today <= extendedLimitStr
     }
@@ -59,4 +75,4 @@ async function validateTripDeadline(tripId, eventDate) {
   return {valid: true}
 }
 
-module.exports = {validateTripDeadline, toleranceDays};
+module.exports = {validateTripDeadline, toleranceDays, getBoliviaToday, toBoliviaDate};
