@@ -1,6 +1,9 @@
--- ------------------------------------------------------------
--- Funcion para signar el siguiente numero disponible cada vez que se genera un recibo
--- ------------------------------------------------------------
+-- ============================================================
+-- Funciones usadas por el backend via supabase.rpc()
+-- ============================================================
+
+-- Incrementa y devuelve el correlativo usado para numerar recibos y memos.
+-- El search_path fijo evita el warning "Function Search Path Mutable".
 create or replace function incrementar_correlativo_recibo()
 returns integer
 language plpgsql
