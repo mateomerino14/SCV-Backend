@@ -6,13 +6,23 @@ const app = express()
 
 app.use(helmet())
 
+const allowedOrigins = [
+  /^https:\/\/scv-frontend(-git-[\w-]+-mat13)?\.vercel\.app$/,
+  'http://localhost:5173',
+];
+
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://scv-frontend.vercel.app'
-  ],
-  credentials: true
-}))
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.some(o => o instanceof RegExp ? o.test(origin) : o === origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('No permitido por CORS'));
+    }
+  },
+  credentials: true,
+}));
+
+
 app.use(express.json())
 app.use(cookieParser())
 
