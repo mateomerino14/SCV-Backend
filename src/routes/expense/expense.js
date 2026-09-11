@@ -3,7 +3,13 @@ const router = express.Router()
 const multer = require('multer')
 const authMiddleware = require('../../middlewares/auth')
 const expenseController = require('../../controllers/expense/expenseController')
-const upload = multer({storage: multer.memoryStorage()})
+
+const maxFileSize = 8 * 1024 * 1024;
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {fileSize: maxFileSize, files: 1},
+})
 
 router.get('/:expenseId/detail', authMiddleware, expenseController.getExpenseDetail)
 router.post('/trip/:tripId/receipt/:type', authMiddleware, expenseController.sendGroupedReceipt)
