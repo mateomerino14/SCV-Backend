@@ -1,5 +1,6 @@
 const supabase = require('../../config/supabase')
 const tripService = require('../../services/trip/tripService')
+const tripStatementService = require('../../services/trip/tripStatementService')
 
 // Lista todos los viajes
 const getAllTrips = async (req, res) => {
@@ -148,4 +149,15 @@ const deleteTrip = async (req, res) => {
   }
 };
 
-module.exports = {getAllTrips, getDashboard, getHistory, getTripDetail, createTrip, updateTrip, editTrip, submitToReview, confirmCompletion, deleteTrip};
+// Genera y descarga la planilla de rendicion de cuentas en PDF
+const downloadStatementPdf = async (req, res) => {
+  const result = await tripStatementService.generateStatementPdf(req.params.id)
+  if (result.error) {
+    return res.status(result.status || 500).json({error: result.error})
+  }
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`)
+  return res.send(result.buffer)
+};
+
+module.exports = {getAllTrips, getDashboard, getHistory, getTripDetail, createTrip, updateTrip, editTrip, submitToReview, confirmCompletion, deleteTrip, downloadStatementPdf};
