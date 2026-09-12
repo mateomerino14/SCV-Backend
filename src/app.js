@@ -6,23 +6,13 @@ const app = express()
 
 app.use(helmet())
 
-const allowedOrigins = [
-  /^https:\/\/scv-frontend(-git-[\w-]+-mat13)?\.vercel\.app$/,
-  'http://localhost:5173',
-];
-
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.some(o => o instanceof RegExp ? o.test(origin) : o === origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('No permitido por CORS'));
-    }
-  },
-  credentials: true,
-}));
-
-
+  origin: [
+    'http://localhost:5173',
+    'https://scv-frontend.vercel.app'
+  ],
+  credentials: true
+}))
 app.use(express.json())
 app.use(cookieParser())
 
@@ -71,5 +61,20 @@ app.use('/admin', adminRoute)
 app.use('/reviewer', reviewerRoute)
 app.use('/deadline-authorization', deadlineAuthorizationRoute)
 app.use('/approver', approverRoute)
+
+// Traduce los errores de carga de archivos a una respuesta legible
+app.use((error, req, res, next) => {
+  if (error?.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({error: 'La imagen supera el tamaño máximo permitido de 8 MB'})
+  }
+  if (error?.code === 'LIMIT_FILE_COUNT') {
+    return res.status(400).json({error: 'Solo se permite un archivo por solicitud'})
+  }
+  if (error) {
+    console.log('Error no controlado:', error.message)
+    return res.status(500).json({error: error.message || 'Error procesando la solicitud'})
+  }
+  return next()
+});
 
 module.exports = app;
