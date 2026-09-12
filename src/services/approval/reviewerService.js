@@ -117,11 +117,9 @@ const notifyTreasurer = async (trip, reviewer, tripCode, expenses) => {
   const pdfBuffer = await finalReviewDocumentService.generatePdf(renditionHtml)
   const pdfBase64 = pdfBuffer.toString('base64')
   const attachments = [{content: pdfBase64, name: `Rendicion_Final_${tripCode.replace('/', '-')}.pdf`}]
-  const emailHtml = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:32px;color:#000;">
-    <h2 style="font-size:16pt;margin-bottom:12px;">Rendición de Gastos — Aprobación Final</h2>
-    <p style="margin-bottom:8px;">Se adjunta la rendición de gastos con aprobación final correspondiente al viaje <strong>${tripCode}</strong>.</p>
-    <p style="font-size:10pt;color:#666;margin-top:16px;">Este es un mensaje automático del Sistema de Control de Viáticos — MAXAM FANEXA.</p>
-  </div>`
+  const emailHtml = emailService.buildEmailLayout('Rendición de Gastos — Aprobación Final', `
+    <p>Se adjunta la rendición de gastos con aprobación final correspondiente al viaje <strong>${tripCode}</strong>.</p>
+  `)
   await emailService.sendEmail(to, `Rendición Final — ${tripCode}`, emailHtml, attachments)
 };
 
@@ -156,12 +154,10 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
   if (exceeds) {
     bodyText = 'Se te reembolsará el saldo excedido.'
   }
-  const emailHtml = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:32px;color:#000;">
-    <h2 style="font-size:16pt;margin-bottom:12px;">Tu rendición fue aprobada</h2>
-    <p style="margin-bottom:8px;">La rendición de gastos del viaje <strong>${tripCode}</strong> fue aprobada de forma definitiva.</p>
-    <p style="margin-bottom:8px;">${bodyText} Revisa el detalle en el documento adjunto.</p>
-    <p style="font-size:10pt;color:#666;margin-top:16px;">Este es un mensaje automático del Sistema de Control de Viáticos — MAXAM FANEXA.</p>
-  </div>`
+  const emailHtml = emailService.buildEmailLayout('Tu rendición fue aprobada', `
+    <p>La rendición de gastos del viaje <strong>${tripCode}</strong> fue aprobada de forma definitiva.</p>
+    <p>${bodyText} Revisa el detalle en el documento adjunto.</p>
+  `, '#155724')
   await emailService.sendEmail(
     [{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}],
     `Resultado de tu Rendición de Gastos — ${tripCode}`,

@@ -1,6 +1,7 @@
 const supabase = require('../../config/supabase')
 const expenseSummaryService = require('./expenseSummaryService')
 const tripCommentService = require('../trip/tripCommentService')
+const emailService = require('../shared/emailService')
 
 // Lista los viajes pendientes de revision previa
 const getPendingTripReviews = async (supervisorId, filters) => {
@@ -146,7 +147,7 @@ const approveTripReview = async (tripId, supervisorId) => {
 
 // Rechaza un viaje en revision previa
 const rejectTripReview = async (tripId, supervisorId) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_supervisor_asignado, estado, ciclo_revision').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_supervisor_asignado, estado, ciclo_revision, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo)').eq('id_viaje', tripId).single()
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
@@ -174,6 +175,7 @@ const rejectTripReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500}
   }
   else {
+    await emailService.sendRejectionNotice(trip.Usuario)
     return {message: 'Viaje rechazado correctamente'}
   }
 };
@@ -355,7 +357,7 @@ const approveExpenseReview = async (tripId, supervisorId) => {
 
 // Rechaza los gastos de un viaje
 const rejectExpenseReview = async (tripId, supervisorId) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_supervisor_asignado, estado, ciclo_revision').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_supervisor_asignado, estado, ciclo_revision, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo)').eq('id_viaje', tripId).single()
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
@@ -384,6 +386,7 @@ const rejectExpenseReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500}
   }
   else {
+    await emailService.sendRejectionNotice(trip.Usuario)
     return {message: 'Viaje rechazado correctamente'}
   }
 };

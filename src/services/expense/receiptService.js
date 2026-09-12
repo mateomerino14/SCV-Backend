@@ -483,11 +483,9 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   if (isInternational) {
     internationalEmailSuffix = ' Internacional'
   }
-  const emailHtml = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:32px;color:#000;">
-      <h2 style="font-size:16pt;margin-bottom:12px;">${emailTitle}${internationalEmailSuffix}</h2>
-      <p style="margin-bottom:8px;">Se adjunta el recibo consolidado de ${typeName.toLowerCase()} Nº ${receiptNumber}, con ${expenses.length} gasto(s) registrado(s).</p>
-      <p style="font-size:10pt;color:#666;margin-top:16px;">Este es un mensaje automático del Sistema de Control de Viáticos — MAXAM FANEXA.</p>
-    </div>`
+  const emailHtml = emailService.buildEmailLayout(`${emailTitle}${internationalEmailSuffix}`, `
+    <p>Se adjunta el recibo consolidado de ${typeName.toLowerCase()} Nº ${receiptNumber}, con ${expenses.length} gasto(s) registrado(s).</p>
+  `)
   await emailService.sendEmail(
     [{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}],
     `${emailTitle}${internationalEmailSuffix} — Nº ${receiptNumber}`,
@@ -542,11 +540,9 @@ const sendIndividualReceipt = async (expenseId) => {
   if (expense.tipo === 'S') {
     emailTitle = 'Recibo de Pago de Servicio'
   }
-  const emailHtml = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:32px;color:#000;">
-      <h2 style="font-size:16pt;margin-bottom:12px;">${emailTitle}</h2>
-      <p style="margin-bottom:8px;">Se adjunta el recibo Nº ${receiptNumber} correspondiente al gasto registrado.</p>
-      <p style="font-size:10pt;color:#666;margin-top:16px;">Este es un mensaje automático del Sistema de Control de Viáticos — MAXAM FANEXA.</p>
-    </div>`
+  const emailHtml = emailService.buildEmailLayout(emailTitle, `
+    <p>Se adjunta el recibo Nº ${receiptNumber} correspondiente al gasto registrado.</p>
+  `)
   await emailService.sendEmail(
     [{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}],
     `${emailTitle} — Nº ${receiptNumber}`,

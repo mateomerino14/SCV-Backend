@@ -132,11 +132,9 @@ const approveTrip = async (tripId, treasurerId) => {
       const pdfBuffer = await treasuryDocumentService.generatePdf(confirmationHtml)
       const pdfBase64 = pdfBuffer.toString('base64')
       const attachments = [{content: pdfBase64, name: `Confirmacion_Fondo_${tripCode.replace('/', '-')}.pdf`}]
-      const emailHtml = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:32px;color:#000;">
-    <h2 style="font-size:16pt;margin-bottom:12px;">Fondo Aprobado</h2>
-    <p style="margin-bottom:8px;">Tu fondo para el viaje <strong>${tripCode}</strong> ha sido aprobado. Ya puedes registrar tus gastos.</p>
-    <p style="font-size:10pt;color:#666;margin-top:16px;">Este es un mensaje automático del Sistema de Control de Viáticos — MAXAM FANEXA.</p>
-  </div>`
+      const emailHtml = emailService.buildEmailLayout('Fondo Aprobado', `
+        <p>Tu fondo para el viaje <strong>${tripCode}</strong> ha sido aprobado. Ya puedes registrar tus gastos.</p>
+      `, '#155724')
       await emailService.sendEmail(
         [{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}],
         `Fondo Aprobado — ${tripCode}`,

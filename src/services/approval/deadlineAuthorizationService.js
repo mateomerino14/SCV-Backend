@@ -34,24 +34,6 @@ const addDaysToDate = (dateStr, days) => {
   return `${year}-${month}-${day}`
 };
 
-// Construye el contenido HTML base de los correos del sistema
-const buildEmailLayout = (title, accentColor, bodyContent) => {
-  return `
-    <div style="font-family: Inter, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff;">
-      <div style="border-bottom: 3px solid ${accentColor}; padding-bottom: 16px; margin-bottom: 24px;">
-        <h1 style="color: ${accentColor}; font-size: 20px; margin: 0; font-weight: bold;">Sistema de Viáticos</h1>
-        <p style="color: #475569; font-size: 13px; margin: 4px 0 0 0;">${title}</p>
-      </div>
-      ${bodyContent}
-      <div style="border-top: 1px solid #DEE2F0; margin-top: 28px; padding-top: 16px;">
-        <p style="color: #94a3b8; font-size: 11px; margin: 0; text-align: center;">
-          Este es un mensaje automático del Sistema de Control de Viáticos. Por favor no respondas a este correo.
-        </p>
-      </div>
-    </div>
-  `
-};
-
 // Obtiene los revisores activos con correo corporativo
 const getActiveReviewers = async () => {
   const {data, error} = await supabase
@@ -121,7 +103,7 @@ const createRequest = async (tripId, employeeId, reason) => {
         Ingresa al sistema para aprobar o rechazar esta solicitud.
       </p>
     `
-    const html = buildEmailLayout('Nueva solicitud de plazo', '#870002', body)
+    const html = emailService.buildEmailLayout('Nueva solicitud de plazo', body, '#870002')
     await emailService.sendEmail(to, `Solicitud de Autorización de Plazo — Viaje de ${trip.Usuario?.nombre}`, html)
   }
   catch (error) {
@@ -232,7 +214,7 @@ const approveRequest = async (requestId, reviewerId) => {
           Ya puedes continuar registrando tus gastos. Si necesitas más tiempo después de esa fecha, deberás solicitar una nueva autorización.
         </p>
       `
-      const html = buildEmailLayout('Autorización de plazo aprobada', '#155724', body)
+      const html = emailService.buildEmailLayout('Autorización de plazo aprobada', body, '#155724')
       await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Autorización Aprobada — ${request.Viaje?.motivo}`, html)
     }
   }
@@ -287,7 +269,7 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
           Si consideras que hubo un error, comunícate con tu revisor asignado.
         </p>
       `
-      const html = buildEmailLayout('Autorización de plazo rechazada', '#D20F12', body)
+      const html = emailService.buildEmailLayout('Autorización de plazo rechazada', body, '#D20F12')
       await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Autorización Rechazada — ${request.Viaje?.motivo}`, html)
     }
   }

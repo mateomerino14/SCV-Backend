@@ -51,11 +51,9 @@ const sendApprovalMemo = async (trip, approver, tripCode, allUsers) => {
   const pdfBuffer = await approvalMemoService.generateMemoPdf(memoHtml)
   const pdfBase64 = pdfBuffer.toString('base64')
   const attachments = [{content: pdfBase64, name: `Memorandum_${tripCode.replace('/', '-')}.pdf`}]
-  const emailHtml = `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:32px;color:#000;">
-    <h2 style="font-size:16pt;margin-bottom:12px;">Memorandum de Aprobación</h2>
-    <p style="margin-bottom:8px;">Se adjunta el memorandum correspondiente al viaje <strong>${tripCode}</strong>. Se solicita la asignación y aprobación del fondo correspondiente.</p>
-    <p style="font-size:10pt;color:#666;margin-top:16px;">Este es un mensaje automático del Sistema de Control de Viáticos — MAXAM FANEXA.</p>
-  </div>`
+  const emailHtml = emailService.buildEmailLayout('Memorandum de Aprobación', `
+    <p>Se adjunta el memorandum correspondiente al viaje <strong>${tripCode}</strong>. Se solicita la asignación y aprobación del fondo correspondiente.</p>
+  `)
   await emailService.sendEmail(to, `Memorandum de Aprobación — ${tripCode}`, emailHtml, attachments)
 };
 
@@ -166,7 +164,7 @@ const approveTrip = async (tripId, approverId) => {
 
 // Rechaza un viaje en fase de aprobacion previa
 const rejectTrip = async (tripId, approverId) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, ciclo_revision').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, ciclo_revision, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo)').eq('id_viaje', tripId).single()
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
@@ -194,6 +192,7 @@ const rejectTrip = async (tripId, approverId) => {
     return {error: error.message, status: 500}
   }
   else {
+    await emailService.sendRejectionNotice(trip.Usuario)
     return {message: 'Viaje rechazado correctamente'}
   }
 };
