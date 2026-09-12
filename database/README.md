@@ -22,6 +22,7 @@ Los archivos `01` a `04` arman la base desde cero. Los cambios posteriores sobre
 | Script | Cambio |
 |---|---|
 | `05_migrate_placa_vehiculo.sql` | Agrega `placa_vehiculo` a `Viaje`, para la opcion de transporte "Vehiculo de Empresa" |
+| `06_migrate_comprobante_categoria.sql` | Agrega `requiere_comprobante` a `Categoria_Gasto` y marca Taxi como no obligatorio |
 
 ## Tablas del sistema
 

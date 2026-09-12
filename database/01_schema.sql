@@ -17,7 +17,8 @@ create table if not exists "Cargo" (
 
 create table if not exists "Categoria_Gasto" (
   id_categoria serial primary key,
-  nombre varchar(50) not null unique
+  nombre varchar(50) not null unique,
+  requiere_comprobante boolean not null default true
 );
 
 create table if not exists "Impuesto" (

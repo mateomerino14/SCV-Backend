@@ -41,3 +41,7 @@ insert into "Categoria_Gasto" (nombre) values
   ('626100 REUN.SINDIC.MANUTENCION/AT.TERCEROS (VIAJE)'),
   ('OTROS')
 on conflict (nombre) do nothing;
+
+update "Categoria_Gasto"
+set requiere_comprobante = false
+where nombre = '626010 TAXIS (VIAJE)';
