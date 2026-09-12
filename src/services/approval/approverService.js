@@ -3,6 +3,7 @@ const commentModerationService = require('../shared/commentModerationService')
 const emailService = require('../shared/emailService')
 const approvalMemoService = require('./approvalMemoService')
 const textNormalizer = require('../../utils/textNormalizer')
+const dependencyAssignmentService = require('../shared/dependencyAssignmentService')
 
 const memoPositions = [
   'Asistente Administrativo de Seguros y Servicios',
@@ -61,7 +62,7 @@ const sendApprovalMemo = async (trip, approver, tripCode, allUsers) => {
 const getPendingTrips = async (approverId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, Cargo(nombre))')
     .eq('estado', 'APROBADO_VIAJE')
     .neq('id_usuario', approverId)
   if (filters.fecha_inicio) {
@@ -78,7 +79,12 @@ const getPendingTrips = async (approverId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: data || []}
+    const [requesterDependency, dependenciesWithRole] = await Promise.all([
+      dependencyAssignmentService.getUserDependency(approverId),
+      dependencyAssignmentService.getDependenciesWithRole('APROBADOR'),
+    ])
+    const trips = dependencyAssignmentService.filterTripsByDependency(data || [], requesterDependency, dependenciesWithRole)
+    return {trips}
   }
 };
 

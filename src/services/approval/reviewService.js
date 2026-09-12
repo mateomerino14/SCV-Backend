@@ -2,12 +2,13 @@ const supabase = require('../../config/supabase')
 const expenseSummaryService = require('./expenseSummaryService')
 const tripCommentService = require('../trip/tripCommentService')
 const emailService = require('../shared/emailService')
+const dependencyAssignmentService = require('../shared/dependencyAssignmentService')
 
 // Lista los viajes pendientes de revision previa
 const getPendingTripReviews = async (supervisorId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, Cargo(nombre))')
     .eq('estado', 'EN_REVISION_VIAJE')
     .is('id_supervisor_asignado', null)
     .neq('id_usuario', supervisorId)
@@ -25,7 +26,12 @@ const getPendingTripReviews = async (supervisorId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: data || []}
+    const [requesterDependency, dependenciesWithRole] = await Promise.all([
+      dependencyAssignmentService.getUserDependency(supervisorId),
+      dependencyAssignmentService.getDependenciesWithRole('SUPERVISOR'),
+    ])
+    const trips = dependencyAssignmentService.filterTripsByDependency(data || [], requesterDependency, dependenciesWithRole)
+    return {trips}
   }
 };
 
@@ -201,7 +207,7 @@ const attachSummaryToTrips = (trips) => {
 const getPendingExpenseReviews = async (supervisorId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre)), Gasto(monto_total, es_gasto_internacional)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, Cargo(nombre)), Gasto(monto_total, es_gasto_internacional)')
     .eq('estado', 'EN_REVISION')
     .is('id_supervisor_asignado', null)
     .neq('id_usuario', supervisorId)
@@ -219,7 +225,12 @@ const getPendingExpenseReviews = async (supervisorId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: attachSummaryToTrips(data || [])}
+    const [requesterDependency, dependenciesWithRole] = await Promise.all([
+      dependencyAssignmentService.getUserDependency(supervisorId),
+      dependencyAssignmentService.getDependenciesWithRole('SUPERVISOR'),
+    ])
+    const trips = dependencyAssignmentService.filterTripsByDependency(data || [], requesterDependency, dependenciesWithRole)
+    return {trips: attachSummaryToTrips(trips)}
   }
 };
 
