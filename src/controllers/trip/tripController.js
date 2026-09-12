@@ -50,8 +50,11 @@ const getTripDetail = async (req, res) => {
 
 // Crea un nuevo viaje en estado borrador
 const createTrip = async (req, res) => {
-  const {motivo, origen, destino, fecha_inicio, fecha_fin, tipo, transporte, monto_asignado, monto_asignado_usd} = req.body
+  const {motivo, origen, destino, fecha_inicio, fecha_fin, tipo, transporte, placa_vehiculo, monto_asignado, monto_asignado_usd} = req.body
   const userId = req.user.id_usuario
+  if (transporte === 'Vehículo de Empresa' && !placa_vehiculo?.trim()) {
+    return res.status(400).json({error: 'La placa del vehículo es requerida'})
+  }
   const {data, error} = await supabase
     .from('Viaje')
     .insert({
@@ -62,6 +65,7 @@ const createTrip = async (req, res) => {
       fecha_fin,
       tipo,
       transporte: transporte || 'Terrestre',
+      placa_vehiculo: transporte === 'Vehículo de Empresa' ? placa_vehiculo.trim() : null,
       monto_asignado,
       monto_asignado_usd: monto_asignado_usd || 0,
       estado: 'BORRADOR',

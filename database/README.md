@@ -15,6 +15,14 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 2. Ve a SQL Editor
 3. Pega el contenido de cada archivo en orden y ejecuta
 
+## Migraciones incrementales
+
+Los archivos `01` a `04` arman la base desde cero. Los cambios posteriores sobre una base ya existente se agregan como scripts numerados aparte (`05_...`, `06_...`), y tambien se reflejan en `01_schema.sql` para que una instalacion nueva quede igual sin necesidad de correr las migraciones una por una.
+
+| Script | Cambio |
+|---|---|
+| `05_migrate_placa_vehiculo.sql` | Agrega `placa_vehiculo` a `Viaje`, para la opcion de transporte "Vehiculo de Empresa" |
+
 ## Tablas del sistema
 
 | Tabla | Descripcion |

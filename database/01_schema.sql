@@ -83,6 +83,7 @@ create table if not exists "Viaje" (
   fecha_fin date not null,
   tipo varchar(15) not null check (tipo in ('Nacional', 'Internacional')),
   transporte text default 'Terrestre',
+  placa_vehiculo varchar(20),
   monto_asignado decimal(10, 2) not null,
   monto_asignado_usd numeric(10, 2) default 0,
   estado varchar(25) not null default 'BORRADOR' check (estado in (

@@ -129,6 +129,9 @@ const editTrip = async (tripId, userId, tripData) => {
   if (trip.estado !== 'RECHAZADO' && trip.estado !== 'BORRADOR') {
     return {error: 'Solo puedes editar viajes en borrador o rechazados', status: 400}
   }
+  if (tripData.transporte === 'Vehículo de Empresa' && !tripData.placa_vehiculo?.trim()) {
+    return {error: 'La placa del vehículo es requerida', status: 400}
+  }
   const updateData = {
     motivo: tripData.motivo,
     origen: tripData.origen || null,
@@ -137,6 +140,7 @@ const editTrip = async (tripId, userId, tripData) => {
     fecha_fin: tripData.fecha_fin,
     tipo: tripData.tipo,
     transporte: tripData.transporte || 'Terrestre',
+    placa_vehiculo: tripData.transporte === 'Vehículo de Empresa' ? tripData.placa_vehiculo.trim() : null,
     monto_asignado: tripData.monto_asignado,
     monto_asignado_usd: tripData.monto_asignado_usd || 0,
   }

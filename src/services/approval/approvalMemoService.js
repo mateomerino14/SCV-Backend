@@ -13,9 +13,13 @@ const generateMemoHtml = (trip, approver, tripCode) => {
   const period = `${formatDate(trip.fecha_inicio)} al ${formatDate(trip.fecha_fin)}`
   const transport = (trip.transporte || '').toLowerCase()
   const isAirTravel = transport.includes('aéreo') || transport.includes('aereo')
+  const isCompanyVehicle = transport.includes('vehículo de empresa') || transport.includes('vehiculo de empresa')
   let ticketsText = 'Asimismo, se autoriza la compra de pasajes terrestres correspondientes al trayecto indicado.'
   if (isAirTravel) {
     ticketsText = 'Asimismo, se autoriza la compra de pasajes aéreos correspondientes al trayecto indicado.'
+  }
+  else if (isCompanyVehicle) {
+    ticketsText = 'Asimismo, se autoriza el uso de vehículo de empresa para el trayecto indicado.'
   }
   let originText = ''
   if (trip.origen) {
