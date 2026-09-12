@@ -214,7 +214,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
       <div class="pie-der">
         <p>Nombre: ${employee?.nombre || ''} ${employee?.apellido_paterno || ''}</p>
         <p>Firma:</p>
-        <p>C.I.:</p>
+        <p>C.I.: ${employee?.carnet_identidad || ''}</p>
       </div>
     </div>
   </div>
@@ -389,7 +389,7 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber) => {
       <div class="pie-der">
         <p>Nombre: ${employee?.nombre || ''} ${employee?.apellido_paterno || ''}</p>
         <p>Firma:</p>
-        <p>C.I.:</p>
+        <p>C.I.: ${employee?.carnet_identidad || ''}</p>
       </div>
     </div>
   </div>
@@ -404,7 +404,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   }
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('id_usuario, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion)')
+    .select('id_usuario, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad)')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -480,7 +480,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
 const sendIndividualReceipt = async (expenseId) => {
   const {data: expense, error: expenseError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_usuario, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion))')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_usuario, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad))')
     .eq('id_gasto', expenseId)
     .single()
   if (expenseError) {

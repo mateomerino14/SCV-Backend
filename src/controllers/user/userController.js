@@ -130,6 +130,9 @@ const updateUser = async (req, res) => {
   if (payload.telefono !== undefined) {
     payload.telefono = payload.telefono?.trim() || null
   }
+  if (payload.carnet_identidad !== undefined) {
+    payload.carnet_identidad = payload.carnet_identidad?.trim() || null
+  }
   if (payload.contrasenia) {
     payload.contrasenia = bcrypt.hashSync(payload.contrasenia, saltRounds)
   }
@@ -176,6 +179,9 @@ const createUser = async (req, res) => {
   const body = {...req.body}
   if (body.telefono !== undefined) {
     body.telefono = body.telefono?.trim() || null
+  }
+  if (body.carnet_identidad !== undefined) {
+    body.carnet_identidad = body.carnet_identidad?.trim() || null
   }
   if (body.contrasenia) {
     body.contrasenia = bcrypt.hashSync(body.contrasenia, saltRounds)
@@ -235,7 +241,7 @@ const getEmployees = async (req, res) => {
 const getAllUsersDetailed = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, email_corporativo, telefono, activo, foto_perfil, id_rol, numero_dependencia, numero_seccion, Cargo(id_cargo, nombre), Rol(nombre)')
+    .select('id_usuario, nombre, apellido_paterno, email_corporativo, telefono, activo, foto_perfil, id_rol, numero_dependencia, numero_seccion, carnet_identidad, Cargo(id_cargo, nombre), Rol(nombre)')
     .order('nombre', {ascending: true})
   if (error) {
     return res.status(500).json({error: error.message})

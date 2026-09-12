@@ -50,6 +50,7 @@ create table if not exists "Usuario" (
   foto_perfil text,
   numero_dependencia varchar(50),
   numero_seccion varchar(50),
+  carnet_identidad varchar(20),
   ultima_cambio_contrasenia timestamptz default now(),
   refresh_token_invalido_desde timestamptz,
   id_cargo integer not null references "Cargo"(id_cargo),
