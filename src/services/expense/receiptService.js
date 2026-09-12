@@ -41,7 +41,7 @@ const generatePdf = async (html) => {
 };
 
 // Genera el HTML de un recibo agrupado por tipo de gasto
-const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isInternational) => {
+const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isInternational, tripId, motivo) => {
   const today = new Date()
   const day = today.getDate()
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -141,6 +141,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
   .titulo { font-size: 20pt; font-weight: bold; text-align: center; letter-spacing: 1px; flex: 1; }
   .numero { color: #c00000; font-size: 13pt; font-weight: bold; text-align: right; width: 20%; }
   .fecha-linea { font-size: 10.5pt; margin: 10px 0 14px; }
+  .viaje-linea { font-size: 10.5pt; margin-bottom: 10px; display: flex; justify-content: space-between; gap: 16px; }
   table.principal { width: 100%; border-collapse: collapse; margin-bottom: 4px; page-break-inside: auto; }
   table.principal thead { display: table-header-group; }
   table.principal th { border: 1px solid #000; padding: 4px 6px; font-size: 10pt; font-weight: bold; text-align: center; }
@@ -176,6 +177,11 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
     </div>
     <div class="fecha-linea">
       Lugar: Cochabamba &nbsp;&nbsp; de ${day} &nbsp;&nbsp; de ${month} &nbsp;&nbsp; de ${year}
+    </div>
+    <div class="viaje-linea">
+      <span>Nº de Viaje: ${tripId}</span>
+      <span>Concepto: ${escapeHtml(motivo || '')}</span>
+      <span>Monto: ${totalAmount.toFixed(2)} ${currency}</span>
     </div>
     <table class="principal">
       <thead>
@@ -223,7 +229,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
 };
 
 // Genera el HTML de un recibo individual por un solo gasto
-const generateIndividualReceiptHtml = (expense, employee, receiptNumber) => {
+const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId, motivo) => {
   const today = new Date()
   const day = today.getDate()
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -314,6 +320,7 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber) => {
   .titulo { font-size: 20pt; font-weight: bold; text-align: center; letter-spacing: 1px; flex: 1; }
   .numero { color: #c00000; font-size: 13pt; font-weight: bold; text-align: right; width: 20%; }
   .fecha-linea { font-size: 10.5pt; margin: 10px 0 14px; }
+  .viaje-linea { font-size: 10.5pt; margin-bottom: 10px; display: flex; justify-content: space-between; gap: 16px; }
   table.principal { width: 100%; border-collapse: collapse; margin-bottom: 4px; page-break-inside: auto; }
   table.principal thead { display: table-header-group; }
   table.principal th { border: 1px solid #000; padding: 4px 6px; font-size: 10pt; font-weight: bold; text-align: center; }
@@ -351,6 +358,11 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber) => {
     </div>
     <div class="fecha-linea">
       Lugar: Cochabamba &nbsp;&nbsp; de ${day} &nbsp;&nbsp; de ${month} &nbsp;&nbsp; de ${year}
+    </div>
+    <div class="viaje-linea">
+      <span>Nº de Viaje: ${tripId}</span>
+      <span>Concepto: ${escapeHtml(motivo || '')}</span>
+      <span>Monto: ${totalAmount.toFixed(2)} ${currency}</span>
     </div>
     ${segmentsHtml}
     <table class="principal">
@@ -404,7 +416,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   }
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('id_usuario, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad)')
+    .select('motivo, id_usuario, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad)')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -442,7 +454,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   if (numberError) {
     return {error: numberError, status: 500}
   }
-  const html = generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational)
+  const html = generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, tripId, trip.motivo)
   const pdfBuffer = await generatePdf(html)
   const pdfBase64 = pdfBuffer.toString('base64')
   let typeName = 'Compras'
@@ -480,7 +492,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
 const sendIndividualReceipt = async (expenseId) => {
   const {data: expense, error: expenseError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_usuario, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad))')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, id_usuario, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad))')
     .eq('id_gasto', expenseId)
     .single()
   if (expenseError) {
@@ -500,7 +512,7 @@ const sendIndividualReceipt = async (expenseId) => {
   if (numberError) {
     return {error: numberError, status: 500}
   }
-  const html = generateIndividualReceiptHtml(expense, employee, receiptNumber)
+  const html = generateIndividualReceiptHtml(expense, employee, receiptNumber, expense.Viaje?.id_viaje, expense.Viaje?.motivo)
   const pdfBuffer = await generatePdf(html)
   const pdfBase64 = pdfBuffer.toString('base64')
   let typeName = 'Compra'
