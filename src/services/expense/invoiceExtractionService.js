@@ -31,6 +31,18 @@ IMPORTANTE:
 - Devuelve SOLO el JSON, sin explicaciones ni texto adicional`
 }
 
+// Verifica si la fecha extraida tiene un formato valido y real
+const isValidEmissionDate = (value) => {
+  if (!value || value === 'No Especificado') {
+    return false
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false
+  }
+  const date = new Date(`${value}T00:00:00`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+}
+
 // Normaliza la respuesta del modelo al formato que espera el sistema
 const normalizeResult = (parsedData) => {
   return {
@@ -38,6 +50,7 @@ const normalizeResult = (parsedData) => {
     numero_factura: parsedData.numero_factura || 'No Especificado',
     nit: parsedData.nit || null,
     fecha_emision: parsedData.fecha_emision || '',
+    fecha_emision_valida: isValidEmissionDate(parsedData.fecha_emision),
     iva: parsedData.iva || 0,
     monto: parsedData.monto || 0,
     monto_total: parsedData.monto_total || 0,
