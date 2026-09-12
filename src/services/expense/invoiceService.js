@@ -157,6 +157,7 @@ const saveInvoice = async (invoiceData, file) => {
     }
   }
   try {
+    await alcoholDetectionService.updateAlcoholInExpenseFromDetails(expense.id_gasto, invoiceData.detalle || [])
     await alcoholDetectionService.updateAlcoholInTrip(invoiceData.id_viaje)
   }
   catch (error) {
@@ -260,6 +261,12 @@ const updateInvoice = async (expenseId, invoiceData, file) => {
     }
     await supabase.from('Factura_Impuestos').delete().eq('id_factura', existingInvoice.id_factura)
     await attachIvaTax(existingInvoice.id_factura, invoiceData.iva)
+  }
+  try {
+    await alcoholDetectionService.updateAlcoholInExpenseFromDetails(expenseId, invoiceData.detalle || [])
+  }
+  catch (error) {
+    console.warn('Error alcohol:', error.message)
   }
   if (invoiceData.id_viaje) {
     try {

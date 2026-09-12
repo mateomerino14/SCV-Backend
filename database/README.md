@@ -23,6 +23,7 @@ Los archivos `01` a `04` arman la base desde cero. Los cambios posteriores sobre
 |---|---|
 | `05_migrate_placa_vehiculo.sql` | Agrega `placa_vehiculo` a `Viaje`, para la opcion de transporte "Vehiculo de Empresa" |
 | `06_migrate_comprobante_categoria.sql` | Agrega `requiere_comprobante` a `Categoria_Gasto` y marca Taxi como no obligatorio |
+| `07_migrate_alcohol_gasto.sql` | Agrega `tiene_alcohol` a `Gasto`, para resaltar el gasto puntual en las tablas de revision |
 
 ## Tablas del sistema
 

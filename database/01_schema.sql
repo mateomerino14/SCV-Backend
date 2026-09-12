@@ -133,6 +133,7 @@ create table if not exists "Gasto" (
   retencion_iue numeric(10, 2) default 0,
   retencion_it numeric(10, 2) default 0,
   importe_costo numeric(10, 2) default 0,
+  tiene_alcohol boolean not null default false,
   id_viaje integer not null references "Viaje"(id_viaje),
   id_categoria integer references "Categoria_Gasto"(id_categoria),
   id_proveedor integer references "Proveedor"(id_proveedor)

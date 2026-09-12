@@ -131,6 +131,8 @@ const createExpense = async (expenseData, file) => {
       await supabase.from('Imagen').insert({url_archivo: urlData.publicUrl, id_gasto: expense.id_gasto})
     }
   }
+  const alcoholText = [expenseData.descripcion, ...(usesSubItems ? expenseData.subitems.map((item) => item.descripcion) : [])].join(' ')
+  alcoholDetectionService.updateAlcoholInExpenseFromText(expense.id_gasto, alcoholText).catch((error) => console.warn('Error alcohol:', error.message))
   return {expense}
 };
 
@@ -221,6 +223,8 @@ const updateExpense = async (expenseId, expenseData, file) => {
       }
     }
   }
+  const alcoholText = [expenseData.descripcion, ...(usesSubItems ? expenseData.subitems.map((item) => item.descripcion) : [])].join(' ')
+  alcoholDetectionService.updateAlcoholInExpenseFromText(expenseId, alcoholText).catch((error) => console.warn('Error alcohol:', error.message))
   return {}
 };
 

@@ -111,6 +111,56 @@ const analyzeAlcohol = async (details) => {
   }
 }
 
+// Analiza un texto libre (descripcion de gasto) y determina si menciona alcohol
+const analyzeAlcoholText = async (text) => {
+  if (!text || !text.trim()) {
+    return false
+  }
+  if (containsAlcoholKeyword(text)) {
+    return true
+  }
+  if (isInnocuousProduct(text)) {
+    return false
+  }
+  try {
+    const prompt = `Analiza este texto y responde SOLO con "true" si menciona o hace referencia a bebidas alcohólicas (cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago, o cualquier bebida con contenido alcohólico de cualquier región o país). Responde SOLO "true" o "false", sin explicación. Texto: ${text}`
+    const result = await geminiModel.generateContent(prompt)
+    const response = result.response.text().trim().toLowerCase()
+    return response === 'true'
+  }
+  catch (error) {
+    console.warn('Gemini error checking alcohol text:', error.message)
+    const riskWords = ['trago', 'copa', 'bebida', 'brebaje', 'fermentado', 'destilado', 'macerado']
+    return riskWords.some((word) => textNormalizer.normalizeText(text).includes(word))
+  }
+}
+
+// Recalcula y actualiza el indicador de alcohol de un gasto puntual a partir del detalle de su factura
+const updateAlcoholInExpenseFromDetails = async (expenseId, details) => {
+  try {
+    const result = await analyzeAlcohol(details)
+    await supabase.from('Gasto').update({tiene_alcohol: result}).eq('id_gasto', expenseId)
+    return result
+  }
+  catch (error) {
+    console.warn('Error en updateAlcoholInExpenseFromDetails:', error.message)
+    return false
+  }
+}
+
+// Recalcula y actualiza el indicador de alcohol de un gasto puntual a partir de su descripcion libre
+const updateAlcoholInExpenseFromText = async (expenseId, text) => {
+  try {
+    const result = await analyzeAlcoholText(text)
+    await supabase.from('Gasto').update({tiene_alcohol: result}).eq('id_gasto', expenseId)
+    return result
+  }
+  catch (error) {
+    console.warn('Error en updateAlcoholInExpenseFromText:', error.message)
+    return false
+  }
+}
+
 // Recalcula y actualiza el indicador de alcohol de un viaje
 const updateAlcoholInTrip = async (tripId) => {
   try {
@@ -202,4 +252,10 @@ const validateText = async (text) => {
   }
 }
 
-module.exports = {analyzeAlcohol, updateAlcoholInTrip, validateText};
+module.exports = {
+  analyzeAlcohol,
+  updateAlcoholInTrip,
+  updateAlcoholInExpenseFromDetails,
+  updateAlcoholInExpenseFromText,
+  validateText,
+};
