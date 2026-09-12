@@ -41,7 +41,7 @@ const generatePdf = async (html) => {
 };
 
 // Genera el HTML de un recibo agrupado por tipo de gasto
-const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isInternational, tripId, motivo) => {
+const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isInternational, tripId, motivo, supervisor) => {
   const today = new Date()
   const day = today.getDate()
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -215,7 +215,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
     </div>
     <div class="pie">
       <div class="pie-izq">
-        <div class="linea-firma">Autorizado por</div>
+        <div class="linea-firma">${supervisor ? supervisor.nombre + ' ' + supervisor.apellido_paterno : 'Autorizado por'}</div>
       </div>
       <div class="pie-der">
         <p>Nombre: ${employee?.nombre || ''} ${employee?.apellido_paterno || ''}</p>
@@ -229,7 +229,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
 };
 
 // Genera el HTML de un recibo individual por un solo gasto
-const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId, motivo) => {
+const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId, motivo, supervisor) => {
   const today = new Date()
   const day = today.getDate()
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -396,7 +396,7 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId,
     </div>
     <div class="pie">
       <div class="pie-izq">
-        <div class="linea-firma">Autorizado por</div>
+        <div class="linea-firma">${supervisor ? supervisor.nombre + ' ' + supervisor.apellido_paterno : 'Autorizado por'}</div>
       </div>
       <div class="pie-der">
         <p>Nombre: ${employee?.nombre || ''} ${employee?.apellido_paterno || ''}</p>
@@ -416,7 +416,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   }
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('motivo, id_usuario, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad)')
+    .select('motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad)')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -425,7 +425,16 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
+  if (trip.estado !== 'APROBADO_FINAL') {
+    return {error: 'El recibo solo puede emitirse cuando el viaje está aprobado en su totalidad', status: 400}
+  }
   const employee = trip.Usuario
+  let supervisor = null
+  if (trip.id_supervisor_asignado) {
+    const {data: supervisorData} = await supabase
+      .from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', trip.id_supervisor_asignado).single()
+    supervisor = supervisorData
+  }
   if (!employee?.email_corporativo) {
     return {error: 'El empleado no tiene un correo corporativo registrado', status: 400}
   }
@@ -454,7 +463,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   if (numberError) {
     return {error: numberError, status: 500}
   }
-  const html = generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, tripId, trip.motivo)
+  const html = generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, tripId, trip.motivo, supervisor)
   const pdfBuffer = await generatePdf(html)
   const pdfBase64 = pdfBuffer.toString('base64')
   let typeName = 'Compras'
@@ -492,7 +501,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
 const sendIndividualReceipt = async (expenseId) => {
   const {data: expense, error: expenseError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, id_usuario, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad))')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad))')
     .eq('id_gasto', expenseId)
     .single()
   if (expenseError) {
@@ -504,15 +513,24 @@ const sendIndividualReceipt = async (expenseId) => {
   if (!['C', 'S'].includes(expense.tipo)) {
     return {error: 'Solo se puede generar recibo para gastos de tipo Compra o Servicio sin factura', status: 400}
   }
+  if (expense.Viaje?.estado !== 'APROBADO_FINAL') {
+    return {error: 'El recibo solo puede emitirse cuando el viaje está aprobado en su totalidad', status: 400}
+  }
   const employee = expense.Viaje?.Usuario
   if (!employee?.email_corporativo) {
     return {error: 'El empleado no tiene un correo corporativo registrado', status: 400}
+  }
+  let supervisor = null
+  if (expense.Viaje?.id_supervisor_asignado) {
+    const {data: supervisorData} = await supabase
+      .from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', expense.Viaje.id_supervisor_asignado).single()
+    supervisor = supervisorData
   }
   const {receiptNumber, error: numberError} = await getNextReceiptNumber()
   if (numberError) {
     return {error: numberError, status: 500}
   }
-  const html = generateIndividualReceiptHtml(expense, employee, receiptNumber, expense.Viaje?.id_viaje, expense.Viaje?.motivo)
+  const html = generateIndividualReceiptHtml(expense, employee, receiptNumber, expense.Viaje?.id_viaje, expense.Viaje?.motivo, supervisor)
   const pdfBuffer = await generatePdf(html)
   const pdfBase64 = pdfBuffer.toString('base64')
   let typeName = 'Compra'

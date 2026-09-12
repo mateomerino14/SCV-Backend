@@ -25,7 +25,7 @@ const getExpenseDetail = async (req, res) => {
         Imagen(url_archivo),
         Gasto_Tramo_Moneda(id_tramo, moneda, monto_origen, tipo_cambio, monto_usd),
         Gasto_Subitem(id_subitem, descripcion, monto),
-        Viaje(fecha_inicio, fecha_fin)
+        Viaje(fecha_inicio, fecha_fin, estado)
       `)
       .eq('id_gasto', expenseId)
       .single()
