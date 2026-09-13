@@ -4,9 +4,10 @@ const alcoholDetectionService = require('../shared/alcoholDetectionService')
 const supplierService = require('./supplierService')
 
 // Calcula las retenciones aplicables segun el monto, tipo de gasto y si es internacional
-const calculateRetentions = (amount, type, isInternational) => {
+// Los gastos con alcohol pierden el credito fiscal y las retenciones: se imputan completos como costo
+const calculateRetentions = (amount, type, isInternational, hasAlcohol) => {
   const amountNum = parseFloat(amount)
-  if (isInternational || type === 'F' || type === 'R') {
+  if (hasAlcohol || isInternational || type === 'F' || type === 'R') {
     return {base_imponible: amountNum, retencion_rc_iva: 0, retencion_iue: 0, retencion_it: 0, importe_costo: amountNum}
   }
   if (type === 'C') {
@@ -58,7 +59,9 @@ const createExpense = async (expenseData, file) => {
   }
   const supplierId = await supplierService.findOrCreateSupplier(expenseData.proveedor)
   const type = expenseData.tipo || 'S'
-  const retentions = calculateRetentions(totalAmount, type, isInternational)
+  const alcoholText = [expenseData.descripcion, ...(usesSubItems ? expenseData.subitems.map((item) => item.descripcion) : [])].join(' ')
+  const hasAlcohol = await alcoholDetectionService.analyzeAlcoholText(alcoholText)
+  const retentions = calculateRetentions(totalAmount, type, isInternational, hasAlcohol)
   let firstSegment = null
   if (usesSegments) {
     firstSegment = expenseData.tramos[0]
@@ -86,6 +89,7 @@ const createExpense = async (expenseData, file) => {
       retencion_iue: retentions.retencion_iue,
       retencion_it: retentions.retencion_it,
       importe_costo: retentions.importe_costo,
+      tiene_alcohol: hasAlcohol,
     })
     .select()
     .single()
@@ -131,8 +135,7 @@ const createExpense = async (expenseData, file) => {
       await supabase.from('Imagen').insert({url_archivo: urlData.publicUrl, id_gasto: expense.id_gasto})
     }
   }
-  const alcoholText = [expenseData.descripcion, ...(usesSubItems ? expenseData.subitems.map((item) => item.descripcion) : [])].join(' ')
-  alcoholDetectionService.updateAlcoholInExpenseFromText(expense.id_gasto, alcoholText).catch((error) => console.warn('Error alcohol:', error.message))
+  alcoholDetectionService.updateAlcoholInTrip(expenseData.id_viaje).catch((error) => console.warn('Error alcohol:', error.message))
   return {expense}
 };
 
@@ -153,7 +156,9 @@ const updateExpense = async (expenseId, expenseData, file) => {
   }
   const supplierId = await supplierService.findOrCreateSupplier(expenseData.proveedor)
   const type = expenseData.tipo || 'S'
-  const retentions = calculateRetentions(totalAmount, type, isInternational)
+  const alcoholText = [expenseData.descripcion, ...(usesSubItems ? expenseData.subitems.map((item) => item.descripcion) : [])].join(' ')
+  const hasAlcohol = await alcoholDetectionService.analyzeAlcoholText(alcoholText)
+  const retentions = calculateRetentions(totalAmount, type, isInternational, hasAlcohol)
   let firstSegment = null
   if (usesSegments) {
     firstSegment = expenseData.tramos[0]
@@ -180,6 +185,7 @@ const updateExpense = async (expenseId, expenseData, file) => {
       retencion_iue: retentions.retencion_iue,
       retencion_it: retentions.retencion_it,
       importe_costo: retentions.importe_costo,
+      tiene_alcohol: hasAlcohol,
     })
     .eq('id_gasto', expenseId)
   if (expenseError) {
@@ -223,8 +229,10 @@ const updateExpense = async (expenseId, expenseData, file) => {
       }
     }
   }
-  const alcoholText = [expenseData.descripcion, ...(usesSubItems ? expenseData.subitems.map((item) => item.descripcion) : [])].join(' ')
-  alcoholDetectionService.updateAlcoholInExpenseFromText(expenseId, alcoholText).catch((error) => console.warn('Error alcohol:', error.message))
+  const {data: updatedExpense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single()
+  if (updatedExpense?.id_viaje) {
+    alcoholDetectionService.updateAlcoholInTrip(updatedExpense.id_viaje).catch((error) => console.warn('Error alcohol:', error.message))
+  }
   return {}
 };
 

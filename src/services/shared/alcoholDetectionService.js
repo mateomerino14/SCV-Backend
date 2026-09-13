@@ -254,6 +254,7 @@ const validateText = async (text) => {
 
 module.exports = {
   analyzeAlcohol,
+  analyzeAlcoholText,
   updateAlcoholInTrip,
   updateAlcoholInExpenseFromDetails,
   updateAlcoholInExpenseFromText,

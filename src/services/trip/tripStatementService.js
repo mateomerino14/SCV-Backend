@@ -46,6 +46,9 @@ const getExpenseTaxValues = (expense) => {
   if (isInternational) {
     return {vat: 0, rcIva: 0, iue: 0, it: 0, cost: amount}
   }
+  if (expense.tiene_alcohol) {
+    return {vat: 0, rcIva: 0, iue: 0, it: 0, cost: amount}
+  }
   if (hasInvoice) {
     const partial = parseFloat(expense.Factura?.monto_parcial || 0)
     const vat = parseFloat((partial * vatRate).toFixed(2))
