@@ -49,9 +49,10 @@ Los archivos `01` a `04` arman la base desde cero. Los cambios posteriores sobre
 | Detalle_Factura | Lineas de detalle (productos) de una factura |
 | Impuesto | Catalogo de impuestos (IVA, etc) |
 | Factura_Impuestos | Relacion muchos a muchos entre facturas e impuestos |
-| Comentario | Observaciones sobre un viaje o gasto especifico, y justificaciones |
+| Comentario | Observaciones sobre un viaje o gasto especifico, y justificaciones (una por dia excedido) |
 | Auditoria | Registro de auditoria (ingreso, salida, cambio de clave) |
 | Correlativo_Recibo | Tabla contador para numerar recibos y documentos PDF generados |
+| Solicitud_Reemplazo | Solicitudes para que un tercero rinda los gastos de un viaje en nombre de otro empleado |
 
 ## Flujo de estados de Viaje
 
@@ -66,10 +67,11 @@ Los archivos `01` a `04` arman la base desde cero. Los cambios posteriores sobre
 **Segundo flujo** - rendicion de gastos:
 
 6. EN_REVISION
-7. APROBADO_SUPERVISOR
-8. APROBADO_FINAL
+7. EN_REVISION_APROBADOR (solo si la rendicion tiene alcohol; en caso contrario se salta este paso)
+8. APROBADO_SUPERVISOR
+9. APROBADO_FINAL
 
-En cualquier etapa de revision (2, 3, 4, 6 o 7), el viaje tambien puede pasar a **RECHAZADO** en vez de continuar al siguiente paso. El rechazo incrementa `ciclo_revision`, y la bandera `fue_iniciado` distingue si ocurrio en el primer o el segundo flujo.
+En cualquier etapa de revision (2, 3, 4, 6, 7 u 8), el viaje tambien puede pasar a **RECHAZADO** en vez de continuar al siguiente paso. El rechazo incrementa `ciclo_revision`, y la bandera `fue_iniciado` distingue si ocurrio en el primer o el segundo flujo.
 
 ## Notas del esquema
 
@@ -101,7 +103,7 @@ Contar las tablas creadas:
 select count(*) from information_schema.tables where table_schema = 'public';
 ```
 
-Debe devolver 19.
+Debe devolver 20.
 
 Comprobar que las columnas temporales quedaron bien tipadas:
 
@@ -112,7 +114,7 @@ where table_schema = 'public' and data_type like 'timestamp%'
 order by table_name, column_name;
 ```
 
-Las siete filas deben indicar `timestamp with time zone`.
+Las nueve filas deben indicar `timestamp with time zone`.
 
 ## Variables de entorno necesarias
 
