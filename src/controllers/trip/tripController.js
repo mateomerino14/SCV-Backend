@@ -40,7 +40,7 @@ const getHistory = async (req, res) => {
 
 // Obtiene el detalle de un viaje
 const getTripDetail = async (req, res) => {
-  const result = await tripService.getTripDetail(req.params.id)
+  const result = await tripService.getTripDetail(req.params.id, req.user.id_usuario)
   if (result.error) {
     return res.status(500).json({error: result.error})
   }

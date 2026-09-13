@@ -39,6 +39,7 @@ const reviewerRoute = require('./routes/approval/reviewer')
 const approverRoute = require('./routes/approval/approver')
 const treasurerRoute = require('./routes/approval/treasurer')
 const deadlineAuthorizationRoute = require('./routes/approval/deadlineAuthorization')
+const substitutionRoute = require('./routes/approval/substitution')
 const adminRoute = require('./routes/admin/admin')
 
 app.use('/role', roleRoute)
@@ -60,6 +61,7 @@ app.use('/auth', authRoute)
 app.use('/admin', adminRoute)
 app.use('/reviewer', reviewerRoute)
 app.use('/deadline-authorization', deadlineAuthorizationRoute)
+app.use('/substitution', substitutionRoute)
 app.use('/approver', approverRoute)
 
 // Traduce los errores de carga de archivos a una respuesta legible

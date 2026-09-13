@@ -1,5 +1,6 @@
 const supabase = require('../../config/supabase')
 const expenseSummaryService = require('../approval/expenseSummaryService')
+const substitutionService = require('../approval/substitutionService')
 const commentModerationService = require('../shared/commentModerationService')
 
 const tripStateCategories = {
@@ -48,10 +49,12 @@ const getDashboardData = async (userId) => {
   if (recentError) {
     return {error: recentError.message}
   }
+  const substitutions = await substitutionService.getActiveSubstitutions(userId)
   return {
     viajesBorrador: draftTrips || [],
     viajesEnCurso: currentTripsWithExpenses,
     viajesRecientes: recentTrips || [],
+    viajesSustitucion: substitutions,
   }
 };
 
@@ -90,7 +93,7 @@ const getHistory = async (userId, page, limit, filter) => {
 };
 
 // Obtiene el detalle completo de un viaje, con sus gastos y comentarios
-const getTripDetail = async (tripId) => {
+const getTripDetail = async (tripId, requesterId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd))')
@@ -98,6 +101,10 @@ const getTripDetail = async (tripId) => {
     .single()
   if (tripError) {
     return {error: tripError.message}
+  }
+  let esSustitucion = false
+  if (requesterId && trip.id_usuario !== requesterId) {
+    esSustitucion = await substitutionService.canActOnTrip(tripId, requesterId)
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
@@ -127,6 +134,7 @@ const getTripDetail = async (tripId) => {
     hotelAcumuladoUsd: summary.hotelAccumuladoUsd,
     excedeTotal: summary.totalExceeds,
     excedeTotalUsd: summary.totalExceedsUsd,
+    esSustitucion,
   }
 };
 
@@ -221,7 +229,10 @@ const confirmCompletion = async (tripId, userId, justifications) => {
     return {error: 'Viaje no encontrado', status: 404}
   }
   if (trip.id_usuario !== userId) {
-    return {error: 'No tienes permiso para finalizar este viaje', status: 403}
+    const canAct = await substitutionService.canActOnTrip(tripId, userId)
+    if (!canAct) {
+      return {error: 'No tienes permiso para finalizar este viaje', status: 403}
+    }
   }
   if (trip.estado !== 'EN_CURSO' && trip.estado !== 'RECHAZADO') {
     return {error: 'Solo puedes finalizar viajes en curso o rechazados (en fase de gastos)', status: 400}
