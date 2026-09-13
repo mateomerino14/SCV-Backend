@@ -200,6 +200,7 @@ create table if not exists "Comentario" (
   fecha timestamptz not null,
   tipo varchar(20) not null default 'OBSERVACION' check (tipo in ('JUSTIFICACION', 'OBSERVACION')),
   ciclo_revision integer,
+  fecha_justificada date,
   id_usuario integer not null references "Usuario"(id_usuario),
   id_viaje integer not null references "Viaje"(id_viaje),
   id_gasto integer references "Gasto"(id_gasto) on delete cascade

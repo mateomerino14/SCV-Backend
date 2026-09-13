@@ -8,7 +8,7 @@ const dependencyAssignmentService = require('../shared/dependencyAssignmentServi
 const getPendingTripReviews = async (supervisorId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, Cargo(nombre, monto_diario, monto_diario_usd))')
     .eq('estado', 'EN_REVISION_VIAJE')
     .is('id_supervisor_asignado', null)
     .neq('id_usuario', supervisorId)
@@ -39,7 +39,7 @@ const getPendingTripReviews = async (supervisorId, filters) => {
 const getMyTripReviews = async (supervisorId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre)), Comentario(*)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd)), Comentario(*)')
     .eq('id_supervisor_asignado', supervisorId)
     .or('estado.eq.EN_CURSO,and(fue_iniciado.eq.false,estado.in.(EN_REVISION_VIAJE,APROBADO_VIAJE,EN_REVISION_TESORERO,RECHAZADO))')
   if (filters.fecha_inicio) {
@@ -109,7 +109,7 @@ const returnTripReview = async (tripId, supervisorId) => {
 const getTripReviewDetail = async (tripId, supervisorId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd))')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -197,6 +197,11 @@ const attachSummaryToTrips = (trips) => {
       gastoAcumuladoUsd: summary.accumulatedExpenseUsd,
       excedePresupuesto: summary.exceedsBudget,
       excedePresupuestoUsd: summary.exceedsBudgetUsd,
+      diasExcedidos: summary.exceededDays,
+      desgloseDiario: summary.dailyBreakdown,
+      excedeHoteles: summary.hotelExceeds || summary.hotelExceedsUsd,
+      excedeTotal: summary.totalExceeds,
+      excedeTotalUsd: summary.totalExceedsUsd,
       alertas: alerts,
       estadoRevision: reviewStatus,
     }
@@ -207,7 +212,7 @@ const attachSummaryToTrips = (trips) => {
 const getPendingExpenseReviews = async (supervisorId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, Cargo(nombre)), Gasto(monto_total, es_gasto_internacional)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'EN_REVISION')
     .is('id_supervisor_asignado', null)
     .neq('id_usuario', supervisorId)
@@ -238,7 +243,7 @@ const getPendingExpenseReviews = async (supervisorId, filters) => {
 const getMyExpenseReviews = async (supervisorId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre)), Gasto(monto_total, es_gasto_internacional), Comentario(*)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)')
     .eq('id_supervisor_asignado', supervisorId)
     .in('estado', ['EN_REVISION', 'APROBADO_SUPERVISOR', 'RECHAZADO'])
     .eq('fue_iniciado', true)
@@ -309,7 +314,7 @@ const returnExpenseReview = async (tripId, supervisorId) => {
 const getExpenseReviewDetail = async (tripId, supervisorId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd))')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -338,6 +343,11 @@ const getExpenseReviewDetail = async (tripId, supervisorId) => {
     accumulatedExpenseUsd: summary.accumulatedExpenseUsd,
     exceedsBudget: summary.exceedsBudget,
     exceedsBudgetUsd: summary.exceedsBudgetUsd,
+    exceededDays: summary.exceededDays,
+    dailyBreakdown: summary.dailyBreakdown,
+    hotelExceeds: summary.hotelExceeds || summary.hotelExceedsUsd,
+    totalExceeds: summary.totalExceeds,
+    totalExceedsUsd: summary.totalExceedsUsd,
     alerts,
   }
 };

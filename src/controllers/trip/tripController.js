@@ -123,9 +123,9 @@ const submitToReview = async (req, res) => {
 
 // Confirma la finalizacion de un viaje
 const confirmCompletion = async (req, res) => {
-  const {justificacion} = req.body
+  const {justificaciones} = req.body
   const userId = req.user.id_usuario
-  const result = await tripService.confirmCompletion(req.params.id, userId, justificacion)
+  const result = await tripService.confirmCompletion(req.params.id, userId, justificaciones)
   if (result.error) {
     return res.status(result.status).json({error: result.error})
   }

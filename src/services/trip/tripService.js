@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase')
+const expenseSummaryService = require('../approval/expenseSummaryService')
 const commentModerationService = require('../shared/commentModerationService')
 
 const tripStateCategories = {
@@ -92,7 +93,7 @@ const getHistory = async (userId, page, limit, filter) => {
 const getTripDetail = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd))')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -110,7 +111,23 @@ const getTripDetail = async (tripId) => {
     .select('*')
     .eq('id_viaje', tripId)
     .order('fecha', {ascending: false})
-  return {viaje: trip, gastos: expenses || [], comentarios: comments || []}
+  const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip)
+  return {
+    viaje: trip,
+    gastos: expenses || [],
+    comentarios: comments || [],
+    gastoAcumulado: summary.accumulatedExpense,
+    gastoAcumuladoUsd: summary.accumulatedExpenseUsd,
+    excedePresupuesto: summary.exceedsBudget,
+    excedePresupuestoUsd: summary.exceedsBudgetUsd,
+    diasExcedidos: summary.exceededDays,
+    desgloseDiario: summary.dailyBreakdown,
+    excedeHoteles: summary.hotelExceeds || summary.hotelExceedsUsd,
+    hotelAcumulado: summary.hotelAccumulated,
+    hotelAcumuladoUsd: summary.hotelAccumuladoUsd,
+    excedeTotal: summary.totalExceeds,
+    excedeTotalUsd: summary.totalExceedsUsd,
+  }
 };
 
 // Reedita un viaje en borrador o rechazado
@@ -194,10 +211,10 @@ const submitToReview = async (tripId, userId) => {
 };
 
 // Confirma la finalizacion de un viaje y lo envia a revision de gastos
-const confirmCompletion = async (tripId, userId, justification) => {
+const confirmCompletion = async (tripId, userId, justifications) => {
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('*')
+    .select('*, Usuario!viaje_id_usuario_foreign(Cargo(monto_diario, monto_diario_usd))')
     .eq('id_viaje', tripId)
     .single()
   if (!trip) {
@@ -209,8 +226,28 @@ const confirmCompletion = async (tripId, userId, justification) => {
   if (trip.estado !== 'EN_CURSO' && trip.estado !== 'RECHAZADO') {
     return {error: 'Solo puedes finalizar viajes en curso o rechazados (en fase de gastos)', status: 400}
   }
-  if (justification && commentModerationService.containsForbiddenWords(justification)) {
-    return {error: 'La justificación contiene palabras inapropiadas', status: 400}
+  const justificationList = Array.isArray(justifications) ? justifications : []
+  for (const item of justificationList) {
+    if (item.descripcion && commentModerationService.containsForbiddenWords(item.descripcion)) {
+      return {error: 'La justificación contiene palabras inapropiadas', status: 400}
+    }
+  }
+  const {data: expenses} = await supabase
+    .from('Gasto')
+    .select('monto_total, fecha_gasto, es_gasto_internacional, Categoria_Gasto(nombre)')
+    .eq('id_viaje', tripId)
+  const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip)
+  const providedDates = new Set(
+    justificationList.filter((item) => item.fecha && item.descripcion?.trim()).map((item) => item.fecha)
+  )
+  const missingDay = summary.exceededDays.find((day) => !providedDates.has(day.fecha))
+  if (missingDay) {
+    return {error: `Debes justificar el exceso del día ${missingDay.fecha}`, status: 400}
+  }
+  const needsHotelJustification = summary.hotelExceeds || summary.hotelExceedsUsd
+  const hotelJustification = justificationList.find((item) => !item.fecha)
+  if (needsHotelJustification && !hotelJustification?.descripcion?.trim()) {
+    return {error: 'Debes justificar el exceso en hoteles', status: 400}
   }
   const wasRejected = trip.estado === 'RECHAZADO'
   const updateData = {
@@ -229,15 +266,20 @@ const confirmCompletion = async (tripId, userId, justification) => {
   if (updateError) {
     return {error: updateError.message, status: 500}
   }
-  if (justification) {
-    await supabase.from('Comentario').insert({
-      descripcion: justification,
+  const currentCycle = updateData.ciclo_revision || trip.ciclo_revision || 1
+  const commentsToInsert = justificationList
+    .filter((item) => item.descripcion?.trim())
+    .map((item) => ({
+      descripcion: item.descripcion.trim(),
       fecha: new Date().toISOString(),
+      fecha_justificada: item.fecha || null,
       id_usuario: userId,
       id_viaje: parseInt(tripId),
       tipo: 'JUSTIFICACION',
-      ciclo_revision: updateData.ciclo_revision || trip.ciclo_revision || 1,
-    })
+      ciclo_revision: currentCycle,
+    }))
+  if (commentsToInsert.length > 0) {
+    await supabase.from('Comentario').insert(commentsToInsert)
   }
   return {message: 'Viaje enviado a revisión de gastos correctamente'}
 };

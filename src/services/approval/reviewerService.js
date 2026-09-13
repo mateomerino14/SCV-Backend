@@ -16,6 +16,11 @@ const attachSummaryToTrips = (trips) => {
       gastoAcumuladoUsd: summary.accumulatedExpenseUsd,
       excedePresupuesto: summary.exceedsBudget,
       excedePresupuestoUsd: summary.exceedsBudgetUsd,
+      diasExcedidos: summary.exceededDays,
+      desgloseDiario: summary.dailyBreakdown,
+      excedeHoteles: summary.hotelExceeds || summary.hotelExceedsUsd,
+      excedeTotal: summary.totalExceeds,
+      excedeTotalUsd: summary.totalExceedsUsd,
       alertas: alerts,
       estadoRevision: reviewStatus,
     }
@@ -26,7 +31,7 @@ const attachSummaryToTrips = (trips) => {
 const getPendingReviews = async (reviewerId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre)), Gasto(monto_total, es_gasto_internacional)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'APROBADO_SUPERVISOR')
     .neq('id_usuario', reviewerId)
   if (filters.fecha_inicio) {
@@ -51,7 +56,7 @@ const getPendingReviews = async (reviewerId, filters) => {
 const getMyReviews = async (reviewerId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre)), Gasto(monto_total, es_gasto_internacional), Comentario(*)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)')
     .eq('id_revisor_asignado', reviewerId)
   if (filters.fecha_inicio) {
     query = query.gte('fecha_inicio', filters.fecha_inicio)
@@ -75,7 +80,7 @@ const getMyReviews = async (reviewerId, filters) => {
 const getReviewDetail = async (tripId, reviewerId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd))')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -100,6 +105,11 @@ const getReviewDetail = async (tripId, reviewerId) => {
     accumulatedExpenseUsd: summary.accumulatedExpenseUsd,
     exceedsBudget: summary.exceedsBudget,
     exceedsBudgetUsd: summary.exceedsBudgetUsd,
+    exceededDays: summary.exceededDays,
+    dailyBreakdown: summary.dailyBreakdown,
+    hotelExceeds: summary.hotelExceeds || summary.hotelExceedsUsd,
+    totalExceeds: summary.totalExceeds,
+    totalExceedsUsd: summary.totalExceedsUsd,
     alerts,
   }
 };
@@ -170,7 +180,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
 const approveReview = async (tripId, reviewerId) => {
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd))')
     .eq('id_viaje', tripId)
     .single()
   if (!trip) {
@@ -186,7 +196,7 @@ const approveReview = async (tripId, reviewerId) => {
   if (error) {
     return {error: error.message, status: 500}
   }
-  const {data: reviewer} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre)').eq('id_usuario', reviewerId).single()
+  const {data: reviewer} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre, monto_diario, monto_diario_usd)').eq('id_usuario', reviewerId).single()
   const {data: expenses} = await supabase
     .from('Gasto').select('*, Categoria_Gasto(nombre), Proveedor(nombre), Factura(numero_factura, monto_parcial)').eq('id_viaje', tripId)
   const year = new Date().getFullYear()

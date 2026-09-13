@@ -117,6 +117,7 @@ const saveInvoice = async (invoiceData, file) => {
       modificado: !!invoiceData.modificado_manualmente,
       id_viaje: invoiceData.id_viaje,
       id_proveedor: supplierId,
+      id_categoria: invoiceData.id_categoria_gasto || null,
       tiene_alcohol: hasAlcohol,
     })
     .select()
@@ -225,6 +226,7 @@ const updateInvoice = async (expenseId, invoiceData, file) => {
       tipo: invoiceData.tipo_doc,
       modificado: true,
       id_proveedor: supplierId,
+      id_categoria: invoiceData.id_categoria_gasto || null,
       tiene_alcohol: hasAlcohol,
     })
     .eq('id_gasto', expenseId)

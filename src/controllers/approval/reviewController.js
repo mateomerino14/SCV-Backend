@@ -156,6 +156,11 @@ const getExpenseReviewDetail = async (req, res) => {
       gastoAcumuladoUsd: result.accumulatedExpenseUsd,
       excedePresupuesto: result.exceedsBudget,
       excedePresupuestoUsd: result.exceedsBudgetUsd,
+      diasExcedidos: result.exceededDays,
+      desgloseDiario: result.dailyBreakdown,
+      excedeHoteles: result.hotelExceeds,
+      excedeTotal: result.totalExceeds,
+      excedeTotalUsd: result.totalExceedsUsd,
       alertas: result.alerts,
     })
   }

@@ -26,6 +26,7 @@ Los archivos `01` a `04` arman la base desde cero. Los cambios posteriores sobre
 | `07_migrate_alcohol_gasto.sql` | Agrega `tiene_alcohol` a `Gasto`, para resaltar el gasto puntual en las tablas de revision |
 | `08_migrate_carnet_identidad.sql` | Agrega `carnet_identidad` a `Usuario`, para mostrarlo en el recibo |
 | `09_migrate_estado_revision_aprobador.sql` | Agrega el estado `EN_REVISION_APROBADOR` a `Viaje`, para la revision adicional del aprobador cuando hay alcohol |
+| `10_migrate_justificacion_diaria.sql` | Agrega `fecha_justificada` a `Comentario`, para justificar cada dia excedido por separado |
 
 ## Tablas del sistema
 

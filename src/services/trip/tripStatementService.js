@@ -101,7 +101,7 @@ const formatDate = (dateInput) => {
 }
 
 // Genera el HTML de la planilla de rendicion de cuentas
-const generateStatementHtml = (trip, expenses, justificationText) => {
+const generateStatementHtml = (trip, expenses, dayJustifications) => {
   const employee = trip.Usuario
   const responsable = `${employee?.nombre || ''} ${employee?.apellido_paterno || ''}`.trim().toUpperCase()
   const cargo = employee?.Cargo?.nombre?.toUpperCase() || ''
@@ -281,7 +281,12 @@ const generateStatementHtml = (trip, expenses, justificationText) => {
       </table>
       <div class="observaciones">
         <p class="observaciones-titulo">OBSERVACIONES:</p>
-        <p>${escapeHtml(justificationText || '')}</p>
+        ${dayJustifications.length === 0
+          ? '<p>—</p>'
+          : dayJustifications.map((item) => {
+            const label = item.fecha_justificada ? formatDate(item.fecha_justificada) : 'Hoteles'
+            return `<p><strong>${label}:</strong> ${escapeHtml(item.descripcion)}</p>`
+          }).join('')}
       </div>
     </div>
     <div class="firmas">
@@ -322,13 +327,12 @@ const generateStatementPdf = async (tripId) => {
   }
   const {data: comments} = await supabase
     .from('Comentario')
-    .select('descripcion, tipo')
+    .select('descripcion, fecha_justificada, tipo')
     .eq('id_viaje', tripId)
     .eq('tipo', 'JUSTIFICACION')
-    .order('fecha', {ascending: false})
-    .limit(1)
-  const justificationText = comments?.[0]?.descripcion || ''
-  const html = generateStatementHtml(trip, expenses || [], justificationText)
+    .order('fecha', {ascending: true})
+  const dayJustifications = comments || []
+  const html = generateStatementHtml(trip, expenses || [], dayJustifications)
   const pdfBuffer = await htmlPdf.generatePdf({content: html}, {
     format: 'A4',
     landscape: true,
