@@ -6,7 +6,7 @@ const commentModerationService = require('../shared/commentModerationService')
 const tripStateCategories = {
   draft: ['BORRADOR'],
   previous: ['EN_REVISION_VIAJE', 'APROBADO_VIAJE', 'EN_REVISION_TESORERO'],
-  expenses: ['EN_CURSO', 'EN_REVISION', 'APROBADO_SUPERVISOR', 'APROBADO_FINAL'],
+  expenses: ['EN_CURSO', 'EN_REVISION', 'EN_REVISION_APROBADOR', 'APROBADO_SUPERVISOR', 'APROBADO_FINAL'],
 }
 
 // Obtiene los datos del dashboard de un usuario: borradores, viajes en curso y recientes

@@ -21,3 +21,5 @@ create table if not exists "Solicitud_Reemplazo" (
 create index if not exists idx_reemplazo_id_viaje on "Solicitud_Reemplazo"(id_viaje);
 create index if not exists idx_reemplazo_id_sustituto on "Solicitud_Reemplazo"(id_sustituto);
 create index if not exists idx_reemplazo_estado on "Solicitud_Reemplazo"(estado);
+
+alter table "Solicitud_Reemplazo" enable row level security;
