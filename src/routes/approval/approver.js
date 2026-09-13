@@ -3,6 +3,7 @@ const router = express.Router()
 const authMiddleware = require('../../middlewares/auth')
 const roleMiddleware = require('../../middlewares/roleAuth')
 const approverController = require('../../controllers/approval/approverController')
+const approverAlcoholReviewController = require('../../controllers/approval/approverAlcoholReviewController')
 
 router.get('/pending-trips', authMiddleware, roleMiddleware(['APROBADOR']), approverController.getPendingTrips)
 router.get('/my-trips', authMiddleware, roleMiddleware(['APROBADOR']), approverController.getMyTrips)
@@ -12,5 +13,16 @@ router.post('/trip/:tripId/reject', authMiddleware, roleMiddleware(['APROBADOR']
 router.post('/trip/:tripId/comment', authMiddleware, roleMiddleware(['APROBADOR']), approverController.addComment)
 router.put('/trip/:tripId/comment/:commentId', authMiddleware, roleMiddleware(['APROBADOR']), approverController.editComment)
 router.delete('/trip/:tripId/comment/:commentId', authMiddleware, roleMiddleware(['APROBADOR']), approverController.deleteComment)
+
+router.get('/alcohol-review/pending', authMiddleware, roleMiddleware(['APROBADOR']), approverAlcoholReviewController.getPendingAlcoholReviews)
+router.get('/alcohol-review/mine', authMiddleware, roleMiddleware(['APROBADOR']), approverAlcoholReviewController.getMyAlcoholReviews)
+router.post('/alcohol-review/:tripId/take', authMiddleware, roleMiddleware(['APROBADOR']), approverAlcoholReviewController.takeAlcoholReview)
+router.post('/alcohol-review/:tripId/return', authMiddleware, roleMiddleware(['APROBADOR']), approverAlcoholReviewController.returnAlcoholReview)
+router.get('/alcohol-review/:tripId', authMiddleware, roleMiddleware(['APROBADOR']), approverAlcoholReviewController.getAlcoholReviewDetail)
+router.post('/alcohol-review/:tripId/approve', authMiddleware, roleMiddleware(['APROBADOR']), approverAlcoholReviewController.approveAlcoholReview)
+router.post('/alcohol-review/:tripId/reject', authMiddleware, roleMiddleware(['APROBADOR']), approverAlcoholReviewController.rejectAlcoholReview)
+router.post('/alcohol-review/:tripId/comment', authMiddleware, roleMiddleware(['APROBADOR']), approverAlcoholReviewController.addAlcoholReviewComment)
+router.put('/alcohol-review/:tripId/comment/:commentId', authMiddleware, roleMiddleware(['APROBADOR']), approverAlcoholReviewController.editAlcoholReviewComment)
+router.delete('/alcohol-review/:tripId/comment/:commentId', authMiddleware, roleMiddleware(['APROBADOR']), approverAlcoholReviewController.deleteAlcoholReviewComment)
 
 module.exports = router;

@@ -90,7 +90,7 @@ create table if not exists "Viaje" (
   monto_asignado_usd numeric(10, 2) default 0,
   estado varchar(25) not null default 'BORRADOR' check (estado in (
     'BORRADOR', 'EN_REVISION_VIAJE', 'APROBADO_VIAJE', 'EN_REVISION_TESORERO', 'EN_CURSO',
-    'EN_REVISION', 'APROBADO_SUPERVISOR', 'APROBADO_FINAL', 'RECHAZADO'
+    'EN_REVISION', 'EN_REVISION_APROBADOR', 'APROBADO_SUPERVISOR', 'APROBADO_FINAL', 'RECHAZADO'
   )),
   fue_iniciado boolean default false,
   ciclo_revision integer not null default 1,

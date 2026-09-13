@@ -344,7 +344,7 @@ const getExpenseReviewDetail = async (tripId, supervisorId) => {
 
 // Aprueba los gastos de un viaje
 const approveExpenseReview = async (tripId, supervisorId) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_supervisor_asignado, estado').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_supervisor_asignado, estado, tiene_alcohol').eq('id_viaje', tripId).single()
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
@@ -357,9 +357,13 @@ const approveExpenseReview = async (tripId, supervisorId) => {
   if (trip.estado !== 'EN_REVISION') {
     return {error: 'Este viaje no está en revisión de gastos', status: 400}
   }
-  const {error} = await supabase.from('Viaje').update({estado: 'APROBADO_SUPERVISOR'}).eq('id_viaje', tripId)
+  const nextState = trip.tiene_alcohol ? 'EN_REVISION_APROBADOR' : 'APROBADO_SUPERVISOR'
+  const {error} = await supabase.from('Viaje').update({estado: nextState}).eq('id_viaje', tripId)
   if (error) {
     return {error: error.message, status: 500}
+  }
+  else if (trip.tiene_alcohol) {
+    return {message: 'Gastos aprobados por supervisor, pasan a revisión adicional del aprobador por contener alcohol'}
   }
   else {
     return {message: 'Gastos aprobados por supervisor correctamente'}

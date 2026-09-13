@@ -17,10 +17,11 @@ const getActiveUsersByRole = async (roleName) => {
 
 // Cuenta cuantos viajes esperan cada tipo de revision
 const getPendingCounts = async () => {
-  const [tripReviews, expenseReviews, approverReviews, reviewerReviews, treasurerReviews] = await Promise.all([
+  const [tripReviews, expenseReviews, approverReviews, alcoholReviews, reviewerReviews, treasurerReviews] = await Promise.all([
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION_VIAJE').is('id_supervisor_asignado', null),
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION').is('id_supervisor_asignado', null),
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'APROBADO_VIAJE'),
+    supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION_APROBADOR').is('id_aprobador_asignado', null),
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'APROBADO_SUPERVISOR'),
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION_TESORERO'),
   ])
@@ -28,6 +29,7 @@ const getPendingCounts = async () => {
     pendingTripReviews: tripReviews.count || 0,
     pendingExpenseReviews: expenseReviews.count || 0,
     pendingApproverReviews: approverReviews.count || 0,
+    pendingAlcoholReviews: alcoholReviews.count || 0,
     pendingReviewerReviews: reviewerReviews.count || 0,
     pendingTreasurerReviews: treasurerReviews.count || 0,
   }
@@ -74,8 +76,9 @@ const sendDailyDigest = async () => {
     if (counts.pendingApproverReviews > 0) {
       approverLines.push(`${counts.pendingApproverReviews} viaje(s) esperando tu aprobación previa a tesorería.`)
     }
-    // Nota: el aviso de rendiciones con alcohol pendientes de revision adicional del aprobador
-    // se agrega aqui cuando exista ese flujo de revision
+    if (counts.pendingAlcoholReviews > 0) {
+      approverLines.push(`${counts.pendingAlcoholReviews} rendición(es) con alcohol esperando tu revisión adicional.`)
+    }
     await sendDigestToGroup(approvers, 'Resumen diario — Pendientes de Aprobación', approverLines)
 
     const reviewers = await getActiveUsersByRole('REVISOR')
