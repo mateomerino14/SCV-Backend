@@ -1,6 +1,7 @@
 const supabase = require('../../config/supabase')
 const expenseSummaryService = require('../approval/expenseSummaryService')
 const substitutionService = require('../approval/substitutionService')
+const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
 const commentModerationService = require('../shared/commentModerationService')
 
 const tripStateCategories = {
@@ -191,6 +192,7 @@ const editTrip = async (tripId, userId, tripData) => {
   let message = 'Borrador actualizado correctamente'
   if (wasRejected) {
     message = 'Viaje reeditado y reenviado a revisión correctamente'
+    await hierarchyAssignmentService.assignNextReviewer(tripId, userId, 'SUPERVISOR', 'id_supervisor_asignado')
   }
   return {message}
 };
@@ -218,6 +220,7 @@ const submitToReview = async (tripId, userId) => {
   if (error) {
     return {error: error.message, status: 500}
   }
+  await hierarchyAssignmentService.assignNextReviewer(tripId, userId, 'SUPERVISOR', 'id_supervisor_asignado')
   return {message: 'Viaje enviado a revisión correctamente'}
 };
 

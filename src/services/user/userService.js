@@ -74,7 +74,7 @@ const releaseAssignedTrips = async (userId) => {
   await supabase.from('Viaje')
     .update({id_aprobador_asignado: null})
     .eq('id_aprobador_asignado', userId)
-    .eq('estado', 'APROBADO_VIAJE')
+    .in('estado', ['APROBADO_VIAJE', 'EN_REVISION_APROBADOR'])
   await supabase.from('Viaje')
     .update({id_revisor_asignado: null})
     .eq('id_revisor_asignado', userId)
