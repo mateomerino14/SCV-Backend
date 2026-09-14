@@ -3,7 +3,7 @@ const commentModerationService = require('../shared/commentModerationService')
 const emailService = require('../shared/emailService')
 const approvalMemoService = require('./approvalMemoService')
 const textNormalizer = require('../../utils/textNormalizer')
-const dependencyAssignmentService = require('../shared/dependencyAssignmentService')
+const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
 
 const memoPositions = [
   'Asistente Administrativo de Seguros y Servicios',
@@ -62,7 +62,7 @@ const sendApprovalMemo = async (trip, approver, tripCode, allUsers) => {
 const getPendingTrips = async (approverId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre))')
     .eq('estado', 'APROBADO_VIAJE')
     .neq('id_usuario', approverId)
   if (filters.fecha_inicio) {
@@ -79,11 +79,9 @@ const getPendingTrips = async (approverId, filters) => {
     return {error: error.message}
   }
   else {
-    const [requesterDependency, dependenciesWithRole] = await Promise.all([
-      dependencyAssignmentService.getUserDependency(approverId),
-      dependencyAssignmentService.getDependenciesWithRole('APROBADOR'),
-    ])
-    const trips = dependencyAssignmentService.filterTripsByDependency(data || [], requesterDependency, dependenciesWithRole)
+    const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
+      data || [], approverId, 'APROBADOR', (trip) => trip.id_supervisor_asignado
+    )
     return {trips}
   }
 };
@@ -147,6 +145,9 @@ const approveTrip = async (tripId, approverId) => {
   if (trip.estado !== 'APROBADO_VIAJE') {
     return {error: 'Este viaje no está en aprobación previa', status: 400}
   }
+  if (trip.id_aprobador_asignado && trip.id_aprobador_asignado !== approverId) {
+    return {error: 'Este viaje ya está asignado a otro aprobador', status: 403}
+  }
   const {error} = await supabase
     .from('Viaje')
     .update({estado: 'EN_REVISION_TESORERO', id_aprobador_asignado: approverId})
@@ -170,7 +171,7 @@ const approveTrip = async (tripId, approverId) => {
 
 // Rechaza un viaje en fase de aprobacion previa
 const rejectTrip = async (tripId, approverId) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, ciclo_revision, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo)').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, ciclo_revision, id_aprobador_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo)').eq('id_viaje', tripId).single()
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
@@ -179,6 +180,9 @@ const rejectTrip = async (tripId, approverId) => {
   }
   if (trip.estado !== 'APROBADO_VIAJE') {
     return {error: 'Este viaje no está en aprobación previa', status: 400}
+  }
+  if (trip.id_aprobador_asignado && trip.id_aprobador_asignado !== approverId) {
+    return {error: 'Este viaje ya está asignado a otro aprobador', status: 403}
   }
   const {data: existingComments} = await supabase
     .from('Comentario')

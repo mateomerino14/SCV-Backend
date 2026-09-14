@@ -2,7 +2,7 @@ const supabase = require('../../config/supabase')
 const expenseSummaryService = require('./expenseSummaryService')
 const tripCommentService = require('../trip/tripCommentService')
 const emailService = require('../shared/emailService')
-const dependencyAssignmentService = require('../shared/dependencyAssignmentService')
+const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
 
 // Agrega el resumen de gastos a una lista de viajes
 const attachSummaryToTrips = (trips) => {
@@ -30,7 +30,7 @@ const attachSummaryToTrips = (trips) => {
 const getPendingAlcoholReviews = async (approverId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'EN_REVISION_APROBADOR')
     .is('id_aprobador_asignado', null)
     .neq('id_usuario', approverId)
@@ -47,11 +47,9 @@ const getPendingAlcoholReviews = async (approverId, filters) => {
   if (error) {
     return {error: error.message}
   }
-  const [requesterDependency, dependenciesWithRole] = await Promise.all([
-    dependencyAssignmentService.getUserDependency(approverId),
-    dependencyAssignmentService.getDependenciesWithRole('APROBADOR'),
-  ])
-  const trips = dependencyAssignmentService.filterTripsByDependency(data || [], requesterDependency, dependenciesWithRole)
+  const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
+    data || [], approverId, 'APROBADOR', (trip) => trip.id_supervisor_asignado
+  )
   return {trips: attachSummaryToTrips(trips)}
 }
 
@@ -59,7 +57,7 @@ const getPendingAlcoholReviews = async (approverId, filters) => {
 const getMyAlcoholReviews = async (approverId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('id_aprobador_asignado', approverId)
     .in('estado', ['EN_REVISION_APROBADOR', 'APROBADO_SUPERVISOR', 'APROBADO_FINAL', 'RECHAZADO'])
     .eq('tiene_alcohol', true)
@@ -130,7 +128,7 @@ const returnAlcoholReview = async (tripId, approverId) => {
 const getAlcoholReviewDetail = async (tripId, approverId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd))')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -188,6 +186,7 @@ const approveAlcoholReview = async (tripId, approverId) => {
     return {error: error.message, status: 500}
   }
   else {
+    await hierarchyAssignmentService.assignNextReviewer(tripId, approverId, 'REVISOR', 'id_revisor_asignado')
     return {message: 'Revisión adicional aprobada, la rendición pasa al revisor final'}
   }
 }

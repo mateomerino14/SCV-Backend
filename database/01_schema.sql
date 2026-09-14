@@ -48,7 +48,7 @@ create table if not exists "Usuario" (
   activo boolean not null default true,
   contrasenia text not null,
   foto_perfil text,
-  numero_dependencia varchar(50),
+  id_jefe_directo integer references "Usuario"(id_usuario),
   numero_seccion varchar(50),
   carnet_identidad varchar(20),
   ultima_cambio_contrasenia timestamptz default now(),
@@ -226,6 +226,8 @@ where not exists (select 1 from "Correlativo_Recibo" where id = 1);
 -- Usuarios y seguridad
 create index if not exists idx_auditoria_id_usuario on "Auditoria"(id_usuario);
 create index if not exists idx_codigo_verificacion_id_usuario on "Codigo_Verificacion"(id_usuario);
+create index if not exists idx_usuario_jefe_directo on "Usuario"(id_jefe_directo);
+create index if not exists idx_usuario_seccion on "Usuario"(numero_seccion);
 
 -- Viajes: filtrado por propietario, estado y asignacion
 create index if not exists idx_viaje_id_usuario on "Viaje"(id_usuario);
