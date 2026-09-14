@@ -64,7 +64,7 @@ Al arrancar, se programa además una tarea diaria (`node-cron`) que envía un re
 | node-cron | Resumen diario de pendientes por correo |
 | Brevo | Correo transaccional |
 | Helmet + CORS | Cabeceras de seguridad y control de orígenes |
-| express-rate-limit | Límite de intentos de inicio de sesión |
+| express-rate-limit | Límite de intentos de acceso, recuperación de contraseña y extracción de facturas |
 
 No se emplea ORM: las consultas se construyen con el constructor que provee el cliente de Supabase.
 
@@ -144,10 +144,12 @@ src/
 │                               dailyDigestService, deadlineService,
 │                               emailService, pdfService
 ├── middlewares/
-│   ├── auth.js               Verificación del token
-│   ├── roleAuth.js           Autorización por rol
-│   ├── loginRateLimiter.js   Límite de intentos de acceso
-│   └── treasurerPosition.js  Restricción por cargo
+│   ├── auth.js                     Verificación del token
+│   ├── roleAuth.js                 Autorización por rol
+│   ├── loginRateLimiter.js         Límite de intentos de inicio de sesión
+│   ├── passwordResetRateLimiter.js Límite de envío/verificación de código de recuperación
+│   ├── invoiceExtractRateLimiter.js Límite de extracciones de factura por usuario
+│   └── treasurerPosition.js        Restricción por cargo
 ├── utils/
 │   ├── forbiddenWords.js     Catálogo de términos vedados
 │   ├── numberToWords.js      Importes en letras
@@ -231,7 +233,7 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 | `dependencyAssignmentService` | Filtra la asignación de viajes por dependencia organizacional |
 | `dailyDigestService` | Arma y envía el resumen diario de pendientes por rol |
 | `emailService` | Correo transaccional mediante Brevo, con plantilla institucional común (`buildEmailLayout`) |
-| `pdfService` | Utilidad compartida para convertir HTML a PDF con `html-pdf-node`; los recibos y la planilla generan su PDF directamente y no la consumen todavía (ver sugerencias de eficiencia) |
+| `pdfService` | Conversión de HTML a PDF mediante `html-pdf-node`, consumida por recibos, planilla y memorándum |
 | `expenseSummaryService` | Calcula el control de gasto diario, el exceso contra el total (hoteles), y las alertas; consumido por la vista del empleado, supervisor, aprobador (revisión por alcohol) y revisor por igual |
 
 ### Retenciones impositivas
