@@ -56,6 +56,9 @@ const createTrip = async (req, res) => {
   if (transporte === 'Vehículo de Empresa' && !placa_vehiculo?.trim()) {
     return res.status(400).json({error: 'La placa del vehículo es requerida'})
   }
+  if (transporte === 'Vehículo de Empresa' && tipo === 'Internacional') {
+    return res.status(400).json({error: 'El vehículo de empresa solo está disponible para viajes nacionales'})
+  }
   const {data, error} = await supabase
     .from('Viaje')
     .insert({

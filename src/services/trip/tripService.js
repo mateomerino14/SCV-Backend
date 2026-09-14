@@ -157,6 +157,9 @@ const editTrip = async (tripId, userId, tripData) => {
   if (tripData.transporte === 'Vehículo de Empresa' && !tripData.placa_vehiculo?.trim()) {
     return {error: 'La placa del vehículo es requerida', status: 400}
   }
+  if (tripData.transporte === 'Vehículo de Empresa' && tripData.tipo === 'Internacional') {
+    return {error: 'El vehículo de empresa solo está disponible para viajes nacionales', status: 400}
+  }
   const updateData = {
     motivo: tripData.motivo,
     origen: tripData.origen || null,
