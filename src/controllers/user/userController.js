@@ -82,8 +82,8 @@ const changeMyPassword = async (req, res) => {
   if (!contrasenia_actual || !contrasenia_nueva) {
     return res.status(400).json({error: 'Todos los campos son requeridos'})
   }
-  if (contrasenia_nueva.length < 6) {
-    return res.status(400).json({error: 'La nueva contraseña debe tener al menos 6 caracteres'})
+  if (contrasenia_nueva.length < 8) {
+    return res.status(400).json({error: 'La nueva contraseña debe tener al menos 8 caracteres'})
   }
   const {data: user, error: userError} = await supabase
     .from('Usuario').select('contrasenia').eq('id_usuario', userId).single()
@@ -109,7 +109,9 @@ const changeMyPassword = async (req, res) => {
 
 // Lista todos los usuarios
 const getAllUsers = async (req, res) => {
-  const {data, error} = await supabase.from('Usuario').select('*')
+  const {data, error} = await supabase
+    .from('Usuario')
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_cargo, numero_dependencia, numero_seccion, carnet_identidad')
   if (error) {
     return res.status(500).json({error: error.message})
   }
@@ -177,6 +179,9 @@ const updateUser = async (req, res) => {
 // Crea un nuevo usuario, validando rol y cargo unicos
 const createUser = async (req, res) => {
   const body = {...req.body}
+  if (!body.contrasenia || body.contrasenia.length < 8) {
+    return res.status(400).json({error: 'La contraseña debe tener al menos 8 caracteres'})
+  }
   if (body.telefono !== undefined) {
     body.telefono = body.telefono?.trim() || null
   }

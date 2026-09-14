@@ -4,7 +4,18 @@ const multer = require('multer')
 const authMiddleware = require('../../middlewares/auth')
 const roleMiddleware = require('../../middlewares/roleAuth')
 const userController = require('../../controllers/user/userController')
-const upload = multer({storage: multer.memoryStorage()})
+const maxProfilePhotoSize = 5 * 1024 * 1024
+const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {fileSize: maxProfilePhotoSize, files: 1},
+  fileFilter: (req, file, callback) => {
+    if (!allowedImageTypes.includes(file.mimetype)) {
+      return callback(new Error('Solo se permiten imágenes JPG, PNG o WEBP'))
+    }
+    callback(null, true)
+  },
+})
 
 router.get('/me', authMiddleware, userController.getMe)
 router.put('/me/update', authMiddleware, userController.updateMe)
