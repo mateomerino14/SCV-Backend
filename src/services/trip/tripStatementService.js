@@ -3,6 +3,9 @@ const pdfService = require('../shared/pdfService')
 
 const vatRate = 0.13
 
+// Blanquea el placeholder que usa la IA cuando no logra extraer un dato
+const cleanValue = (value) => (value === 'No Especificado' ? '' : (value || ''))
+
 const symbologyRows = [
   ['F', 'Compra Bien/Servicio c/factura'],
   ['C', 'Compra de Bien sin factura'],
@@ -68,9 +71,9 @@ const getExpenseDescription = (expense) => {
   const hasInvoice = !!expense.Factura
   if (hasInvoice) {
     const products = (expense.Factura?.Detalle_Factura || [])
-      .map((detail) => `${detail.nombre_producto}${detail.cantidad ? ` x${detail.cantidad}` : ''}`)
+      .map((detail) => `${cleanValue(detail.nombre_producto)}${detail.cantidad ? ` x${detail.cantidad}` : ''}`)
       .join(', ')
-    return escapeHtml((products || expense.descripcion || `Factura N° ${expense.Factura?.numero_factura || ''}`).toUpperCase())
+    return escapeHtml((products || expense.descripcion || `Factura N° ${cleanValue(expense.Factura?.numero_factura)}`).toUpperCase())
   }
   const subitems = expense.Gasto_Subitem || []
   if (subitems.length > 0) {
@@ -150,8 +153,8 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
       <td class="col-oracle">${oracleValue}</td>
       <td class="col-detalle">${detailText}</td>
       <td class="col-tipo">${oracleType}</td>
-      <td class="col-doc">${escapeHtml(expense.Factura?.numero_factura || '')}</td>
-      <td class="col-nit">${escapeHtml(expense.Proveedor?.numero_doc_fiscal || '')}</td>
+      <td class="col-doc">${escapeHtml(cleanValue(expense.Factura?.numero_factura))}</td>
+      <td class="col-nit">${escapeHtml(cleanValue(expense.Proveedor?.numero_doc_fiscal))}</td>
       <td class="col-importe-fact">${hasInvoice ? amount.toFixed(2) : ''}</td>
       <td class="col-tramos">${tramosText}</td>
       <td class="col-importe">${amount.toFixed(2)} ${currency}</td>
@@ -181,7 +184,7 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   @page { size: landscape; margin: 0; }
-  body { font-family: Arial, sans-serif; font-size: 8pt; color: #000; background: #fff; }
+  body { font-family: Arial, sans-serif; font-size: 8pt; color: #000; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .marco { border: 1.5px solid #000; padding: 12px 16px; width: 100%; min-height: 100vh; }
   .header { display: flex; justify-content: space-between; align-items: stretch; margin-bottom: 8px; gap: 10px; }
   .logo { font-size: 11pt; font-weight: bold; width: 15%; display: flex; align-items: center; }
@@ -194,7 +197,7 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
   .info-box { border: 1px solid #000; background: #eaf3fb; padding: 4px 8px; margin-bottom: 8px; display: grid; grid-template-columns: repeat(4, auto 1fr); gap: 3px 8px; font-size: 8pt; }
   .info-label { font-weight: bold; color: #1a5276; }
   table.principal { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-  table.principal th { background: #4a90d9; color: #fff; border: 1px solid #1b4f91; padding: 3px; font-size: 7pt; text-align: center; }
+  table.principal th { background: #cfe2f3; color: #000; font-weight: bold; border: 1px solid #1b4f91; padding: 3px; font-size: 7pt; text-align: center; }
   table.principal td { border: 1px solid #b0c4d4; padding: 3px 4px; font-size: 7.5pt; }
   .fila-nacional { background: #f4f9fd; }
   .fila-internacional { background: #fdeeee; }
@@ -213,7 +216,7 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
   .totales-fila td:first-child { text-align: left; }
   .zona-inferior { display: flex; gap: 16px; margin-bottom: 10px; }
   .balance-table { width: 45%; border-collapse: collapse; }
-  .balance-table th { background: #4a90d9; color: #fff; padding: 3px; font-size: 7.5pt; }
+  .balance-table th { background: #cfe2f3; color: #000; font-weight: bold; padding: 3px; font-size: 7.5pt; }
   .balance-table td { border: 1px solid #b0c4d4; padding: 3px 8px; font-size: 8pt; }
   .observaciones { flex: 1; border: 1px solid #000; padding: 4px 8px; font-size: 8pt; }
   .observaciones-titulo { font-weight: bold; margin-bottom: 4px; }

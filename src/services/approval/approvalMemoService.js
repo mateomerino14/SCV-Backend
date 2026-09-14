@@ -31,7 +31,7 @@ const generateMemoHtml = (trip, approver, tripCode) => {
 <meta charset="UTF-8">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Times New Roman', serif; font-size: 12pt; color: #000; background: #fff; padding: 40px 60px; line-height: 1.15; }
+  body { font-family: 'Times New Roman', serif; font-size: 12pt; color: #000; background: #fff; padding: 40px 60px; line-height: 1.15; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .logo-area { font-size: 18pt; font-weight: bold; color: #000; letter-spacing: 1px; margin-bottom: 30px; }
   .titulo { font-size: 20pt; font-weight: bold; text-align: center; letter-spacing: 2px; margin-bottom: 24px; }
   .ref-block { text-align: left; margin-left: auto; margin-bottom: 20px; max-width: 45%; font-size: 11pt; line-height: 1.6; font-style: italic; }

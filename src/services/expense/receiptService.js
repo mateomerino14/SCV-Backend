@@ -122,7 +122,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   @page { size: landscape; margin: 0; }
-  body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; background: #fff; }
+  body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .marco { border: 1.5px solid #000; padding: 16px 24px; width: 100%; min-height: 100vh; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
   .logo { font-size: 14pt; font-weight: bold; letter-spacing: 1px; width: 20%; }
@@ -301,7 +301,7 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId,
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   @page { size: landscape; margin: 0; }
-  body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; background: #fff; }
+  body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .marco { border: 1.5px solid #000; padding: 16px 24px; width: 100%; min-height: 100vh; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
   .logo { font-size: 14pt; font-weight: bold; letter-spacing: 1px; width: 20%; }
