@@ -17,7 +17,7 @@ const extractInvoice = async (req, res) => {
 const saveInvoice = async (req, res) => {
   try {
     const invoiceData = JSON.parse(req.body.datos)
-    const result = await invoiceService.saveInvoice(invoiceData, req.file)
+    const result = await invoiceService.saveInvoice(invoiceData, req.file, req.user.id_usuario)
     if (result.error) {
       return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion})
     }
@@ -36,7 +36,7 @@ const updateInvoice = async (req, res) => {
   try {
     const invoiceData = JSON.parse(req.body.datos)
     const {expenseId} = req.params
-    const result = await invoiceService.updateInvoice(expenseId, invoiceData, req.file)
+    const result = await invoiceService.updateInvoice(expenseId, invoiceData, req.file, req.user.id_usuario)
     if (result.error) {
       return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion})
     }

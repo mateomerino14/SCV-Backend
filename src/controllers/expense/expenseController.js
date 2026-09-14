@@ -79,7 +79,7 @@ const sendIndividualReceipt = async (req, res) => {
 const registerExpense = async (req, res) => {
   try {
     const expenseData = JSON.parse(req.body.datos)
-    const result = await expenseService.createExpense(expenseData, req.file)
+    const result = await expenseService.createExpense(expenseData, req.file, req.user.id_usuario)
     if (result.error) {
       return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion})
     }
@@ -95,7 +95,7 @@ const updateExpense = async (req, res) => {
   try {
     const expenseData = JSON.parse(req.body.datos)
     const {expenseId} = req.params
-    const result = await expenseService.updateExpense(expenseId, expenseData, req.file)
+    const result = await expenseService.updateExpense(expenseId, expenseData, req.file, req.user.id_usuario)
     if (result.error) {
       return res.status(result.status || 500).json({error: result.error})
     }
@@ -110,7 +110,7 @@ const updateExpense = async (req, res) => {
 const deleteExpense = async (req, res) => {
   try {
     const {expenseId} = req.params
-    const result = await expenseService.deleteExpense(expenseId)
+    const result = await expenseService.deleteExpense(expenseId, req.user.id_usuario)
     if (result.error) {
       return res.status(result.status || 500).json({error: result.error})
     }

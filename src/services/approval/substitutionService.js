@@ -273,6 +273,35 @@ const canActOnTrip = async (tripId, userId) => {
     .eq('estado', 'APROBADA')
     .maybeSingle()
   return !!approvedSubstitution
+}
+
+// Verifica si un usuario puede registrar, editar o eliminar gastos de un viaje:
+// debe ser el titular o su sustituto aprobado, y el viaje debe estar en fase de gastos
+const canRegisterExpenseOnTrip = async (tripId, userId) => {
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, fue_iniciado').eq('id_viaje', tripId).single()
+  if (!trip) {
+    return {allowed: false, error: 'Viaje no encontrado', status: 404}
+  }
+  const isOwner = trip.id_usuario === userId
+  let isSubstitute = false
+  if (!isOwner) {
+    const {data: approvedSubstitution} = await supabase
+      .from('Solicitud_Reemplazo')
+      .select('id_solicitud')
+      .eq('id_viaje', tripId)
+      .eq('id_sustituto', userId)
+      .eq('estado', 'APROBADA')
+      .maybeSingle()
+    isSubstitute = !!approvedSubstitution
+  }
+  if (!isOwner && !isSubstitute) {
+    return {allowed: false, error: 'No tienes permiso sobre este viaje', status: 403}
+  }
+  const isExpensePhase = trip.estado === 'EN_CURSO' || (trip.estado === 'RECHAZADO' && !!trip.fue_iniciado)
+  if (!isExpensePhase) {
+    return {allowed: false, error: 'Este viaje no está en fase de registro de gastos', status: 400}
+  }
+  return {allowed: true, trip}
 };
 
 module.exports = {
@@ -284,4 +313,5 @@ module.exports = {
   rejectRequest,
   getActiveSubstitutions,
   canActOnTrip,
+  canRegisterExpenseOnTrip,
 };

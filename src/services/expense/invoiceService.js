@@ -2,6 +2,7 @@ const supabase = require('../../config/supabase')
 const deadlineService = require('../shared/deadlineService')
 const alcoholDetectionService = require('../shared/alcoholDetectionService')
 const supplierService = require('./supplierService')
+const substitutionService = require('../approval/substitutionService')
 
 const ivaPercentageBolivia = 13
 
@@ -72,10 +73,14 @@ const validateInvoiceData = (invoiceData) => {
 };
 
 // Guarda una nueva factura junto con su gasto, proveedor y detalle
-const saveInvoice = async (invoiceData, file) => {
+const saveInvoice = async (invoiceData, file, userId) => {
   const validationError = validateInvoiceData(invoiceData)
   if (validationError) {
     return {error: validationError, status: 400}
+  }
+  const access = await substitutionService.canRegisterExpenseOnTrip(invoiceData.id_viaje, userId)
+  if (!access.allowed) {
+    return {error: access.error, status: access.status}
   }
   const deadlineValidation = await deadlineService.validateTripDeadline(invoiceData.id_viaje, invoiceData.fecha_emision)
   if (!deadlineValidation.valid) {
@@ -175,7 +180,7 @@ const saveInvoice = async (invoiceData, file) => {
 };
 
 // Actualiza una factura existente junto con su gasto, proveedor y detalle
-const updateInvoice = async (expenseId, invoiceData, file) => {
+const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   if (!invoiceData.proveedor) {
     return {error: 'El nombre del proveedor es requerido', status: 400}
   }
@@ -184,6 +189,14 @@ const updateInvoice = async (expenseId, invoiceData, file) => {
   }
   if (!invoiceData.monto_total || isNaN(parseFloat(invoiceData.monto_total))) {
     return {error: 'El monto total es requerido', status: 400}
+  }
+  const {data: existingExpense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single()
+  if (!existingExpense) {
+    return {error: 'Gasto no encontrado', status: 404}
+  }
+  const access = await substitutionService.canRegisterExpenseOnTrip(existingExpense.id_viaje, userId)
+  if (!access.allowed) {
+    return {error: access.error, status: access.status}
   }
   if (invoiceData.id_viaje) {
     const deadlineValidation = await deadlineService.validateTripDeadline(invoiceData.id_viaje, invoiceData.fecha_emision)

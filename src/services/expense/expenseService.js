@@ -2,6 +2,7 @@ const supabase = require('../../config/supabase')
 const deadlineService = require('../shared/deadlineService')
 const alcoholDetectionService = require('../shared/alcoholDetectionService')
 const supplierService = require('./supplierService')
+const substitutionService = require('../approval/substitutionService')
 
 // Calcula las retenciones aplicables segun el monto, tipo de gasto y si es internacional
 // Los gastos con alcohol pierden el credito fiscal y las retenciones: se imputan completos como costo
@@ -34,9 +35,13 @@ const calculateAmountFromSubitems = (subItems) => {
 };
 
 // Crea un gasto nuevo, con sus tramos de moneda, subitems e imagen asociada
-const createExpense = async (expenseData, file) => {
+const createExpense = async (expenseData, file, userId) => {
   if (!expenseData.id_viaje) {
     return {error: 'El viaje es requerido', status: 400}
+  }
+  const access = await substitutionService.canRegisterExpenseOnTrip(expenseData.id_viaje, userId)
+  if (!access.allowed) {
+    return {error: access.error, status: access.status}
   }
   const isInternational = expenseData.es_gasto_internacional || false
   const usesSegments = isInternational && Array.isArray(expenseData.tramos) && expenseData.tramos.length > 0
@@ -140,7 +145,15 @@ const createExpense = async (expenseData, file) => {
 };
 
 // Actualiza un gasto existente, reemplazando sus tramos de moneda, subitems e imagen
-const updateExpense = async (expenseId, expenseData, file) => {
+const updateExpense = async (expenseId, expenseData, file, userId) => {
+  const {data: existingExpense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single()
+  if (!existingExpense) {
+    return {error: 'Gasto no encontrado', status: 404}
+  }
+  const access = await substitutionService.canRegisterExpenseOnTrip(existingExpense.id_viaje, userId)
+  if (!access.allowed) {
+    return {error: access.error, status: access.status}
+  }
   const isInternational = expenseData.es_gasto_internacional || false
   const usesSegments = isInternational && Array.isArray(expenseData.tramos) && expenseData.tramos.length > 0
   const usesSubItems = Array.isArray(expenseData.subitems) && expenseData.subitems.length > 0
@@ -237,12 +250,16 @@ const updateExpense = async (expenseId, expenseData, file) => {
 };
 
 // Elimina un gasto y todos sus registros relacionados
-const deleteExpense = async (expenseId) => {
+const deleteExpense = async (expenseId, userId) => {
   const {data: expense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single()
   if (!expense) {
     return {error: 'Gasto no encontrado', status: 404}
   }
   const tripId = expense.id_viaje
+  const access = await substitutionService.canRegisterExpenseOnTrip(tripId, userId)
+  if (!access.allowed) {
+    return {error: access.error, status: access.status}
+  }
   const {data: invoices} = await supabase.from('Factura').select('id_factura').eq('id_gasto', expenseId)
   if (invoices && invoices.length > 0) {
     const invoiceIds = invoices.map((invoice) => invoice.id_factura)
