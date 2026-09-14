@@ -28,6 +28,7 @@ Los archivos `01` a `04` arman la base desde cero. Los cambios posteriores sobre
 | `09_migrate_estado_revision_aprobador.sql` | Agrega el estado `EN_REVISION_APROBADOR` a `Viaje`, para la revision adicional del aprobador cuando hay alcohol |
 | `10_migrate_justificacion_diaria.sql` | Agrega `fecha_justificada` a `Comentario`, para justificar cada dia excedido por separado |
 | `11_migrate_rendicion_terceros.sql` | Crea `Solicitud_Reemplazo`, para que un tercero rinda gastos en nombre de otro empleado |
+| `12_migrate_jerarquia_jefe_directo.sql` | Reemplaza `numero_dependencia` (codigo de texto compartido) por `id_jefe_directo` (referencia directa a otro usuario), para modelar la jerarquia real de la empresa |
 
 ## Tablas del sistema
 

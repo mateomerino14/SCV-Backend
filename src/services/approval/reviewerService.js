@@ -4,6 +4,7 @@ const tripCommentService = require('../trip/tripCommentService')
 const emailService = require('../shared/emailService')
 const userDirectoryService = require('../user/userDirectoryService')
 const finalReviewDocumentService = require('./finalReviewDocumentService')
+const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
 
 // Anexa el resumen de gastos y alertas a una lista de viajes
 const attachSummaryToTrips = (trips) => {
@@ -31,8 +32,9 @@ const attachSummaryToTrips = (trips) => {
 const getPendingReviews = async (reviewerId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'APROBADO_SUPERVISOR')
+    .is('id_revisor_asignado', null)
     .neq('id_usuario', reviewerId)
   if (filters.fecha_inicio) {
     query = query.gte('fecha_inicio', filters.fecha_inicio)
@@ -48,7 +50,10 @@ const getPendingReviews = async (reviewerId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: attachSummaryToTrips(data || [])}
+    const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
+      data || [], reviewerId, 'REVISOR', (trip) => (trip.tiene_alcohol ? trip.id_aprobador_asignado : trip.id_supervisor_asignado)
+    )
+    return {trips: attachSummaryToTrips(trips)}
   }
 };
 
@@ -80,7 +85,7 @@ const getMyReviews = async (reviewerId, filters) => {
 const getReviewDetail = async (tripId, reviewerId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_dependencia, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd))')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -192,6 +197,9 @@ const approveReview = async (tripId, reviewerId) => {
   if (trip.estado !== 'APROBADO_SUPERVISOR') {
     return {error: 'Este viaje no está en revisión final', status: 400}
   }
+  if (trip.id_revisor_asignado && trip.id_revisor_asignado !== reviewerId) {
+    return {error: 'Este viaje ya está asignado a otro revisor', status: 403}
+  }
   const {error} = await supabase.from('Viaje').update({estado: 'APROBADO_FINAL', id_revisor_asignado: reviewerId}).eq('id_viaje', tripId)
   if (error) {
     return {error: error.message, status: 500}
@@ -223,7 +231,7 @@ const approveReview = async (tripId, reviewerId) => {
 
 // Rechaza definitivamente un viaje
 const rejectReview = async (tripId, reviewerId) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, ciclo_revision').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, ciclo_revision, id_revisor_asignado').eq('id_viaje', tripId).single()
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
@@ -232,6 +240,9 @@ const rejectReview = async (tripId, reviewerId) => {
   }
   if (trip.estado !== 'APROBADO_SUPERVISOR') {
     return {error: 'Este viaje no está en revisión final', status: 400}
+  }
+  if (trip.id_revisor_asignado && trip.id_revisor_asignado !== reviewerId) {
+    return {error: 'Este viaje ya está asignado a otro revisor', status: 403}
   }
   const {data: existingComments} = await supabase
     .from('Comentario')
