@@ -235,15 +235,27 @@ const getActiveSubstitutions = async (substituteId) => {
     return []
   }
   const activeTrips = (data || []).filter((row) => row.Viaje && ['EN_CURSO', 'RECHAZADO'].includes(row.Viaje.estado))
-  return Promise.all(activeTrips.map(async (row) => {
-    const {data: expenses} = await supabase
-      .from('Gasto')
-      .select('monto_total, es_gasto_internacional')
-      .eq('id_viaje', row.Viaje.id_viaje)
-    const gastoAcumulado = (expenses || [])
+  if (activeTrips.length === 0) {
+    return []
+  }
+  const tripIds = activeTrips.map((row) => row.Viaje.id_viaje)
+  const {data: allExpenses} = await supabase
+    .from('Gasto')
+    .select('id_viaje, monto_total, es_gasto_internacional')
+    .in('id_viaje', tripIds)
+  const expensesByTrip = {}
+  ;(allExpenses || []).forEach((expense) => {
+    if (!expensesByTrip[expense.id_viaje]) {
+      expensesByTrip[expense.id_viaje] = []
+    }
+    expensesByTrip[expense.id_viaje].push(expense)
+  })
+  return activeTrips.map((row) => {
+    const expenses = expensesByTrip[row.Viaje.id_viaje] || []
+    const gastoAcumulado = expenses
       .filter((expense) => !expense.es_gasto_internacional)
       .reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0)
-    const gastoAcumuladoUsd = (expenses || [])
+    const gastoAcumuladoUsd = expenses
       .filter((expense) => !!expense.es_gasto_internacional)
       .reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0)
     return {
@@ -253,7 +265,7 @@ const getActiveSubstitutions = async (substituteId) => {
       gastoAcumulado,
       gastoAcumuladoUsd,
     }
-  }))
+  })
 };
 
 // Verifica si un usuario puede operar sobre un viaje: es el titular o su sustituto aprobado

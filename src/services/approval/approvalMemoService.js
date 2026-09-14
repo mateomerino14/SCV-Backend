@@ -1,4 +1,4 @@
-const htmlPdf = require('html-pdf-node')
+const pdfService = require('../shared/pdfService')
 
 // Formatea una fecha ISO a formato dia/mes/anio
 const formatDate = (isoString) => {
@@ -68,9 +68,8 @@ const generateMemoHtml = (trip, approver, tripCode) => {
 
 // Genera el PDF del memorandum a partir de su HTML
 const generateMemoPdf = async (html) => {
-  const file = {content: html}
   const options = {format: 'A4', margin: {top: '10mm', bottom: '10mm', left: '10mm', right: '10mm'}}
-  return await htmlPdf.generatePdf(file, options)
+  return await pdfService.generatePdf(html, options)
 };
 
 module.exports = {generateMemoHtml, generateMemoPdf};

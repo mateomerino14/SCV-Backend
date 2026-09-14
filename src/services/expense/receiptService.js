@@ -1,7 +1,7 @@
 const supabase = require('../../config/supabase')
-const htmlPdf = require('html-pdf-node')
 const numberToWords = require('../../utils/numberToWords')
 const emailService = require('../shared/emailService')
+const pdfService = require('../shared/pdfService')
 
 // Escapa caracteres especiales de HTML para prevenir inyeccion
 const escapeHtml = (text) => {
@@ -26,18 +26,6 @@ const getNextReceiptNumber = async () => {
   else {
     return {receiptNumber: String(correlativeData).padStart(6, '0')}
   }
-};
-
-// Genera el PDF a partir de un contenido HTML
-const generatePdf = async (html) => {
-  const file = {content: html}
-  const options = {
-    format: 'A4',
-    landscape: true,
-    margin: {top: '5mm', bottom: '5mm', left: '5mm', right: '5mm'},
-    preferCSSPageSize: true,
-  }
-  return await htmlPdf.generatePdf(file, options)
 };
 
 // Genera el HTML de un recibo agrupado por tipo de gasto
@@ -464,7 +452,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
     return {error: numberError, status: 500}
   }
   const html = generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, tripId, trip.motivo, supervisor)
-  const pdfBuffer = await generatePdf(html)
+  const pdfBuffer = await pdfService.generatePdf(html)
   const pdfBase64 = pdfBuffer.toString('base64')
   let typeName = 'Compras'
   if (type === 'S') {
@@ -529,7 +517,7 @@ const sendIndividualReceipt = async (expenseId) => {
     return {error: numberError, status: 500}
   }
   const html = generateIndividualReceiptHtml(expense, employee, receiptNumber, expense.Viaje?.id_viaje, expense.Viaje?.motivo, supervisor)
-  const pdfBuffer = await generatePdf(html)
+  const pdfBuffer = await pdfService.generatePdf(html)
   const pdfBase64 = pdfBuffer.toString('base64')
   let typeName = 'Compra'
   if (expense.tipo === 'S') {

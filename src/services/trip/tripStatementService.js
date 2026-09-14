@@ -1,5 +1,5 @@
 const supabase = require('../../config/supabase')
-const htmlPdf = require('html-pdf-node')
+const pdfService = require('../shared/pdfService')
 
 const vatRate = 0.13
 
@@ -333,12 +333,7 @@ const generateStatementPdf = async (tripId) => {
     .order('fecha', {ascending: true})
   const dayJustifications = comments || []
   const html = generateStatementHtml(trip, expenses || [], dayJustifications)
-  const pdfBuffer = await htmlPdf.generatePdf({content: html}, {
-    format: 'A4',
-    landscape: true,
-    margin: {top: '5mm', bottom: '5mm', left: '5mm', right: '5mm'},
-    preferCSSPageSize: true,
-  })
+  const pdfBuffer = await pdfService.generatePdf(html)
   return {buffer: pdfBuffer, fileName: `Rendicion_${tripId}_${(trip.motivo || 'viaje').replace(/\s+/g, '_')}.pdf`}
 }
 

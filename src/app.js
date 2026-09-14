@@ -9,7 +9,8 @@ app.use(helmet())
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'https://scv-frontend.vercel.app'
+    'https://scv-frontend.vercel.app',
+    'https://scv-frontend-git-develop-mat13.vercel.app'
   ],
   credentials: true
 }))
