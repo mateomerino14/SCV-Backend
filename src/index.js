@@ -7,7 +7,7 @@ app.listen(port, () => {
   console.log(`Server is running on port ${port}`)
 })
 
-// Envia el resumen diario de pendientes todos los dias a las 08:00 (hora Bolivia)
-cron.schedule('0 8 * * *', () => {
+// Envia el resumen de pendientes 3 veces al dia (08:00, 12:00 y 16:00, hora Bolivia)
+cron.schedule('0 8,12,16 * * *', () => {
   dailyDigestService.sendDailyDigest()
 }, {timezone: 'America/La_Paz'})

@@ -46,7 +46,7 @@ npm run dev    # con recarga automática (nodemon)
 npm start      # producción
 ```
 
-Al arrancar, se programa además una tarea diaria (`node-cron`) que envía un resumen de pendientes a supervisores, aprobadores, revisores y tesorero.
+Al arrancar, se programa además una tarea (`node-cron`) que envía un resumen de pendientes a supervisores, aprobadores, revisor y tesorero tres veces al día (08:00, 12:00 y 16:00, hora Bolivia), solo a quienes tengan algo pendiente.
 
 ## Stack
 
@@ -61,7 +61,7 @@ Al arrancar, se programa además una tarea diaria (`node-cron`) que envía un re
 | Cheerio + Axios | Consulta y análisis del portal del SIAT |
 | Google Generative AI | Extracción de datos de comprobantes y detección de alcohol |
 | html-pdf-node | Generación de recibos y planilla en PDF |
-| node-cron | Resumen diario de pendientes por correo |
+| node-cron | Resumen de pendientes por correo, tres veces al día |
 | Brevo | Correo transaccional |
 | Helmet + CORS | Cabeceras de seguridad y control de orígenes |
 | express-rate-limit | Límite de intentos de acceso, recuperación de contraseña y extracción de facturas |
@@ -155,7 +155,7 @@ src/
 │   ├── numberToWords.js      Importes en letras
 │   └── textNormalizer.js     Normalización para comparaciones
 ├── app.js                    Configuración de Express
-└── index.js                  Arranque del servidor y del cron diario
+└── index.js                  Arranque del servidor y del cron de resumenes
 
 database/                     Scripts SQL del esquema (ver su README.md)
 ```
@@ -231,7 +231,7 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 | `alcoholDetectionService` | Detecta bebidas alcohólicas en los productos facturados o en la descripción libre del gasto, a nivel de gasto individual y agregado por viaje |
 | `commentModerationService` | Verifica que el texto no contenga términos prohibidos |
 | `dependencyAssignmentService` | Filtra la asignación de viajes por dependencia organizacional |
-| `dailyDigestService` | Arma y envía el resumen diario de pendientes por rol |
+| `dailyDigestService` | Arma y envía el resumen de pendientes por rol, tres veces al día |
 | `emailService` | Correo transaccional mediante Brevo, con plantilla institucional común (`buildEmailLayout`) |
 | `pdfService` | Conversión de HTML a PDF mediante `html-pdf-node`, consumida por recibos, planilla y memorándum |
 | `expenseSummaryService` | Calcula el control de gasto diario, el exceso contra el total (hoteles), y las alertas; consumido por la vista del empleado, supervisor, aprobador (revisión por alcohol) y revisor por igual |

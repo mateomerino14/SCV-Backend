@@ -42,7 +42,7 @@ const sendDigestToGroup = async (users, title, bodyLines) => {
   }
   const body = `
     <p>Hola,</p>
-    <p>Este es tu resumen diario de pendientes:</p>
+    <p>Este es tu resumen de pendientes:</p>
     <ul>
       ${bodyLines.map((line) => `<li style="margin-bottom: 6px;">${line}</li>`).join('')}
     </ul>
@@ -69,7 +69,7 @@ const sendDailyDigest = async () => {
     if (counts.pendingExpenseReviews > 0) {
       supervisorLines.push(`${counts.pendingExpenseReviews} rendición(es) de gastos esperando revisión.`)
     }
-    await sendDigestToGroup(supervisors, 'Resumen diario — Pendientes de Supervisión', supervisorLines)
+    await sendDigestToGroup(supervisors, 'Resumen de Pendientes — Supervisión', supervisorLines)
 
     const approvers = await getActiveUsersByRole('APROBADOR')
     const approverLines = []
@@ -79,14 +79,14 @@ const sendDailyDigest = async () => {
     if (counts.pendingAlcoholReviews > 0) {
       approverLines.push(`${counts.pendingAlcoholReviews} rendición(es) con alcohol esperando tu revisión adicional.`)
     }
-    await sendDigestToGroup(approvers, 'Resumen diario — Pendientes de Aprobación', approverLines)
+    await sendDigestToGroup(approvers, 'Resumen de Pendientes — Aprobación', approverLines)
 
     const reviewers = await getActiveUsersByRole('REVISOR')
     const reviewerLines = []
     if (counts.pendingReviewerReviews > 0) {
       reviewerLines.push(`${counts.pendingReviewerReviews} rendición(es) esperando tu revisión final.`)
     }
-    await sendDigestToGroup(reviewers, 'Resumen diario — Pendientes de Revisión Final', reviewerLines)
+    await sendDigestToGroup(reviewers, 'Resumen de Pendientes — Revisión Final', reviewerLines)
 
     const activeUsers = await userDirectoryService.getActiveUsersWithActivePosition()
     const treasurers = userDirectoryService.getUsersByPositionName(activeUsers, userDirectoryService.treasurerPositionName)
@@ -94,7 +94,7 @@ const sendDailyDigest = async () => {
     if (counts.pendingTreasurerReviews > 0) {
       treasurerLines.push(`${counts.pendingTreasurerReviews} viaje(s) esperando la asignación de fondos.`)
     }
-    await sendDigestToGroup(treasurers, 'Resumen diario — Pendientes de Tesorería', treasurerLines)
+    await sendDigestToGroup(treasurers, 'Resumen de Pendientes — Tesorería', treasurerLines)
   }
   catch (error) {
     console.warn('Error enviando el resumen diario de pendientes:', error.message)
