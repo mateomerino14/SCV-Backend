@@ -29,7 +29,7 @@ const getPendingTripReviews = async (supervisorId, filters) => {
     const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
       data || [], supervisorId, 'SUPERVISOR', (trip) => trip.id_usuario
     )
-    return {trips}
+    return {trips: hierarchyAssignmentService.filterBySection(trips, filters.numero_seccion)}
   }
 };
 
@@ -37,7 +37,7 @@ const getPendingTripReviews = async (supervisorId, filters) => {
 const getMyTripReviews = async (supervisorId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd)), Comentario(*)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd)), Comentario(*)')
     .eq('id_supervisor_asignado', supervisorId)
     .or('estado.eq.EN_CURSO,and(fue_iniciado.eq.false,estado.in.(EN_REVISION_VIAJE,APROBADO_VIAJE,EN_REVISION_TESORERO,RECHAZADO))')
   if (filters.fecha_inicio) {
@@ -54,7 +54,7 @@ const getMyTripReviews = async (supervisorId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: data || []}
+    return {trips: hierarchyAssignmentService.filterBySection(data || [], filters.numero_seccion)}
   }
 };
 
@@ -232,7 +232,7 @@ const getPendingExpenseReviews = async (supervisorId, filters) => {
     const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
       data || [], supervisorId, 'SUPERVISOR', (trip) => trip.id_usuario
     )
-    return {trips: attachSummaryToTrips(trips)}
+    return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(trips, filters.numero_seccion))}
   }
 };
 
@@ -240,7 +240,7 @@ const getPendingExpenseReviews = async (supervisorId, filters) => {
 const getMyExpenseReviews = async (supervisorId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)')
     .eq('id_supervisor_asignado', supervisorId)
     .in('estado', ['EN_REVISION', 'APROBADO_SUPERVISOR', 'RECHAZADO'])
     .eq('fue_iniciado', true)
@@ -258,7 +258,7 @@ const getMyExpenseReviews = async (supervisorId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: attachSummaryToTrips(data || [])}
+    return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(data || [], filters.numero_seccion))}
   }
 };
 

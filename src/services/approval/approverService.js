@@ -82,7 +82,7 @@ const getPendingTrips = async (approverId, filters) => {
     const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
       data || [], approverId, 'APROBADOR', (trip) => trip.id_supervisor_asignado
     )
-    return {trips}
+    return {trips: hierarchyAssignmentService.filterBySection(trips, filters.numero_seccion)}
   }
 };
 
@@ -90,7 +90,7 @@ const getPendingTrips = async (approverId, filters) => {
 const getMyTrips = async (approverId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre)), Comentario(*)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre)), Comentario(*)')
     .eq('id_aprobador_asignado', approverId)
     .or('estado.eq.EN_CURSO,and(fue_iniciado.eq.false,estado.in.(APROBADO_VIAJE,EN_REVISION_TESORERO,RECHAZADO))')
   if (filters.fecha_inicio) {
@@ -107,7 +107,7 @@ const getMyTrips = async (approverId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: data || []}
+    return {trips: hierarchyAssignmentService.filterBySection(data || [], filters.numero_seccion)}
   }
 };
 

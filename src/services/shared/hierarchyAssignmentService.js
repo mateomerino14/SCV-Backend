@@ -73,4 +73,12 @@ const filterTripsByHierarchy = async (trips, requesterId, roleName, ownerIdExtra
   return results
 }
 
-module.exports = {resolveReviewerScope, assignNextReviewer, filterTripsByHierarchy}
+// Filtra una lista de viajes ya obtenida por la seccion del empleado dueno de cada viaje
+const filterBySection = (trips, seccion) => {
+  if (!seccion) {
+    return trips
+  }
+  return trips.filter((trip) => trip.Usuario?.numero_seccion === seccion)
+}
+
+module.exports = {resolveReviewerScope, assignNextReviewer, filterTripsByHierarchy, filterBySection}

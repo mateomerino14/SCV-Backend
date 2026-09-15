@@ -53,7 +53,7 @@ const getPendingReviews = async (reviewerId, filters) => {
     const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
       data || [], reviewerId, 'REVISOR', (trip) => (trip.tiene_alcohol ? trip.id_aprobador_asignado : trip.id_supervisor_asignado)
     )
-    return {trips: attachSummaryToTrips(trips)}
+    return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(trips, filters.numero_seccion))}
   }
 };
 
@@ -61,7 +61,7 @@ const getPendingReviews = async (reviewerId, filters) => {
 const getMyReviews = async (reviewerId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)')
     .eq('id_revisor_asignado', reviewerId)
   if (filters.fecha_inicio) {
     query = query.gte('fecha_inicio', filters.fecha_inicio)
@@ -77,7 +77,7 @@ const getMyReviews = async (reviewerId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: attachSummaryToTrips(data || [])}
+    return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(data || [], filters.numero_seccion))}
   }
 };
 

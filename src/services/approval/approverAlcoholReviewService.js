@@ -50,7 +50,7 @@ const getPendingAlcoholReviews = async (approverId, filters) => {
   const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
     data || [], approverId, 'APROBADOR', (trip) => trip.id_supervisor_asignado
   )
-  return {trips: attachSummaryToTrips(trips)}
+  return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(trips, filters.numero_seccion))}
 }
 
 // Lista los viajes de revision adicional asignados al aprobador
@@ -75,7 +75,7 @@ const getMyAlcoholReviews = async (approverId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: attachSummaryToTrips(data || [])}
+    return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(data || [], filters.numero_seccion))}
   }
 }
 
