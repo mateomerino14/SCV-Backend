@@ -9,7 +9,7 @@ create table if not exists "Rol" (
 
 create table if not exists "Cargo" (
   id_cargo serial primary key,
-  nombre varchar(50) not null unique,
+  nombre varchar(100) not null unique,
   monto_diario decimal(10, 2) not null,
   monto_diario_usd numeric(10, 2) default 0,
   activo boolean not null default true
