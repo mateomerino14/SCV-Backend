@@ -4,10 +4,12 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 
 ## Orden de ejecucion
 
-1. `01_schema.sql` - crea las 19 tablas, relaciones e indices
+1. `01_schema.sql` - crea las 20 tablas, relaciones e indices
 2. `02_functions.sql` - crea la funcion `incrementar_correlativo_recibo()`, usada por el backend para numerar recibos
 3. `03_seed.sql` - datos iniciales: roles, cargos, impuesto de IVA y categorias de gasto
 4. `04_rls_hardening.sql` - activa seguridad por fila (RLS) en todas las tablas
+
+Estos cuatro archivos reflejan siempre el estado final y completo del esquema: alcanza con correrlos en orden para levantar una base nueva desde cero, sin necesidad de aplicar ningun cambio adicional despues.
 
 ## Como correrlo en Supabase
 
@@ -15,21 +17,19 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 2. Ve a SQL Editor
 3. Pega el contenido de cada archivo en orden y ejecuta
 
-## Migraciones incrementales
+## Si ya tenes una base de datos existente
 
-Los archivos `01` a `04` arman la base desde cero. Los cambios posteriores sobre una base ya existente se agregan como scripts numerados aparte (`05_...`, `06_...`), y tambien se reflejan en `01_schema.sql` para que una instalacion nueva quede igual sin necesidad de correr las migraciones una por una.
+Si tu base ya tiene datos cargados con una version anterior del esquema, **no vuelvas a correr `01_schema.sql`**: en su lugar, compara tu esquema actual contra este archivo y aplica manualmente (`alter table`, etc.) las columnas o tablas que te falten. Los scripts de migracion incremental que se usaron durante el desarrollo ya se incorporaron a estos cuatro archivos y no se conservan por separado, para no acumular decenas de archivos con el tiempo.
 
-| Script | Cambio |
+## Scripts de prueba
+
+| Script | Uso |
 |---|---|
-| `05_migrate_placa_vehiculo.sql` | Agrega `placa_vehiculo` a `Viaje`, para la opcion de transporte "Vehiculo de Empresa" |
-| `06_migrate_comprobante_categoria.sql` | Agrega `requiere_comprobante` a `Categoria_Gasto` y marca Taxi como no obligatorio |
-| `07_migrate_alcohol_gasto.sql` | Agrega `tiene_alcohol` a `Gasto`, para resaltar el gasto puntual en las tablas de revision |
-| `08_migrate_carnet_identidad.sql` | Agrega `carnet_identidad` a `Usuario`, para mostrarlo en el recibo |
-| `09_migrate_estado_revision_aprobador.sql` | Agrega el estado `EN_REVISION_APROBADOR` a `Viaje`, para la revision adicional del aprobador cuando hay alcohol |
-| `10_migrate_justificacion_diaria.sql` | Agrega `fecha_justificada` a `Comentario`, para justificar cada dia excedido por separado |
-| `11_migrate_rendicion_terceros.sql` | Crea `Solicitud_Reemplazo`, para que un tercero rinda gastos en nombre de otro empleado |
-| `12_migrate_jerarquia_jefe_directo.sql` | Reemplaza `numero_dependencia` (codigo de texto compartido) por `id_jefe_directo` (referencia directa a otro usuario), para modelar la jerarquia real de la empresa |
-| `13_migrate_ampliar_nombre_cargo.sql` | Amplia `Cargo.nombre` de 50 a 100 caracteres; el seed original no entraba con nombres de cargo reales mas largos |
+| `testing_01_limpieza_completa.sql` | Borra usuarios, viajes, gastos, facturas y solicitudes. No toca los catalogos (Rol, Cargo, Categoria_Gasto, Impuesto) |
+| `testing_02_organizacion_prueba.sql` | Carga una organizacion de prueba completa con jerarquia de jefe directo, lista para probar el flujo de revision. Contrasenia de todos los usuarios: `Prueba1234` |
+
+Solo para entornos de prueba, nunca correr en produccion.
+
 
 ## Tablas del sistema
 
