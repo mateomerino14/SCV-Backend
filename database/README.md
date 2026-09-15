@@ -29,6 +29,7 @@ Los archivos `01` a `04` arman la base desde cero. Los cambios posteriores sobre
 | `10_migrate_justificacion_diaria.sql` | Agrega `fecha_justificada` a `Comentario`, para justificar cada dia excedido por separado |
 | `11_migrate_rendicion_terceros.sql` | Crea `Solicitud_Reemplazo`, para que un tercero rinda gastos en nombre de otro empleado |
 | `12_migrate_jerarquia_jefe_directo.sql` | Reemplaza `numero_dependencia` (codigo de texto compartido) por `id_jefe_directo` (referencia directa a otro usuario), para modelar la jerarquia real de la empresa |
+| `13_migrate_ampliar_nombre_cargo.sql` | Amplia `Cargo.nombre` de 50 a 100 caracteres; el seed original no entraba con nombres de cargo reales mas largos |
 
 ## Tablas del sistema
 
