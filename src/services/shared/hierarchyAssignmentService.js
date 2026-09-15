@@ -27,6 +27,7 @@ const resolveReviewerScope = async (personId, roleName) => {
       .eq('activo', true)
       .eq('numero_seccion', person.numero_seccion)
       .eq('Rol.nombre', roleName)
+      .neq('id_usuario', personId)
     if (sameSection && sameSection.length > 0) {
       return {level: 'seccion', userIds: sameSection.map((user) => user.id_usuario)}
     }
