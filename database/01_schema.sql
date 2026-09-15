@@ -88,7 +88,7 @@ create table if not exists "Viaje" (
   placa_vehiculo varchar(20),
   monto_asignado decimal(10, 2) not null,
   monto_asignado_usd numeric(10, 2) default 0,
-  estado varchar(25) not null default 'BORRADOR' check (estado in (
+  estado varchar(25) not null default 'BORRADOR' constraint viaje_estado_check check (estado in (
     'BORRADOR', 'EN_REVISION_VIAJE', 'APROBADO_VIAJE', 'EN_REVISION_TESORERO', 'EN_CURSO',
     'EN_REVISION', 'EN_REVISION_APROBADOR', 'APROBADO_SUPERVISOR', 'APROBADO_FINAL', 'RECHAZADO'
   )),

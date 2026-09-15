@@ -270,7 +270,7 @@ La invocación al modelo incorpora reintentos con espera incremental. Si la fech
 
 ## Base de datos
 
-Sobre PostgreSQL. Los scripts de reconstrucción están en `database/`; ver su `README.md` para el orden de ejecución, las migraciones incrementales y las decisiones de diseño.
+Sobre PostgreSQL. Los scripts de reconstrucción están en `database/` (cuatro archivos: esquema, funciones, semillas y RLS); ver su `README.md` para el orden de ejecución y las decisiones de diseño.
 
 Todas las marcas temporales usan `timestamptz`: el tipo sin zona horaria descartaba el huso al persistir, produciendo un desplazamiento de cuatro horas respecto de Bolivia.
 
