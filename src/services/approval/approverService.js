@@ -115,7 +115,7 @@ const getMyTrips = async (approverId, filters) => {
 const getTripDetail = async (tripId, approverId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, numero_seccion, Cargo(nombre))')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -133,7 +133,7 @@ const getTripDetail = async (tripId, approverId) => {
 const approveTrip = async (tripId, approverId) => {
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, numero_seccion, Cargo(nombre))')
     .eq('id_viaje', tripId)
     .single()
   if (!trip) {
