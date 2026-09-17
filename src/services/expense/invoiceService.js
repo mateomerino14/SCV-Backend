@@ -69,6 +69,9 @@ const validateInvoiceData = (invoiceData) => {
   if (!invoiceData.id_viaje) {
     return 'El viaje asociado es requerido'
   }
+  if (!Array.isArray(invoiceData.detalle) || invoiceData.detalle.length === 0) {
+    return 'Debes agregar al menos un producto al detalle de la factura'
+  }
   return null
 };
 
@@ -189,6 +192,9 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   }
   if (!invoiceData.monto_total || isNaN(parseFloat(invoiceData.monto_total))) {
     return {error: 'El monto total es requerido', status: 400}
+  }
+  if (!Array.isArray(invoiceData.detalle) || invoiceData.detalle.length === 0) {
+    return {error: 'Debes agregar al menos un producto al detalle de la factura', status: 400}
   }
   const {data: existingExpense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single()
   if (!existingExpense) {

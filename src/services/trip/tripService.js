@@ -298,6 +298,7 @@ const confirmCompletion = async (tripId, userId, justifications) => {
   if (commentsToInsert.length > 0) {
     await supabase.from('Comentario').insert(commentsToInsert)
   }
+  await hierarchyAssignmentService.assignNextReviewer(tripId, trip.id_usuario, 'SUPERVISOR', 'id_supervisor_asignado')
   return {message: 'Viaje enviado a revisión de gastos correctamente'}
 };
 
