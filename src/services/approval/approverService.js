@@ -64,6 +64,7 @@ const getPendingTrips = async (approverId, filters) => {
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre))')
     .eq('estado', 'APROBADO_VIAJE')
+    .is('id_aprobador_asignado', null)
     .neq('id_usuario', approverId)
   if (filters.fecha_inicio) {
     query = query.gte('fecha_inicio', filters.fecha_inicio)
