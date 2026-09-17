@@ -29,7 +29,7 @@ create table if not exists "Impuesto" (
 
 create table if not exists "Proveedor" (
   id_proveedor serial primary key,
-  nombre varchar(50) not null,
+  nombre varchar(150) not null,
   tipo_doc_fiscal varchar(3) check (tipo_doc_fiscal in ('NIT', 'CI')),
   numero_doc_fiscal varchar(50)
 );
@@ -178,7 +178,7 @@ create table if not exists "Factura" (
 
 create table if not exists "Detalle_Factura" (
   id_detalle serial primary key,
-  nombre_producto varchar(50) not null,
+  nombre_producto varchar(255) not null,
   cantidad numeric(10, 2) not null,
   precio decimal(10, 2) not null,
   id_factura integer not null references "Factura"(id_factura)
