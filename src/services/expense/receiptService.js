@@ -55,7 +55,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
     totalIt = expenses.reduce((sum, expense) => sum + parseFloat(expense.retencion_it || 0), 0)
   }
   const totalToPay = expenses.reduce((sum, expense) => sum + parseFloat(expense.importe_costo || expense.monto_total || 0), 0)
-  const costCenter = employee?.numero_seccion || ''
+  const costCenter = employee?.Seccion?.nombre || ''
   const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords)
   const expenseRows = expenses.map((expense, index) => {
     const subItems = expense.Gasto_Subitem || []
@@ -248,7 +248,7 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId,
     totalIt = parseFloat(expense.retencion_it || 0)
   }
   const totalToPay = parseFloat(expense.importe_costo || expense.monto_total || 0)
-  const costCenter = employee?.numero_seccion || ''
+  const costCenter = employee?.Seccion?.nombre || ''
   const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords)
   let expenseRows = ''
   if (hasSubItems) {
@@ -404,7 +404,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   }
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_seccion, carnet_identidad)')
+    .select('motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad)')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -487,7 +487,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
 const sendIndividualReceipt = async (expenseId) => {
   const {data: expense, error: expenseError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_seccion, carnet_identidad))')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad))')
     .eq('id_gasto', expenseId)
     .single()
   if (expenseError) {

@@ -97,7 +97,7 @@ const getHistory = async (userId, page, limit, filter) => {
 const getTripDetail = async (tripId, requesterId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd))')
+    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd))')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {

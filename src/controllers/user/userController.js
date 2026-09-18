@@ -7,7 +7,7 @@ const saltRounds = 10
 const getMe = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd), Rol(nombre)')
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd), Rol(nombre)')
     .eq('id_usuario', req.user.id_usuario)
     .single()
   if (error) {
@@ -36,7 +36,7 @@ const updateMe = async (req, res) => {
     .from('Usuario')
     .update(fieldsToUpdate)
     .eq('id_usuario', userId)
-    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd)')
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)')
     .single()
   if (error) {
     return res.status(500).json({error: error.message})
@@ -65,7 +65,7 @@ const updateMyPhoto = async (req, res) => {
     .from('Usuario')
     .update({foto_perfil: urlData.publicUrl})
     .eq('id_usuario', userId)
-    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, numero_seccion, Cargo(nombre, monto_diario, monto_diario_usd)')
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)')
     .single()
   if (error) {
     return res.status(500).json({error: error.message})
@@ -111,7 +111,7 @@ const changeMyPassword = async (req, res) => {
 const getAllUsers = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_cargo, numero_seccion, carnet_identidad')
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_cargo, id_seccion, Seccion(nombre), carnet_identidad')
   if (error) {
     return res.status(500).json({error: error.message})
   }
@@ -235,7 +235,7 @@ const checkEmail = async (req, res) => {
 const getEmployees = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, foto_perfil')
+    .select('id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion')
     .order('nombre', {ascending: true})
   if (error) {
     return res.status(500).json({error: error.message})
@@ -249,7 +249,7 @@ const getEmployees = async (req, res) => {
 const getAllUsersDetailed = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, email_corporativo, telefono, activo, foto_perfil, id_rol, numero_seccion, carnet_identidad, id_jefe_directo, Jefe:Usuario!id_jefe_directo(id_usuario, nombre, apellido_paterno), Cargo(id_cargo, nombre), Rol(nombre)')
+    .select('id_usuario, nombre, apellido_paterno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_seccion, Seccion(nombre), carnet_identidad, id_jefe_directo, Jefe:Usuario!id_jefe_directo(id_usuario, nombre, apellido_paterno), Cargo(id_cargo, nombre), Rol(nombre)')
     .order('nombre', {ascending: true})
   if (error) {
     return res.status(500).json({error: error.message})

@@ -7,7 +7,7 @@ const supabase = require('../../config/supabase')
 const resolveReviewerScope = async (personId, roleName) => {
   const {data: person} = await supabase
     .from('Usuario')
-    .select('id_jefe_directo, numero_seccion')
+    .select('id_jefe_directo, id_seccion')
     .eq('id_usuario', personId)
     .single()
   if (person?.id_jefe_directo) {
@@ -20,12 +20,12 @@ const resolveReviewerScope = async (personId, roleName) => {
       return {level: 'directo', userIds: [boss.id_usuario]}
     }
   }
-  if (person?.numero_seccion) {
+  if (person?.id_seccion) {
     const {data: sameSection} = await supabase
       .from('Usuario')
       .select('id_usuario, Rol!inner(nombre)')
       .eq('activo', true)
-      .eq('numero_seccion', person.numero_seccion)
+      .eq('id_seccion', person.id_seccion)
       .eq('Rol.nombre', roleName)
       .neq('id_usuario', personId)
     if (sameSection && sameSection.length > 0) {
@@ -75,11 +75,11 @@ const filterTripsByHierarchy = async (trips, requesterId, roleName, ownerIdExtra
 }
 
 // Filtra una lista de viajes ya obtenida por la seccion del empleado dueno de cada viaje
-const filterBySection = (trips, seccion) => {
-  if (!seccion) {
+const filterBySection = (trips, seccionId) => {
+  if (!seccionId) {
     return trips
   }
-  return trips.filter((trip) => trip.Usuario?.numero_seccion === seccion)
+  return trips.filter((trip) => String(trip.Usuario?.id_seccion) === String(seccionId))
 }
 
 module.exports = {resolveReviewerScope, assignNextReviewer, filterTripsByHierarchy, filterBySection}

@@ -2,8 +2,8 @@ const supabase = require('../../config/supabase')
 
 // Obtiene las estadisticas generales del dashboard de administrador
 const getDashboardStats = async (req, res) => {
-  const {data: users} = await supabase.from('Usuario').select('id_usuario, activo, id_rol, numero_seccion, Rol(nombre)')
-  const {data: trips} = await supabase.from('Viaje').select('id_viaje, estado, monto_asignado, Usuario!viaje_id_usuario_foreign(numero_seccion)')
+  const {data: users} = await supabase.from('Usuario').select('id_usuario, activo, id_rol, id_seccion, Seccion(nombre), Rol(nombre)')
+  const {data: trips} = await supabase.from('Viaje').select('id_viaje, estado, monto_asignado, Usuario!viaje_id_usuario_foreign(id_seccion, Seccion(nombre))')
   const {data: positions} = await supabase.from('Cargo').select('id_cargo, activo')
   const totalUsers = users?.length || 0
   const activeUsers = users?.filter((user) => user.activo).length || 0
@@ -26,7 +26,7 @@ const getDashboardStats = async (req, res) => {
   const usersByRole = Object.entries(roleCount).map(([nombre, cantidad]) => ({nombre, cantidad}))
   const sectionStats = {}
   for (const trip of trips || []) {
-    const sectionName = trip.Usuario?.numero_seccion || 'Sin sección'
+    const sectionName = trip.Usuario?.Seccion?.nombre || 'Sin sección'
     if (!sectionStats[sectionName]) {
       sectionStats[sectionName] = {cantidadViajes: 0, montoAsignado: 0}
     }
@@ -38,7 +38,7 @@ const getDashboardStats = async (req, res) => {
   }))
   const usersBySectionCount = {}
   for (const user of users || []) {
-    const sectionName = user.numero_seccion || 'Sin sección'
+    const sectionName = user.Seccion?.nombre || 'Sin sección'
     usersBySectionCount[sectionName] = (usersBySectionCount[sectionName] || 0) + 1
   }
   const usuariosPorSeccion = Object.entries(usersBySectionCount).map(([seccion, cantidad]) => ({seccion, cantidad}))

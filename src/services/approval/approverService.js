@@ -62,7 +62,7 @@ const sendApprovalMemo = async (trip, approver, tripCode, allUsers) => {
 const getPendingTrips = async (approverId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
     .eq('estado', 'APROBADO_VIAJE')
     .is('id_aprobador_asignado', null)
     .neq('id_usuario', approverId)
@@ -83,7 +83,7 @@ const getPendingTrips = async (approverId, filters) => {
     const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
       data || [], approverId, 'APROBADOR', (trip) => trip.id_supervisor_asignado
     )
-    return {trips: hierarchyAssignmentService.filterBySection(trips, filters.numero_seccion)}
+    return {trips: hierarchyAssignmentService.filterBySection(trips, filters.id_seccion)}
   }
 };
 
@@ -91,7 +91,7 @@ const getPendingTrips = async (approverId, filters) => {
 const getMyTrips = async (approverId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, numero_seccion, Cargo(nombre)), Comentario(*)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre)), Comentario(*)')
     .eq('id_aprobador_asignado', approverId)
     .or('estado.eq.EN_CURSO,and(fue_iniciado.eq.false,estado.in.(APROBADO_VIAJE,EN_REVISION_TESORERO,RECHAZADO))')
   if (filters.fecha_inicio) {
@@ -108,7 +108,7 @@ const getMyTrips = async (approverId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: hierarchyAssignmentService.filterBySection(data || [], filters.numero_seccion)}
+    return {trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion)}
   }
 };
 
@@ -116,7 +116,7 @@ const getMyTrips = async (approverId, filters) => {
 const getTripDetail = async (tripId, approverId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, numero_seccion, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {
@@ -134,7 +134,7 @@ const getTripDetail = async (tripId, approverId) => {
 const approveTrip = async (tripId, approverId) => {
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, numero_seccion, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
     .eq('id_viaje', tripId)
     .single()
   if (!trip) {
