@@ -1,11 +1,11 @@
 const usuarios = [
-  {id_usuario: 1, activo: true, numero_seccion: 'Ventas', id_jefe_directo: null, id_rol: 4}, // Lucia, REVISOR
-  {id_usuario: 2, activo: true, numero_seccion: null, id_jefe_directo: 1, id_rol: 5}, // Pedro, APROBADOR, jefe=Lucia
-  {id_usuario: 3, activo: true, numero_seccion: 'Ventas', id_jefe_directo: 2, id_rol: 2}, // Maria, SUPERVISOR, jefe=Pedro
-  {id_usuario: 4, activo: true, numero_seccion: 'Logistica', id_jefe_directo: 2, id_rol: 2}, // Jorge, SUPERVISOR, jefe=Pedro
-  {id_usuario: 5, activo: true, numero_seccion: 'Ventas', id_jefe_directo: 3, id_rol: 3}, // Juan, EMPLEADO, jefe=Maria
-  {id_usuario: 6, activo: true, numero_seccion: 'Sin Cobertura', id_jefe_directo: null, id_rol: 3}, // Sofia, EMPLEADO, sin jefe
-  {id_usuario: 7, activo: true, numero_seccion: 'Ventas', id_jefe_directo: null, id_rol: 3}, // Diego, EMPLEADO, sin jefe, seccion Ventas
+  {id_usuario: 1, activo: true, id_seccion: 1, id_jefe_directo: null, id_rol: 4}, // Lucia, REVISOR, seccion Ventas
+  {id_usuario: 2, activo: true, id_seccion: null, id_jefe_directo: 1, id_rol: 5}, // Pedro, APROBADOR, jefe=Lucia
+  {id_usuario: 3, activo: true, id_seccion: 1, id_jefe_directo: 2, id_rol: 2}, // Maria, SUPERVISOR, jefe=Pedro, seccion Ventas
+  {id_usuario: 4, activo: true, id_seccion: 2, id_jefe_directo: 2, id_rol: 2}, // Jorge, SUPERVISOR, jefe=Pedro, seccion Logistica
+  {id_usuario: 5, activo: true, id_seccion: 1, id_jefe_directo: 3, id_rol: 3}, // Juan, EMPLEADO, jefe=Maria, seccion Ventas
+  {id_usuario: 6, activo: true, id_seccion: 3, id_jefe_directo: null, id_rol: 3}, // Sofia, EMPLEADO, sin jefe, seccion Sin Cobertura
+  {id_usuario: 7, activo: true, id_seccion: 1, id_jefe_directo: null, id_rol: 3}, // Diego, EMPLEADO, sin jefe, seccion Ventas
 ]
 const roles = {2: 'SUPERVISOR', 3: 'EMPLEADO', 4: 'REVISOR', 5: 'APROBADOR'}
 
@@ -32,7 +32,7 @@ jest.mock('../../src/config/supabase', () => ({
         // Consulta por seccion + rol + activo (nivel 2, respaldo por seccion)
         const matches = usuarios.filter((entry) =>
           entry.activo === state.eq.activo &&
-          entry.numero_seccion === state.eq.numero_seccion &&
+          entry.id_seccion === state.eq.id_seccion &&
           roles[entry.id_rol] === state.eq['Rol.nombre'] &&
           entry.id_usuario !== state.neq.id_usuario
         )

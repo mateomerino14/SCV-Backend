@@ -108,7 +108,7 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
   const employee = trip.Usuario
   const responsable = `${employee?.nombre || ''} ${employee?.apellido_paterno || ''}`.trim().toUpperCase()
   const cargo = employee?.Cargo?.nombre?.toUpperCase() || ''
-  const costCenter = employee?.numero_seccion || ''
+  const costCenter = employee?.Seccion?.nombre || ''
 
   let totalImporteFactura = 0
   let totalImporteBs = 0
@@ -308,7 +308,7 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
 const generateStatementPdf = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, numero_seccion, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, Seccion(nombre), Cargo(nombre))')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {

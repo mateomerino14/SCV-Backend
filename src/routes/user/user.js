@@ -26,7 +26,7 @@ router.put('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userContro
 router.post('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.createUser)
 router.delete('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.deleteUser)
 router.post('/check-email', userController.checkEmail)
-router.get('/employees', authMiddleware, roleMiddleware(['SUPERVISOR', 'ADMINISTRADOR', 'REVISOR', 'APROBADOR']), userController.getEmployees)
+router.get('/employees', authMiddleware, roleMiddleware(['SUPERVISOR', 'ADMINISTRADOR', 'REVISOR', 'APROBADOR', 'EMPLEADO']), userController.getEmployees)
 router.get('/all', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.getAllUsersDetailed)
 router.patch('/:id/activate', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.activateUser)
 router.patch('/:id/suspend', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.suspendUser)
