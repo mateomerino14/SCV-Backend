@@ -15,6 +15,12 @@ create table if not exists "Cargo" (
   activo boolean not null default true
 );
 
+create table if not exists "Seccion" (
+  id_seccion serial primary key,
+  nombre varchar(100) not null unique,
+  activo boolean not null default true
+);
+
 create table if not exists "Categoria_Gasto" (
   id_categoria serial primary key,
   nombre varchar(50) not null unique,
@@ -49,7 +55,7 @@ create table if not exists "Usuario" (
   contrasenia text not null,
   foto_perfil text,
   id_jefe_directo integer references "Usuario"(id_usuario),
-  numero_seccion varchar(50),
+  id_seccion integer references "Seccion"(id_seccion),
   carnet_identidad varchar(20),
   ultima_cambio_contrasenia timestamptz default now(),
   refresh_token_invalido_desde timestamptz,
@@ -227,7 +233,7 @@ where not exists (select 1 from "Correlativo_Recibo" where id = 1);
 create index if not exists idx_auditoria_id_usuario on "Auditoria"(id_usuario);
 create index if not exists idx_codigo_verificacion_id_usuario on "Codigo_Verificacion"(id_usuario);
 create index if not exists idx_usuario_jefe_directo on "Usuario"(id_jefe_directo);
-create index if not exists idx_usuario_seccion on "Usuario"(numero_seccion);
+create index if not exists idx_usuario_seccion on "Usuario"(id_seccion);
 
 -- Viajes: filtrado por propietario, estado y asignacion
 create index if not exists idx_viaje_id_usuario on "Viaje"(id_usuario);

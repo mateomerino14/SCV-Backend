@@ -4,7 +4,7 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 
 ## Orden de ejecucion
 
-1. `01_schema.sql` - crea las 20 tablas, relaciones e indices
+1. `01_schema.sql` - crea las 21 tablas, relaciones e indices
 2. `02_functions.sql` - crea la funcion `incrementar_correlativo_recibo()`, usada por el backend para numerar recibos
 3. `03_seed.sql` - datos iniciales: roles, cargos, impuesto de IVA y categorias de gasto
 4. `04_rls_hardening.sql` - activa seguridad por fila (RLS) en todas las tablas
@@ -25,7 +25,7 @@ Si tu base ya tiene datos cargados con una version anterior del esquema, **no vu
 
 | Script | Uso |
 |---|---|
-| `testing_01_limpieza_completa.sql` | Borra usuarios, viajes, gastos, facturas y solicitudes. No toca los catalogos (Rol, Cargo, Categoria_Gasto, Impuesto) |
+| `testing_01_limpieza_completa.sql` | Borra usuarios, viajes, gastos, facturas y solicitudes. No toca los catalogos (Rol, Cargo, Seccion, Categoria_Gasto, Impuesto) |
 | `testing_02_organizacion_prueba.sql` | Carga una organizacion de prueba completa con jerarquia de jefe directo, lista para probar el flujo de revision. Contrasenia de todos los usuarios: `Prueba1234` |
 
 Solo para entornos de prueba, nunca correr en produccion.
@@ -37,6 +37,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 |---|---|
 | Rol | Roles del sistema |
 | Cargo | Cargos/puestos de trabajo, con su monto de viatico diario en ambas monedas |
+| Seccion | Secciones/departamentos de la empresa; se usa como respaldo intermedio en la jerarquia de revision cuando falta el jefe directo |
 | Usuario | Usuarios del sistema |
 | Codigo_Verificacion | Codigos temporales de verificacion por correo |
 | Viaje | Viajes registrados, con su flujo de estados y revisores asignados |
