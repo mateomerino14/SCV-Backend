@@ -245,6 +245,9 @@ const confirmCompletion = async (tripId, userId, justifications) => {
   }
   const justificationList = Array.isArray(justifications) ? justifications : []
   for (const item of justificationList) {
+    if (item.descripcion && item.descripcion.length > 300) {
+      return {error: 'Cada justificación no puede superar los 300 caracteres', status: 400}
+    }
     if (item.descripcion && commentModerationService.containsForbiddenWords(item.descripcion)) {
       return {error: 'La justificación contiene palabras inapropiadas', status: 400}
     }

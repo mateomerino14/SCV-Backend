@@ -151,7 +151,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
   .son-texto { flex: 1; border-bottom: 1px solid #000; padding-bottom: 2px; margin-right: 12px; }
   .pie { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
   .pie-izq { width: 45%; text-align: center; }
-  .pie-izq .linea-firma { border-top: 1px solid #000; margin-top: 40px; padding-top: 4px; font-size: 9.5pt; }
+  .pie-izq .linea-firma { margin-top: 40px; font-size: 13pt; font-weight: bold; }
   .pie-der { width: 45%; font-size: 10pt; }
   .pie-der p { margin-bottom: 18px; border-bottom: 1px solid #000; padding-bottom: 2px; }
 </style>
@@ -332,7 +332,7 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId,
   .son-texto { flex: 1; border-bottom: 1px solid #000; padding-bottom: 2px; margin-right: 12px; }
   .pie { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
   .pie-izq { width: 45%; text-align: center; }
-  .pie-izq .linea-firma { border-top: 1px solid #000; margin-top: 40px; padding-top: 4px; font-size: 9.5pt; }
+  .pie-izq .linea-firma { margin-top: 40px; font-size: 13pt; font-weight: bold; }
   .pie-der { width: 45%; font-size: 10pt; }
   .pie-der p { margin-bottom: 18px; border-bottom: 1px solid #000; padding-bottom: 2px; }
 </style>

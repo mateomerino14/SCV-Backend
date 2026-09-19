@@ -2,6 +2,8 @@ const {GoogleGenerativeAI} = require('@google/generative-ai')
 
 const geminiClient = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
 const geminiModel = geminiClient.getGenerativeModel({model: 'gemini-3.6-flash'})
+// Modelo de respaldo, de menor carga, usado si el principal falla todos sus reintentos
+const geminiFallbackModel = geminiClient.getGenerativeModel({model: 'gemini-3.5-flash-lite'})
 
 const maxAttempts = 3
 
@@ -60,10 +62,11 @@ const normalizeResult = (parsedData) => {
 }
 
 // Extrae los datos de una factura enviando la imagen al modelo de vision
-const extractInvoiceData = async (file, attempt = 1) => {
+const extractInvoiceData = async (file, attempt = 1, useFallback = false) => {
   try {
     const imageBase64 = file.buffer.toString('base64')
-    const result = await geminiModel.generateContent([
+    const model = useFallback ? geminiFallbackModel : geminiModel
+    const result = await model.generateContent([
       {inlineData: {data: imageBase64, mimeType: file.mimetype}},
       buildPrompt(),
     ])
@@ -75,7 +78,11 @@ const extractInvoiceData = async (file, attempt = 1) => {
     if (attempt < maxAttempts) {
       console.warn(`Intento ${attempt} fallido al extraer factura, reintentando...`, error.message)
       await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
-      return extractInvoiceData(file, attempt + 1)
+      return extractInvoiceData(file, attempt + 1, useFallback)
+    }
+    if (!useFallback) {
+      console.warn('Modelo principal agotó sus reintentos, probando con el modelo de respaldo...', error.message)
+      return extractInvoiceData(file, 1, true)
     }
     throw error
   }
