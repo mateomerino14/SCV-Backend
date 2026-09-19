@@ -34,6 +34,22 @@ const calculateAmountFromSubitems = (subItems) => {
   return parseFloat(subItems.reduce((sum, item) => sum + parseFloat(item.monto || 0), 0).toFixed(2))
 };
 
+// En un viaje internacional, el primer y el ultimo dia se controlan en bolivianos
+// y los dias intermedios en dolares; valida que el gasto use la moneda correcta segun la fecha
+const validateCurrencyByDay = (trip, expenseDate, isInternational) => {
+  if (trip.tipo !== 'Internacional' || !expenseDate) {
+    return null
+  }
+  const isEdgeDay = expenseDate === trip.fecha_inicio || expenseDate === trip.fecha_fin
+  if (isEdgeDay && isInternational) {
+    return 'El primer y el último día de un viaje internacional se registran en bolivianos, no en dólares'
+  }
+  if (!isEdgeDay && !isInternational) {
+    return 'Los días intermedios de un viaje internacional se registran en dólares, no en bolivianos'
+  }
+  return null
+};
+
 // Crea un gasto nuevo, con sus tramos de moneda, subitems e imagen asociada
 const createExpense = async (expenseData, file, userId) => {
   if (!expenseData.id_viaje) {
@@ -44,6 +60,10 @@ const createExpense = async (expenseData, file, userId) => {
     return {error: access.error, status: access.status}
   }
   const isInternational = expenseData.es_gasto_internacional || false
+  const currencyError = validateCurrencyByDay(access.trip, expenseData.fecha_gasto, isInternational)
+  if (currencyError) {
+    return {error: currencyError, status: 400}
+  }
   const usesSegments = isInternational && Array.isArray(expenseData.tramos) && expenseData.tramos.length > 0
   const usesSubItems = Array.isArray(expenseData.subitems) && expenseData.subitems.length > 0
   let totalAmount = parseFloat(expenseData.monto_total)
@@ -155,6 +175,10 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
     return {error: access.error, status: access.status}
   }
   const isInternational = expenseData.es_gasto_internacional || false
+  const currencyError = validateCurrencyByDay(access.trip, expenseData.fecha_gasto, isInternational)
+  if (currencyError) {
+    return {error: currencyError, status: 400}
+  }
   const usesSegments = isInternational && Array.isArray(expenseData.tramos) && expenseData.tramos.length > 0
   const usesSubItems = Array.isArray(expenseData.subitems) && expenseData.subitems.length > 0
   let totalAmount = parseFloat(expenseData.monto_total)
