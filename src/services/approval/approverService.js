@@ -126,7 +126,7 @@ const getTripDetail = async (tripId, approverId) => {
     return {error: 'Viaje no encontrado', status: 404}
   }
   const {data: comments} = await supabase
-    .from('Comentario').select('*').eq('id_viaje', tripId).eq('id_usuario', approverId).order('fecha', {ascending: false})
+    .from('Comentario').select('*').eq('id_viaje', tripId).order('fecha', {ascending: false})
   return {trip, comments: comments || []}
 };
 
