@@ -56,7 +56,7 @@ create table if not exists "Usuario" (
   foto_perfil text,
   id_jefe_directo integer references "Usuario"(id_usuario),
   id_seccion integer references "Seccion"(id_seccion),
-  carnet_identidad varchar(20),
+  carnet_identidad varchar(30),
   ultima_cambio_contrasenia timestamptz default now(),
   refresh_token_invalido_desde timestamptz,
   id_cargo integer not null references "Cargo"(id_cargo),

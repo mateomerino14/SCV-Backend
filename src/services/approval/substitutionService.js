@@ -163,7 +163,7 @@ const approveRequest = async (requestId, reviewerId) => {
       const body = `
         <p>Tu solicitud para que <strong>${substituteName}</strong> rinda los gastos de tu viaje <strong>${request.Viaje?.motivo}</strong> fue aprobada.</p>
       `
-      const html = emailService.buildEmailLayout('Reemplazo aprobado', body, '#155724')
+      const html = emailService.buildEmailLayout('Reemplazo aprobado', body)
       await emailService.sendEmail([{email: employee.email_corporativo, name: employeeName}], `Reemplazo Aprobado — ${request.Viaje?.motivo}`, html)
     }
     if (substitute?.email_corporativo) {
@@ -171,7 +171,7 @@ const approveRequest = async (requestId, reviewerId) => {
         <p>Fuiste designado para rendir los gastos del viaje <strong>${request.Viaje?.motivo}</strong> de <strong>${employeeName}</strong>.</p>
         <p>Ingresa al sistema para registrar los gastos correspondientes.</p>
       `
-      const html = emailService.buildEmailLayout('Nueva rendición asignada', body, '#155724')
+      const html = emailService.buildEmailLayout('Nueva rendición asignada', body)
       await emailService.sendEmail([{email: substitute.email_corporativo, name: substituteName}], `Rendición de ${employeeName} — ${request.Viaje?.motivo}`, html)
     }
   }
