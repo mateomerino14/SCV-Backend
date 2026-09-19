@@ -266,12 +266,13 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
           <td>${totalIt.toFixed(2)}</td>
           <td>${totalCostBs.toFixed(2)}</td>
         </tr>
+        ${trip.tipo === 'Internacional' ? `
         <tr class="totales-fila">
           <td colspan="9">Sumas Totales (USD)</td>
           <td>${totalImporteUsd.toFixed(2)}</td>
           <td></td><td></td><td></td>
           <td>${totalCostUsd.toFixed(2)}</td>
-        </tr>
+        </tr>` : ''}
       </tbody>
     </table>
     <div class="zona-inferior">
