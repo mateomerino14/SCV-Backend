@@ -214,7 +214,7 @@ const approveRequest = async (requestId, reviewerId) => {
           Ya puedes continuar registrando tus gastos. Si necesitas más tiempo después de esa fecha, deberás solicitar una nueva autorización.
         </p>
       `
-      const html = emailService.buildEmailLayout('Autorización de plazo aprobada', body, '#155724')
+      const html = emailService.buildEmailLayout('Autorización de plazo aprobada', body)
       await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Autorización Aprobada — ${request.Viaje?.motivo}`, html)
     }
   }
