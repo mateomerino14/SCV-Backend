@@ -2,6 +2,7 @@ const supabase = require('../../config/supabase')
 const emailService = require('../shared/emailService')
 const treasuryDocumentService = require('./treasuryDocumentService')
 const tripCommentService = require('../trip/tripCommentService')
+const tripCodeUtil = require('../../utils/tripCode')
 
 // Lista los viajes pendientes de aprobacion de fondos
 const getPendingTrips = async (treasurerId, filters) => {
@@ -67,7 +68,7 @@ const getTripDetail = async (tripId, treasurerId) => {
     return {error: 'Viaje no encontrado', status: 404}
   }
   const {data: comments} = await supabase
-    .from('Comentario').select('*').eq('id_viaje', tripId).eq('id_usuario', treasurerId).order('fecha', {ascending: false})
+    .from('Comentario').select('*').eq('id_viaje', tripId).order('fecha', {ascending: false})
   return {trip, comments: comments || []}
 };
 
@@ -123,8 +124,7 @@ const approveTrip = async (tripId, treasurerId) => {
     return {error: error.message, status: 500}
   }
   const {data: treasurer} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre)').eq('id_usuario', treasurerId).single()
-  const year = new Date().getFullYear()
-  const tripCode = `VIA-${tripId}/${year}`
+  const tripCode = tripCodeUtil.buildTripCode(trip)
   try {
     const employee = trip.Usuario
     if (employee?.email_corporativo) {

@@ -1,5 +1,6 @@
 const supabase = require('../../config/supabase')
 const pdfService = require('../shared/pdfService')
+const tripCodeUtil = require('../../utils/tripCode')
 
 const vatRate = 0.13
 
@@ -240,7 +241,7 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
     <div class="info-box">
       <span class="info-label">RESPONSABLE:</span><span>${escapeHtml(responsable)}</span>
       <span class="info-label">CARGO:</span><span>${escapeHtml(cargo)}</span>
-      <span class="info-label">MEMORANDUM:</span><span>V-${trip.id_viaje}</span>
+      <span class="info-label">MEMORANDUM:</span><span>${tripCodeUtil.buildTripCode(trip)}</span>
       <span class="info-label">FECHA:</span><span>${formatDate(trip.fecha_inicio)}</span>
       <span class="info-label">MOTIVO:</span><span>${escapeHtml(trip.motivo?.toUpperCase() || '')}</span>
       <span class="info-label">SECCIÓN:</span><span>${escapeHtml(costCenter)}</span>

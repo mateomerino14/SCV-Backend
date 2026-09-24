@@ -1,11 +1,11 @@
 const express = require('express')
 const router = express.Router()
-const authController = require('../../controllers/user/authController')
+const authMiddleware = require('../../middlewares/auth')
+const roleMiddleware = require('../../middlewares/roleAuth')
+const auditController = require('../../controllers/catalog/auditController')
 
-router.post('/', authController.login)
-router.post('/refresh', authController.refresh)
-router.post('/logout', authController.logout)
-router.post('/send-code', authController.sendCode)
-router.post('/verify-code', authController.verifyCode)
+router.get('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), auditController.getAllAudits)
+router.post('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), auditController.createAudit)
+router.delete('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), auditController.deleteAudit)
 
 module.exports = router;
