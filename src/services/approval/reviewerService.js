@@ -5,6 +5,7 @@ const emailService = require('../shared/emailService')
 const userDirectoryService = require('../user/userDirectoryService')
 const finalReviewDocumentService = require('./finalReviewDocumentService')
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
+const tripCodeUtil = require('../../utils/tripCode')
 
 // Anexa el resumen de gastos y alertas a una lista de viajes
 const attachSummaryToTrips = (trips) => {
@@ -207,8 +208,7 @@ const approveReview = async (tripId, reviewerId) => {
   const {data: reviewer} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre, monto_diario, monto_diario_usd)').eq('id_usuario', reviewerId).single()
   const {data: expenses} = await supabase
     .from('Gasto').select('*, Categoria_Gasto(nombre), Proveedor(nombre), Factura(numero_factura, monto_parcial)').eq('id_viaje', tripId)
-  const year = new Date().getFullYear()
-  const tripCode = `VIA-${tripId}/${year}`
+  const tripCode = tripCodeUtil.buildTripCode(trip)
   let warning = null
   try {
     await notifyTreasurer(trip, reviewer, tripCode, expenses || [])

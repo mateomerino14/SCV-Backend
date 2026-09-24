@@ -2,6 +2,7 @@ const supabase = require('../../config/supabase')
 const numberToWords = require('../../utils/numberToWords')
 const emailService = require('../shared/emailService')
 const pdfService = require('../shared/pdfService')
+const {buildTripCode} = require('../../utils/tripCode')
 
 // Escapa caracteres especiales de HTML para prevenir inyeccion
 const escapeHtml = (text) => {
@@ -29,7 +30,7 @@ const getNextReceiptNumber = async () => {
 };
 
 // Genera el HTML de un recibo agrupado por tipo de gasto
-const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isInternational, tripId, motivo, supervisor) => {
+const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isInternational, tripCode, motivo, supervisor) => {
   const today = new Date()
   const day = today.getDate()
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -167,7 +168,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
       Lugar: Cochabamba &nbsp;&nbsp; de ${day} &nbsp;&nbsp; de ${month} &nbsp;&nbsp; de ${year}
     </div>
     <div class="viaje-linea">
-      <span>Nº de Viaje: ${tripId}</span>
+      <span>Nº de Viaje: ${tripCode}</span>
       <span>Concepto: ${escapeHtml(motivo || '')}</span>
       <span>Monto: ${totalAmount.toFixed(2)} ${currency}</span>
     </div>
@@ -217,7 +218,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
 };
 
 // Genera el HTML de un recibo individual por un solo gasto
-const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId, motivo, supervisor) => {
+const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripCode, motivo, supervisor) => {
   const today = new Date()
   const day = today.getDate()
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -348,7 +349,7 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId,
       Lugar: Cochabamba &nbsp;&nbsp; de ${day} &nbsp;&nbsp; de ${month} &nbsp;&nbsp; de ${year}
     </div>
     <div class="viaje-linea">
-      <span>Nº de Viaje: ${tripId}</span>
+      <span>Nº de Viaje: ${tripCode}</span>
       <span>Concepto: ${escapeHtml(motivo || '')}</span>
       <span>Monto: ${totalAmount.toFixed(2)} ${currency}</span>
     </div>
@@ -451,7 +452,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   if (numberError) {
     return {error: numberError, status: 500}
   }
-  const html = generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, tripId, trip.motivo, supervisor)
+  const html = generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, buildTripCode(trip), trip.motivo, supervisor)
   const pdfBuffer = await pdfService.generatePdf(html)
   const pdfBase64 = pdfBuffer.toString('base64')
   let typeName = 'Compras'
@@ -487,7 +488,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
 const sendIndividualReceipt = async (expenseId) => {
   const {data: expense, error: expenseError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad))')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, estado, fecha_inicio, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad))')
     .eq('id_gasto', expenseId)
     .single()
   if (expenseError) {
@@ -516,7 +517,7 @@ const sendIndividualReceipt = async (expenseId) => {
   if (numberError) {
     return {error: numberError, status: 500}
   }
-  const html = generateIndividualReceiptHtml(expense, employee, receiptNumber, expense.Viaje?.id_viaje, expense.Viaje?.motivo, supervisor)
+  const html = generateIndividualReceiptHtml(expense, employee, receiptNumber, buildTripCode(expense.Viaje || {}), expense.Viaje?.motivo, supervisor)
   const pdfBuffer = await pdfService.generatePdf(html)
   const pdfBase64 = pdfBuffer.toString('base64')
   let typeName = 'Compra'

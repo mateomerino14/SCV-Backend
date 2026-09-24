@@ -243,7 +243,6 @@ const getMyExpenseReviews = async (supervisorId, filters) => {
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)')
     .eq('id_supervisor_asignado', supervisorId)
     .in('estado', ['EN_REVISION', 'APROBADO_SUPERVISOR', 'RECHAZADO'])
-    .eq('fue_iniciado', true)
   if (filters.fecha_inicio) {
     query = query.gte('fecha_inicio', filters.fecha_inicio)
   }

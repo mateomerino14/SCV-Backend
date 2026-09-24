@@ -4,6 +4,7 @@ const emailService = require('../shared/emailService')
 const approvalMemoService = require('./approvalMemoService')
 const textNormalizer = require('../../utils/textNormalizer')
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
+const tripCodeUtil = require('../../utils/tripCode')
 
 const memoPositions = [
   'Asistente Administrativo de Seguros y Servicios',
@@ -158,8 +159,7 @@ const approveTrip = async (tripId, approverId) => {
   }
   const {data: approver} = await supabase
     .from('Usuario').select('nombre, apellido_paterno, email_corporativo, Cargo(nombre)').eq('id_usuario', approverId).single()
-  const year = new Date().getFullYear()
-  const tripCode = `VIA-${tripId}/${year}`
+  const tripCode = tripCodeUtil.buildTripCode(trip)
   try {
     const allUsers = await getActiveUsers()
     await sendApprovalMemo(trip, approver, tripCode, allUsers)
