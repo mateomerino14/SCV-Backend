@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt')
 const supabase = require('../../config/supabase')
 const tokenService = require('../../services/user/tokenService')
 const emailService = require('../../services/shared/emailService')
+const auditLogService = require('../../services/shared/auditLogService')
 
 // Inicia sesion con correo corporativo y contrasenia
 const login = async (req, res) => {
@@ -30,6 +31,7 @@ const login = async (req, res) => {
   const accessToken = tokenService.generateAccessToken(data, passwordExpired)
   const refreshToken = tokenService.generateRefreshToken(data)
   res.cookie('refreshToken', refreshToken, tokenService.cookieOptions)
+  await auditLogService.logAudit(data.id_usuario, 'INGRESO')
   return res.json({token: accessToken, contraseniavencida: passwordExpired})
 };
 
@@ -69,7 +71,17 @@ const refresh = async (req, res) => {
 };
 
 // Cierra la sesion del usuario
-const logout = (req, res) => {
+const logout = async (req, res) => {
+  const refreshToken = req.cookies?.refreshToken
+  if (refreshToken) {
+    try {
+      const decodedToken = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET)
+      await auditLogService.logAudit(decodedToken.id_usuario, 'SALIDA')
+    }
+    catch (error) {
+      // Token ya vencido o invalido: no hay a quien registrarle la salida
+    }
+  }
   res.clearCookie('refreshToken', tokenService.cookieOptions)
   return res.json({message: 'Sesión cerrada'})
 };
@@ -169,6 +181,7 @@ const verifyCode = async (req, res) => {
   const accessToken = tokenService.generateAccessToken(fullUser)
   const refreshToken = tokenService.generateRefreshToken(fullUser)
   res.cookie('refreshToken', refreshToken, tokenService.cookieOptions)
+  await auditLogService.logAudit(fullUser.id_usuario, 'INGRESO')
   return res.json({message: 'Código verificado correctamente', token: accessToken})
 };
 

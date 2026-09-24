@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt')
 const crypto = require('crypto')
 const userService = require('../../services/user/userService')
 const emailService = require('../../services/shared/emailService')
+const auditLogService = require('../../services/shared/auditLogService')
 const saltRounds = 10
 
 // Genera una contrasenia temporal legible, sin caracteres ambiguos (0/O, 1/l/I)
@@ -115,6 +116,7 @@ const changeMyPassword = async (req, res) => {
     return res.status(500).json({error: updateError.message})
   }
   else {
+    await auditLogService.logAudit(userId, 'CAMBIO_CLAVE')
     return res.json({message: 'Contraseña actualizada correctamente'})
   }
 };
