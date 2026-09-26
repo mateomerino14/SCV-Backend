@@ -101,11 +101,19 @@ create table if not exists "Viaje" (
   fue_iniciado boolean default false,
   ciclo_revision integer not null default 1,
   tiene_alcohol boolean,
-  id_usuario integer not null references "Usuario"(id_usuario),
-  id_supervisor_asignado integer references "Usuario"(id_usuario),
-  id_aprobador_asignado integer references "Usuario"(id_usuario),
-  id_revisor_asignado integer references "Usuario"(id_usuario),
-  id_tesorero_asignado integer references "Usuario"(id_usuario)
+  id_usuario integer not null,
+  id_supervisor_asignado integer,
+  id_aprobador_asignado integer,
+  id_revisor_asignado integer,
+  id_tesorero_asignado integer,
+  -- Viaje tiene cinco claves foraneas hacia Usuario; el backend desambigua los
+  -- embeds de PostgREST por nombre (Usuario!viaje_id_usuario_foreign), asi que
+  -- estos nombres NO deben cambiarse.
+  constraint viaje_id_usuario_foreign foreign key (id_usuario) references "Usuario"(id_usuario),
+  constraint viaje_id_supervisor_asignado_foreign foreign key (id_supervisor_asignado) references "Usuario"(id_usuario),
+  constraint viaje_id_aprobador_asignado_foreign foreign key (id_aprobador_asignado) references "Usuario"(id_usuario),
+  constraint viaje_id_revisor_asignado_foreign foreign key (id_revisor_asignado) references "Usuario"(id_usuario),
+  constraint viaje_id_tesorero_asignado_foreign foreign key (id_tesorero_asignado) references "Usuario"(id_usuario)
 );
 
 create table if not exists "Solicitud_Autorizacion_Plazo" (
