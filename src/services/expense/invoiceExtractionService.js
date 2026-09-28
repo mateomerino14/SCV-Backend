@@ -1,11 +1,4 @@
-const {GoogleGenerativeAI} = require('@google/generative-ai')
-
-const geminiClient = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-const geminiModel = geminiClient.getGenerativeModel({model: 'gemini-3.6-flash'})
-// Modelo de respaldo, de menor carga, usado si el principal falla todos sus reintentos
-const geminiFallbackModel = geminiClient.getGenerativeModel({model: 'gemini-3.5-flash-lite'})
-
-const maxAttempts = 3
+const geminiService = require('../shared/geminiService')
 
 // Construye la instruccion enviada al modelo para interpretar el comprobante
 const buildPrompt = () => {
@@ -62,30 +55,15 @@ const normalizeResult = (parsedData) => {
 }
 
 // Extrae los datos de una factura enviando la imagen al modelo de vision
-const extractInvoiceData = async (file, attempt = 1, useFallback = false) => {
-  try {
-    const imageBase64 = file.buffer.toString('base64')
-    const model = useFallback ? geminiFallbackModel : geminiModel
-    const result = await model.generateContent([
-      {inlineData: {data: imageBase64, mimeType: file.mimetype}},
-      buildPrompt(),
-    ])
-    const responseText = result.response.text().trim()
-    const cleanJson = responseText.replace(/```json|```/g, '').trim()
-    return normalizeResult(JSON.parse(cleanJson))
-  }
-  catch (error) {
-    if (attempt < maxAttempts) {
-      console.warn(`Intento ${attempt} fallido al extraer factura, reintentando...`, error.message)
-      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
-      return extractInvoiceData(file, attempt + 1, useFallback)
-    }
-    if (!useFallback) {
-      console.warn('Modelo principal agotó sus reintentos, probando con el modelo de respaldo...', error.message)
-      return extractInvoiceData(file, 1, true)
-    }
-    throw error
-  }
+// (con modelo de respaldo si el principal falla o se queda sin cuota)
+const extractInvoiceData = async (file) => {
+  const imageBase64 = file.buffer.toString('base64')
+  const responseText = await geminiService.generateText([
+    {inlineData: {data: imageBase64, mimeType: file.mimetype}},
+    buildPrompt(),
+  ], {taskName: 'extraccion de factura'})
+  const cleanJson = responseText.replace(/```json|```/g, '').trim()
+  return normalizeResult(JSON.parse(cleanJson))
 }
 
 module.exports = {extractInvoiceData}
