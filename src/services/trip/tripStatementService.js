@@ -97,6 +97,12 @@ const formatDate = (dateInput) => {
   if (!dateInput) {
     return ''
   }
+  // Las fechas YYYY-MM-DD se formatean tal cual: new Date() las toma como UTC y en
+  // Bolivia (UTC-4) mostraria el dia anterior
+  const dateOnly = String(dateInput).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dateOnly) {
+    return `${dateOnly[3]}/${dateOnly[2]}/${dateOnly[1]}`
+  }
   const date = new Date(dateInput)
   const day = String(date.getDate()).padStart(2, '0')
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -110,6 +116,8 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
   const responsable = `${employee?.nombre || ''} ${employee?.apellido_paterno || ''}`.trim().toUpperCase()
   const cargo = employee?.Cargo?.nombre?.toUpperCase() || ''
   const costCenter = employee?.Seccion?.nombre || ''
+  // En viajes nacionales no hay tramos de cambio ni montos en USD
+  const isInternationalTrip = trip.tipo === 'Internacional'
 
   let totalImporteFactura = 0
   let totalImporteBs = 0
@@ -123,7 +131,7 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
 
   const rows = expenses.map((expense, index) => {
     const amount = parseFloat(expense.monto_total) || 0
-    const isInternational = !!expense.es_gasto_internacional
+    const isInternational = isInternationalTrip && !!expense.es_gasto_internacional
     const hasInvoice = !!expense.Factura
     const {vat, rcIva, iue, it, cost} = getExpenseTaxValues(expense)
     const oracleValue = escapeHtml(extractOracleAccount(expense.Categoria_Gasto?.nombre))
@@ -157,7 +165,7 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
       <td class="col-doc">${escapeHtml(cleanValue(expense.Factura?.numero_factura))}</td>
       <td class="col-nit">${escapeHtml(cleanValue(expense.Proveedor?.numero_doc_fiscal))}</td>
       <td class="col-importe-fact">${hasInvoice ? amount.toFixed(2) : ''}</td>
-      <td class="col-tramos">${tramosText}</td>
+      ${isInternationalTrip ? `<td class="col-tramos">${tramosText}</td>` : ''}
       <td class="col-importe">${amount.toFixed(2)} ${currency}</td>
       <td class="col-num">${vat.toFixed(2)}</td>
       <td class="col-num">${rcIva.toFixed(2)}</td>
@@ -219,8 +227,11 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
   .balance-table { width: 45%; border-collapse: collapse; }
   .balance-table th { background: #cfe2f3; color: #000; font-weight: bold; padding: 3px; font-size: 7.5pt; }
   .balance-table td { border: 1px solid #b0c4d4; padding: 3px 8px; font-size: 8pt; }
-  .observaciones { flex: 1; border: 1px solid #000; padding: 4px 8px; font-size: 8pt; }
-  .observaciones-titulo { font-weight: bold; margin-bottom: 4px; }
+  .justificaciones { flex: 1; border-collapse: collapse; align-self: flex-start; }
+  .justificaciones th { background: #cfe2f3; color: #000; font-weight: bold; padding: 3px 6px; font-size: 7.5pt; border: 1px solid #1b4f91; text-align: left; }
+  .justificaciones .justificaciones-titulo { background: #4a90d9; color: #fff; font-size: 8pt; }
+  .justificaciones td { border: 1px solid #b0c4d4; padding: 3px 6px; font-size: 8pt; vertical-align: top; }
+  .justificaciones .justificaciones-fecha { width: 70px; text-align: center; }
   .firmas { display: flex; justify-content: space-between; margin-top: 30px; gap: 10px; }
   .firma-bloque { flex: 1; text-align: center; }
   .firma-linea { border-top: 1px solid #000; margin-top: 30px; padding-top: 4px; font-size: 7.5pt; font-weight: bold; }
@@ -250,8 +261,8 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
       <thead>
         <tr>
           <th>N°</th><th>FECHA</th><th>CUENTA/ORACLE</th><th>DETALLE</th><th>TIPO GASTO</th>
-          <th>N° DOCUMENTO</th><th>NIT</th><th>IMPORTE FACT./REC.</th><th>TRAMOS DE CAMBIO</th>
-          <th>IMPORTE Bs./USD</th><th>I.V.A.</th><th>RC-IVA</th><th>IUE</th><th>IT</th><th>IMPORTE COSTO/GASTO</th>
+          <th>N° DOCUMENTO</th><th>NIT</th><th>IMPORTE FACT./REC.</th>
+          ${isInternationalTrip ? '<th>TRAMOS DE CAMBIO</th><th>IMPORTE Bs./USD</th>' : '<th>IMPORTE Bs.</th>'}<th>I.V.A.</th><th>RC-IVA</th><th>IUE</th><th>IT</th><th>IMPORTE COSTO/GASTO</th>
         </tr>
       </thead>
       <tbody>
@@ -259,7 +270,7 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
         <tr class="totales-fila">
           <td colspan="7">Sumas Totales (Bs)</td>
           <td>${totalImporteFactura.toFixed(2)}</td>
-          <td></td>
+          ${isInternationalTrip ? '<td></td>' : ''}
           <td>${totalImporteBs.toFixed(2)}</td>
           <td>${totalVat.toFixed(2)}</td>
           <td>${totalRcIva.toFixed(2)}</td>
@@ -267,32 +278,37 @@ const generateStatementHtml = (trip, expenses, dayJustifications) => {
           <td>${totalIt.toFixed(2)}</td>
           <td>${totalCostBs.toFixed(2)}</td>
         </tr>
-        ${trip.tipo === 'Internacional' ? `
+        ${isInternationalTrip ? `
         <tr class="totales-fila">
           <td colspan="9">Sumas Totales (USD)</td>
           <td>${totalImporteUsd.toFixed(2)}</td>
-          <td></td><td></td><td></td>
+          <td></td><td></td><td></td><td></td>
           <td>${totalCostUsd.toFixed(2)}</td>
         </tr>` : ''}
       </tbody>
     </table>
     <div class="zona-inferior">
       <table class="balance-table">
-        <thead><tr><th>CONC.</th><th>Bs</th><th>USD</th></tr></thead>
+        <thead><tr><th>CONC.</th><th>Bs</th>${isInternationalTrip ? '<th>USD</th>' : ''}</tr></thead>
         <tbody>
           ${balanceRows.map(([label, bsValue, usdValue]) => `
-          <tr><td>${label}</td><td style="text-align:right">${bsValue.toFixed(2)}</td><td style="text-align:right">${usdValue.toFixed(2)}</td></tr>`).join('')}
+          <tr><td>${label}</td><td style="text-align:right">${bsValue.toFixed(2)}</td>${isInternationalTrip ? `<td style="text-align:right">${usdValue.toFixed(2)}</td>` : ''}</tr>`).join('')}
         </tbody>
       </table>
-      <div class="observaciones">
-        <p class="observaciones-titulo">OBSERVACIONES:</p>
-        ${dayJustifications.length === 0
-          ? '<p>—</p>'
-          : dayJustifications.map((item) => {
-            const label = item.fecha_justificada ? formatDate(item.fecha_justificada) : 'Hoteles'
-            return `<p><strong>${label}:</strong> ${escapeHtml(item.descripcion)}</p>`
-          }).join('')}
-      </div>
+      <table class="justificaciones">
+        <thead>
+          <tr><th colspan="2" class="justificaciones-titulo">JUSTIFICACIONES DE EXCESOS</th></tr>
+          <tr><th class="justificaciones-fecha">FECHA</th><th>JUSTIFICACIÓN</th></tr>
+        </thead>
+        <tbody>
+          ${dayJustifications.length === 0
+            ? '<tr><td colspan="2" style="text-align:center">Sin excesos que justificar</td></tr>'
+            : dayJustifications.map((item) => {
+              const label = item.fecha_justificada ? formatDate(item.fecha_justificada) : 'Hoteles'
+              return `<tr><td class="justificaciones-fecha"><strong>${label}</strong></td><td>${escapeHtml(item.descripcion)}</td></tr>`
+            }).join('')}
+        </tbody>
+      </table>
     </div>
     <div class="firmas">
       <div class="firma-bloque"><div class="firma-linea">Preparado por</div><div class="firma-rol">Responsable</div></div>
