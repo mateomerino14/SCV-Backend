@@ -156,36 +156,17 @@ const updateAlcoholInExpenseFromText = async (expenseId, text) => {
   }
 }
 
-// Recalcula y actualiza el indicador de alcohol de un viaje
+// Recalcula y actualiza el indicador de alcohol de un viaje. Cada gasto ya guarda su
+// propio tiene_alcohol al registrarse o editarse (facturas por su detalle de productos,
+// gastos sin factura por su descripcion y subgastos), asi que el viaje tiene alcohol si
+// cualquiera de sus gastos lo tiene. No se vuelve a consultar a la IA.
 const updateAlcoholInTrip = async (tripId) => {
   try {
     const {data: expenses} = await supabase
       .from('Gasto')
-      .select('id_gasto')
+      .select('tiene_alcohol')
       .eq('id_viaje', tripId)
-    if (!expenses || expenses.length === 0) {
-      await supabase.from('Viaje').update({tiene_alcohol: false}).eq('id_viaje', tripId)
-      return false
-    }
-    const expenseIds = expenses.map((expense) => expense.id_gasto)
-    const {data: invoices} = await supabase
-      .from('Factura')
-      .select('id_factura')
-      .in('id_gasto', expenseIds)
-    if (!invoices || invoices.length === 0) {
-      await supabase.from('Viaje').update({tiene_alcohol: false}).eq('id_viaje', tripId)
-      return false
-    }
-    const invoiceIds = invoices.map((invoice) => invoice.id_factura)
-    const {data: details} = await supabase
-      .from('Detalle_Factura')
-      .select('nombre_producto')
-      .in('id_factura', invoiceIds)
-    if (!details || details.length === 0) {
-      await supabase.from('Viaje').update({tiene_alcohol: false}).eq('id_viaje', tripId)
-      return false
-    }
-    const result = await analyzeAlcohol(details)
+    const result = (expenses || []).some((expense) => expense.tiene_alcohol === true)
     await supabase.from('Viaje').update({tiene_alcohol: result}).eq('id_viaje', tripId)
     return result
   }
