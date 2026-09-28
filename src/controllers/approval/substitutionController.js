@@ -1,6 +1,15 @@
 const substitutionService = require('../../services/approval/substitutionService')
 
 // Crea una solicitud de reemplazo
+// Lista las personas de la misma seccion que pueden rendir por el usuario
+const getCandidates = async (req, res) => {
+  const result = await substitutionService.getCandidates(req.user.id_usuario)
+  if (result.error) {
+    return res.status(result.status).json({error: result.error})
+  }
+  return res.json({candidatos: result.candidates, sinSeccion: result.sinSeccion})
+};
+
 const createRequest = async (req, res) => {
   const {tripId} = req.params
   const {id_sustituto} = req.body
@@ -91,4 +100,5 @@ module.exports = {
   approveRequest,
   rejectRequest,
   getActiveSubstitutions,
+  getCandidates,
 };

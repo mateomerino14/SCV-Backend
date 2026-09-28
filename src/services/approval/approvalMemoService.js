@@ -41,6 +41,7 @@ const generateMemoHtml = (trip, approver, tripCode) => {
   .firma-area { margin-top: 20px; text-align: center; }
   .firma-nombre { font-size: 12pt; font-weight: bold; font-style: italic; }
   .firma-cargo { font-size: 11pt; text-transform: uppercase; font-style: italic; }
+  .firma-nota { font-size: 9pt; color: #475569; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -59,8 +60,12 @@ const generateMemoHtml = (trip, approver, tripCode) => {
   <p class="cuerpo">El presente memorandum tiene carácter oficial y forma parte del expediente de rendición de cuentas del empleado mencionado.</p>
   <div class="despedida">Sin otro particular, reciba un cordial saludo.</div>
   <div class="firma-area">
-    <div class="firma-nombre">${approver?.nombre} ${approver?.apellido_paterno}</div>
-    <div class="firma-cargo">APROBADOR — MAXAM FANEXA</div>
+    ${approver?.aprobacionAutomatica
+      ? `<div class="firma-nombre">Aprobación automática</div>
+    <div class="firma-cargo">Sistema de Control de Viáticos — MAXAM FANEXA</div>
+    <div class="firma-nota">El titular del viaje es el aprobador; esta etapa se aprobó automáticamente.</div>`
+      : `<div class="firma-nombre">${approver?.nombre} ${approver?.apellido_paterno}</div>
+    <div class="firma-cargo">APROBADOR — MAXAM FANEXA</div>`}
   </div>
 </body>
 </html>`

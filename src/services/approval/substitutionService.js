@@ -17,6 +17,27 @@ const getActiveReviewers = async () => {
 };
 
 // Crea una solicitud para que otra persona rinda los gastos de un viaje
+// Personas que pueden rendir en nombre del solicitante: usuarios activos de su misma
+// seccion, sin incluirlo a el ni a los administradores
+const getCandidates = async (requesterId) => {
+  const {data: requester} = await supabase.from('Usuario').select('id_seccion').eq('id_usuario', requesterId).single()
+  if (!requester?.id_seccion) {
+    return {candidates: [], sinSeccion: true}
+  }
+  const {data, error} = await supabase
+    .from('Usuario')
+    .select('id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Rol!inner(nombre)')
+    .eq('activo', true)
+    .eq('id_seccion', requester.id_seccion)
+    .neq('id_usuario', requesterId)
+    .neq('Rol.nombre', 'ADMINISTRADOR')
+    .order('nombre', {ascending: true})
+  if (error) {
+    return {error: error.message, status: 500}
+  }
+  return {candidates: data || [], sinSeccion: false}
+}
+
 const createRequest = async (tripId, requesterId, substituteId) => {
   if (!substituteId) {
     return {error: 'Debes seleccionar quién rendirá por ti', status: 400}
@@ -45,6 +66,10 @@ const createRequest = async (tripId, requesterId, substituteId) => {
     .single()
   if (!substitute || !substitute.activo) {
     return {error: 'El usuario seleccionado no está disponible', status: 400}
+  }
+  const {candidates} = await getCandidates(requesterId)
+  if (!(candidates || []).some((candidate) => candidate.id_usuario === parseInt(substituteId))) {
+    return {error: 'Solo puedes designar a una persona activa de tu misma sección', status: 400}
   }
   const {data: existingRequest} = await supabase
     .from('Solicitud_Reemplazo')
@@ -343,4 +368,5 @@ module.exports = {
   getActiveSubstitutions,
   canActOnTrip,
   canRegisterExpenseOnTrip,
+  getCandidates,
 };

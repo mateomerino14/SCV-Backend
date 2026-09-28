@@ -165,8 +165,10 @@ const approveTrip = async (tripId, approverId, {selfStageSkip = false} = {}) => 
   if (error) {
     return {error: error.message, status: 500}
   }
-  const {data: approver} = await supabase
+  const {data: approverData} = await supabase
     .from('Usuario').select('nombre, apellido_paterno, email_corporativo, Cargo(nombre)').eq('id_usuario', approverId).single()
+  // Si es el viaje del propio aprobador, el memorandum indica aprobacion automatica
+  const approver = {...approverData, aprobacionAutomatica: selfStageSkip}
   const tripCode = tripCodeUtil.buildTripCode(trip)
   try {
     const allUsers = await getActiveUsers()

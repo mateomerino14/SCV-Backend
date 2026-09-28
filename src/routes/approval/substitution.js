@@ -4,6 +4,7 @@ const authMiddleware = require('../../middlewares/auth')
 const roleMiddleware = require('../../middlewares/roleAuth')
 const substitutionController = require('../../controllers/approval/substitutionController')
 
+router.get('/candidates', authMiddleware, substitutionController.getCandidates)
 router.post('/trip/:tripId/request', authMiddleware, substitutionController.createRequest)
 router.get('/trip/:tripId/status', authMiddleware, substitutionController.getRequestStatus)
 router.get('/pending', authMiddleware, roleMiddleware(['REVISOR']), substitutionController.getPendingRequests)
