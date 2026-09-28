@@ -1,10 +1,25 @@
 const supabase = require('../../config/supabase')
 
+// Personas con un reemplazo aprobado en el viaje: rinden los gastos en nombre del titular,
+// asi que no pueden ser quienes revisen esa rendicion
+const getTripSubstituteIds = async (tripId) => {
+  if (!tripId) {
+    return []
+  }
+  const {data} = await supabase
+    .from('Solicitud_Reemplazo')
+    .select('id_sustituto')
+    .eq('id_viaje', tripId)
+    .eq('estado', 'APROBADA')
+  return (data || []).map((row) => row.id_sustituto)
+}
+
 // Resuelve quien debe ver el paso de revision de una persona dada, segun la jerarquia:
 // 1. su jefe directo, si esta activo y tiene el rol correcto
 // 2. si no, cualquier usuario activo con ese rol que comparta su misma seccion
 // 3. si tampoco, todos los usuarios activos con ese rol
-const resolveReviewerScope = async (personId, roleName) => {
+// excludeIds deja fuera a personas que no pueden revisar (p. ej. el reemplazo del viaje)
+const resolveReviewerScope = async (personId, roleName, excludeIds = []) => {
   const {data: person} = await supabase
     .from('Usuario')
     .select('id_jefe_directo, id_seccion')
@@ -16,7 +31,7 @@ const resolveReviewerScope = async (personId, roleName) => {
       .select('id_usuario, activo, Rol(nombre)')
       .eq('id_usuario', person.id_jefe_directo)
       .single()
-    if (boss?.activo && boss.Rol?.nombre === roleName) {
+    if (boss?.activo && boss.Rol?.nombre === roleName && !excludeIds.includes(boss.id_usuario)) {
       return {level: 'directo', userIds: [boss.id_usuario]}
     }
   }
@@ -28,11 +43,12 @@ const resolveReviewerScope = async (personId, roleName) => {
       .eq('id_seccion', person.id_seccion)
       .eq('Rol.nombre', roleName)
       .neq('id_usuario', personId)
-    if (sameSection && sameSection.length > 0) {
-      return {level: 'seccion', userIds: sameSection.map((user) => user.id_usuario)}
+    const allowed = (sameSection || []).filter((user) => !excludeIds.includes(user.id_usuario))
+    if (allowed.length > 0) {
+      return {level: 'seccion', userIds: allowed.map((user) => user.id_usuario)}
     }
   }
-  return {level: 'todos', userIds: null}
+  return {level: 'todos', userIds: null, excludeIds}
 }
 
 // Roles que solo puede tener una persona activa (userService.validateUniqueRole).
@@ -76,7 +92,8 @@ const assignNextReviewer = async (tripId, personId, roleName, assignedField) => 
     await supabase.from('Viaje').update({[assignedField]: holderId}).eq('id_viaje', tripId)
     return {level: 'unico', userIds: holderId ? [holderId] : []}
   }
-  const scope = await resolveReviewerScope(personId, roleName)
+  const substituteIds = await getTripSubstituteIds(tripId)
+  const scope = await resolveReviewerScope(personId, roleName, substituteIds)
   if (scope.level === 'directo') {
     await supabase.from('Viaje').update({[assignedField]: scope.userIds[0]}).eq('id_viaje', tripId)
   }
@@ -93,7 +110,11 @@ const filterTripsByHierarchy = async (trips, requesterId, roleName, ownerIdExtra
   const results = []
   for (const trip of trips) {
     const ownerId = ownerIdExtractor(trip)
-    const scope = await resolveReviewerScope(ownerId, roleName)
+    const substituteIds = await getTripSubstituteIds(trip.id_viaje)
+    if (substituteIds.includes(requesterId)) {
+      continue
+    }
+    const scope = await resolveReviewerScope(ownerId, roleName, substituteIds)
     if (scope.level === 'directo') {
       if (scope.userIds.includes(requesterId)) {
         results.push(trip)
@@ -119,4 +140,4 @@ const filterBySection = (trips, seccionId) => {
   return trips.filter((trip) => String(trip.Usuario?.id_seccion) === String(seccionId))
 }
 
-module.exports = {resolveReviewerScope, assignNextReviewer, filterTripsByHierarchy, filterBySection, claimStageTrips, getUniqueRoleHolder, uniqueRoles}
+module.exports = {getTripSubstituteIds, resolveReviewerScope, assignNextReviewer, filterTripsByHierarchy, filterBySection, claimStageTrips, getUniqueRoleHolder, uniqueRoles}

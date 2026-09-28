@@ -70,6 +70,9 @@ const takeTripReview = async (tripId, supervisorId) => {
   if (trip.id_usuario === supervisorId) {
     return {error: 'No puedes revisar tu propio viaje', status: 403}
   }
+  if ((await hierarchyAssignmentService.getTripSubstituteIds(tripId)).includes(supervisorId)) {
+    return {error: 'No puedes revisar una rendición que registraste como reemplazo', status: 403}
+  }
   if (trip.id_supervisor_asignado) {
     return {error: 'Este viaje ya fue tomado por otro supervisor', status: 409}
   }
@@ -274,6 +277,9 @@ const takeExpenseReview = async (tripId, supervisorId) => {
   if (trip.id_usuario === supervisorId) {
     return {error: 'No puedes revisar tu propio viaje', status: 403}
   }
+  if ((await hierarchyAssignmentService.getTripSubstituteIds(tripId)).includes(supervisorId)) {
+    return {error: 'No puedes revisar una rendición que registraste como reemplazo', status: 403}
+  }
   if (trip.id_supervisor_asignado) {
     return {error: 'Este viaje ya fue tomado por otro supervisor', status: 409}
   }
@@ -363,6 +369,9 @@ const approveExpenseReview = async (tripId, supervisorId) => {
   }
   if (trip.estado !== 'EN_REVISION') {
     return {error: 'Este viaje no está en revisión de gastos', status: 400}
+  }
+  if ((await hierarchyAssignmentService.getTripSubstituteIds(tripId)).includes(supervisorId)) {
+    return {error: 'No puedes aprobar una rendición que registraste como reemplazo', status: 403}
   }
   const nextState = trip.tiene_alcohol ? 'EN_REVISION_APROBADOR' : 'APROBADO_SUPERVISOR'
   const {error} = await supabase.from('Viaje').update({estado: nextState}).eq('id_viaje', tripId)

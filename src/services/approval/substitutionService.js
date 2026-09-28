@@ -17,8 +17,12 @@ const getActiveReviewers = async () => {
 };
 
 // Crea una solicitud para que otra persona rinda los gastos de un viaje
+// Roles que no pueden ser reemplazo: el revisor y el aprobador son unicos y revisarian
+// la misma rendicion que registraron; el administrador no participa del flujo de viajes
+const excludedSubstituteRoles = ['ADMINISTRADOR', 'REVISOR', 'APROBADOR']
+
 // Personas que pueden rendir en nombre del solicitante: usuarios activos de su misma
-// seccion, sin incluirlo a el ni a los administradores
+// seccion, sin incluirlo a el ni a los roles excluidos
 const getCandidates = async (requesterId) => {
   const {data: requester} = await supabase.from('Usuario').select('id_seccion').eq('id_usuario', requesterId).single()
   if (!requester?.id_seccion) {
@@ -30,7 +34,7 @@ const getCandidates = async (requesterId) => {
     .eq('activo', true)
     .eq('id_seccion', requester.id_seccion)
     .neq('id_usuario', requesterId)
-    .neq('Rol.nombre', 'ADMINISTRADOR')
+    .not('Rol.nombre', 'in', `(${excludedSubstituteRoles.join(',')})`)
     .order('nombre', {ascending: true})
   if (error) {
     return {error: error.message, status: 500}
