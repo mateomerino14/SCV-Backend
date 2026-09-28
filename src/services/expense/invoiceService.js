@@ -196,6 +196,9 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   if (!Array.isArray(invoiceData.detalle) || invoiceData.detalle.length === 0) {
     return {error: 'Debes agregar al menos un producto al detalle de la factura', status: 400}
   }
+  if (!file && !invoiceData.mantener_imagen) {
+    return {error: 'Debes subir el comprobante de la factura', status: 400}
+  }
   const {data: existingExpense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single()
   if (!existingExpense) {
     return {error: 'Gasto no encontrado', status: 404}
