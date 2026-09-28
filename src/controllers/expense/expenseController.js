@@ -10,7 +10,7 @@ const getExpenseDetail = async (req, res) => {
       .from('Gasto')
       .select(`
         *,
-        Categoria_Gasto(nombre),
+        Categoria_Gasto(nombre, requiere_comprobante),
         Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal),
         Factura(
           id_factura,
