@@ -221,18 +221,14 @@ const createUser = async (req, res) => {
     try {
       const loginUrl = process.env.FRONTEND_URL || 'https://scv-frontend.vercel.app'
       const emailBody = `
-        <p>Hola <strong>${newUser.nombre}</strong>,</p>
-        <p>Se creó tu cuenta en el Sistema de Control de Viáticos. Estas son tus credenciales de acceso:</p>
-        <div style="background-color: #F3F6FF; border-radius: 12px; padding: 16px; margin: 16px 0;">
-          <p style="color: #475569; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 4px 0;">Correo</p>
-          <p style="color: #2e2827; font-size: 14px; margin: 0 0 12px 0;">${newUser.email_corporativo}</p>
-          <p style="color: #475569; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 4px 0;">Contraseña temporal</p>
-          <p style="color: #870002; font-size: 20px; font-weight: bold; letter-spacing: 1px; margin: 0;">${temporaryPassword}</p>
-        </div>
-        <p style="color: #475569; font-size: 13px;">Por tu seguridad, te recomendamos cambiar esta contraseña desde tu perfil apenas ingreses al sistema.</p>
-        <a href="${loginUrl}" style="display: inline-block; margin-top: 8px; background-color: #870002; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: bold;">Ingresar al sistema</a>
+        ${emailService.emailParagraph(`Hola <strong>${newUser.nombre}</strong>,`)}
+        ${emailService.emailParagraph('Se creó tu cuenta en el Sistema de Control de Viáticos. Estas son tus credenciales de acceso:')}
+        ${emailService.emailInfoBox([{label: 'Correo', value: newUser.email_corporativo}])}
+        ${emailService.emailHighlightBox('Contraseña temporal', temporaryPassword)}
+        ${emailService.emailNote('Por tu seguridad, te recomendamos cambiar esta contraseña desde tu perfil apenas ingreses al sistema.')}
+        ${emailService.emailButton('Ingresar al sistema', loginUrl)}
       `
-      const emailHtml = emailService.buildEmailLayout('Bienvenido al Sistema de Control de Viáticos', emailBody)
+      const emailHtml = emailService.buildEmailLayout('Bienvenido al sistema', emailBody)
       await emailService.sendEmail([{email: newUser.email_corporativo, name: `${newUser.nombre} ${newUser.apellido_paterno}`}], 'Tu cuenta fue creada', emailHtml)
     }
     catch (emailError) {

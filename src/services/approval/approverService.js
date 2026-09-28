@@ -53,8 +53,13 @@ const sendApprovalMemo = async (trip, approver, tripCode, allUsers) => {
   const pdfBuffer = await approvalMemoService.generateMemoPdf(memoHtml)
   const pdfBase64 = pdfBuffer.toString('base64')
   const attachments = [{content: pdfBase64, name: `Memorandum_${tripCode.replace('/', '-')}.pdf`}]
-  const emailHtml = emailService.buildEmailLayout('Memorandum de Aprobación', `
-    <p>Se adjunta el memorandum correspondiente al viaje <strong>${tripCode}</strong>. Se solicita la asignación y aprobación del fondo correspondiente.</p>
+  const emailHtml = emailService.buildEmailLayout('Memorándum de aprobación', `
+    ${emailService.emailParagraph(`Se adjunta el memorándum del viaje <strong>${tripCode}</strong>.`)}
+    ${emailService.emailInfoBox([
+      {label: 'Viaje', value: `${tripCode} — ${trip.motivo || ''}`},
+      {label: 'Empleado', value: trip.Usuario ? `${trip.Usuario.nombre} ${trip.Usuario.apellido_paterno}` : ''},
+    ])}
+    ${emailService.emailNote('Se solicita la asignación y aprobación del fondo correspondiente.')}
   `)
   await emailService.sendEmail(to, `Memorandum de Aprobación — ${tripCode}`, emailHtml, attachments)
 };

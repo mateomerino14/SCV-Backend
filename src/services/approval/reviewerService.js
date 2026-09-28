@@ -133,8 +133,8 @@ const notifyTreasurer = async (trip, reviewer, tripCode, expenses) => {
   const pdfBuffer = await finalReviewDocumentService.generatePdf(renditionHtml)
   const pdfBase64 = pdfBuffer.toString('base64')
   const attachments = [{content: pdfBase64, name: `Rendicion_Final_${tripCode.replace('/', '-')}.pdf`}]
-  const emailHtml = emailService.buildEmailLayout('Rendición de Gastos — Aprobación Final', `
-    <p>Se adjunta la rendición de gastos con aprobación final correspondiente al viaje <strong>${tripCode}</strong>.</p>
+  const emailHtml = emailService.buildEmailLayout('Rendición con aprobación final', `
+    ${emailService.emailParagraph(`Se adjunta la rendición de gastos con aprobación final del viaje <strong>${tripCode}</strong>.`)}
   `)
   await emailService.sendEmail(to, `Rendición Final — ${tripCode}`, emailHtml, attachments)
 };
@@ -171,9 +171,11 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
     bodyText = 'Se te reembolsará el saldo excedido.'
   }
   const emailHtml = emailService.buildEmailLayout('Tu rendición fue aprobada', `
-    <p>La rendición de gastos del viaje <strong>${tripCode}</strong> fue aprobada de forma definitiva.</p>
-    <p>${bodyText} Revisa el detalle en el documento adjunto.</p>
-  `, '#155724')
+    ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+    ${emailService.emailParagraph(`La rendición de gastos del viaje <strong>${tripCode}</strong> fue aprobada de forma definitiva.`)}
+    ${emailService.emailHighlightBox('Resultado', bodyText)}
+    ${emailService.emailNote('Revisa el detalle en el documento adjunto.')}
+  `)
   await emailService.sendEmail(
     [{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}],
     `Resultado de tu Rendición de Gastos — ${tripCode}`,

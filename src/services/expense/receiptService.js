@@ -473,7 +473,9 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
     internationalEmailSuffix = ' Internacional'
   }
   const emailHtml = emailService.buildEmailLayout(`${emailTitle}${internationalEmailSuffix}`, `
-    <p>Se adjunta el recibo consolidado de ${typeName.toLowerCase()} Nº ${receiptNumber}, con ${expenses.length} gasto(s) registrado(s).</p>
+    ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+    ${emailService.emailParagraph(`Se adjunta el recibo consolidado de ${typeName.toLowerCase()}, con ${expenses.length} gasto(s) registrado(s).`)}
+    ${emailService.emailHighlightBox('Recibo', `Nº ${receiptNumber}`)}
   `)
   await emailService.sendEmail(
     [{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}],
@@ -530,7 +532,9 @@ const sendIndividualReceipt = async (expenseId) => {
     emailTitle = 'Recibo de Pago de Servicio'
   }
   const emailHtml = emailService.buildEmailLayout(emailTitle, `
-    <p>Se adjunta el recibo Nº ${receiptNumber} correspondiente al gasto registrado.</p>
+    ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+    ${emailService.emailParagraph('Se adjunta el recibo correspondiente al gasto registrado.')}
+    ${emailService.emailHighlightBox('Recibo', `Nº ${receiptNumber}`)}
   `)
   await emailService.sendEmail(
     [{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}],

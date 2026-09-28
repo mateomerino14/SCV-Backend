@@ -69,11 +69,15 @@ const createRequest = async (tripId, requesterId, substituteId) => {
     const employeeName = `${trip.Usuario?.nombre} ${trip.Usuario?.apellido_paterno}`
     const substituteName = `${substitute.nombre} ${substitute.apellido_paterno}`
     const body = `
-      <p>Hola,</p>
-      <p><strong>${employeeName}</strong> solicita que <strong>${substituteName}</strong> rinda los gastos de su viaje <strong>${trip.motivo}</strong> en su nombre.</p>
-      <p>Ingresa al sistema para aprobar o rechazar esta solicitud.</p>
+      ${emailService.emailParagraph(`<strong>${employeeName}</strong> solicita que otra persona rinda los gastos de su viaje en su nombre.`)}
+      ${emailService.emailInfoBox([
+        {label: 'Viaje', value: trip.motivo},
+        {label: 'Reemplazo propuesto', value: substituteName},
+      ])}
+      ${emailService.emailParagraph('Ingresa al sistema para aprobar o rechazar esta solicitud.')}
+      ${emailService.emailButton()}
     `
-    const html = emailService.buildEmailLayout('Nueva solicitud de reemplazo', body, '#870002')
+    const html = emailService.buildEmailLayout('Nueva solicitud de reemplazo', body)
     await emailService.sendEmail(to, `Solicitud de Reemplazo — Viaje de ${employeeName}`, html)
   }
   catch (emailError) {
@@ -161,15 +165,26 @@ const approveRequest = async (requestId, reviewerId) => {
     const employeeName = `${employee?.nombre} ${employee?.apellido_paterno}`
     if (employee?.email_corporativo) {
       const body = `
-        <p>Tu solicitud para que <strong>${substituteName}</strong> rinda los gastos de tu viaje <strong>${request.Viaje?.motivo}</strong> fue aprobada.</p>
+        ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+        ${emailService.emailParagraph('Tu solicitud de reemplazo fue aprobada.')}
+        ${emailService.emailInfoBox([
+          {label: 'Viaje', value: request.Viaje?.motivo},
+          {label: 'Rendirá en tu nombre', value: substituteName},
+        ])}
       `
       const html = emailService.buildEmailLayout('Reemplazo aprobado', body)
       await emailService.sendEmail([{email: employee.email_corporativo, name: employeeName}], `Reemplazo Aprobado — ${request.Viaje?.motivo}`, html)
     }
     if (substitute?.email_corporativo) {
       const body = `
-        <p>Fuiste designado para rendir los gastos del viaje <strong>${request.Viaje?.motivo}</strong> de <strong>${employeeName}</strong>.</p>
-        <p>Ingresa al sistema para registrar los gastos correspondientes.</p>
+        ${emailService.emailParagraph(`Hola <strong>${substitute.nombre}</strong>,`)}
+        ${emailService.emailParagraph(`Fuiste designado para rendir los gastos de un viaje de <strong>${employeeName}</strong>.`)}
+        ${emailService.emailInfoBox([
+          {label: 'Viaje', value: request.Viaje?.motivo},
+          {label: 'Titular', value: employeeName},
+        ])}
+        ${emailService.emailParagraph('Ingresa al sistema para registrar los gastos correspondientes.')}
+        ${emailService.emailButton()}
       `
       const html = emailService.buildEmailLayout('Nueva rendición asignada', body)
       await emailService.sendEmail([{email: substitute.email_corporativo, name: substituteName}], `Rendición de ${employeeName} — ${request.Viaje?.motivo}`, html)
@@ -211,10 +226,12 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
     const employee = request.Viaje?.Usuario
     if (employee?.email_corporativo) {
       const body = `
-        <p>Tu solicitud de reemplazo para el viaje <strong>${request.Viaje?.motivo}</strong> fue rechazada.</p>
-        <p><strong>Motivo:</strong> ${observation.trim()}</p>
+        ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+        ${emailService.emailParagraph('Tu solicitud de reemplazo fue rechazada.')}
+        ${emailService.emailInfoBox([{label: 'Viaje', value: request.Viaje?.motivo}])}
+        ${emailService.emailHighlightBox('Motivo del rechazo', observation.trim())}
       `
-      const html = emailService.buildEmailLayout('Reemplazo rechazado', body, '#D20F12')
+      const html = emailService.buildEmailLayout('Reemplazo rechazado', body)
       await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Reemplazo Rechazado — ${request.Viaje?.motivo}`, html)
     }
   }

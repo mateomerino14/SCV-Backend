@@ -133,9 +133,16 @@ const approveTrip = async (tripId, treasurerId) => {
       const pdfBuffer = await treasuryDocumentService.generatePdf(confirmationHtml)
       const pdfBase64 = pdfBuffer.toString('base64')
       const attachments = [{content: pdfBase64, name: `Confirmacion_Fondo_${tripCode.replace('/', '-')}.pdf`}]
-      const emailHtml = emailService.buildEmailLayout('Fondo Aprobado', `
-        <p>Tu fondo para el viaje <strong>${tripCode}</strong> ha sido aprobado. Ya puedes registrar tus gastos.</p>
-      `, '#155724')
+      const emailHtml = emailService.buildEmailLayout('Fondo aprobado', `
+        ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+        ${emailService.emailParagraph(`El fondo para tu viaje <strong>${tripCode}</strong> fue aprobado. Ya puedes registrar tus gastos.`)}
+        ${emailService.emailInfoBox([
+          {label: 'Viaje', value: `${tripCode} — ${trip.motivo || ''}`},
+          {label: 'Destino', value: trip.destino},
+        ])}
+        ${emailService.emailNote('Adjuntamos la confirmación del fondo asignado.')}
+        ${emailService.emailButton()}
+      `)
       await emailService.sendEmail(
         [{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}],
         `Fondo Aprobado — ${tripCode}`,

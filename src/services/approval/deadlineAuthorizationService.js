@@ -90,20 +90,15 @@ const createRequest = async (tripId, employeeId, reason) => {
     const to = reviewers.map((reviewer) => ({email: reviewer.email_corporativo, name: `${reviewer.nombre} ${reviewer.apellido_paterno}`}))
     const employeeName = `${trip.Usuario?.nombre} ${trip.Usuario?.apellido_paterno}`
     const body = `
-      <p style="color: #2e2827; font-size: 14px; margin: 0 0 16px 0;">
-        <strong>${employeeName}</strong> solicita autorización para seguir registrando gastos fuera del plazo de tolerancia.
-      </p>
-      <div style="background-color: #F3F6FF; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-        <p style="color: #475569; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 4px 0;">Viaje</p>
-        <p style="color: #2e2827; font-size: 14px; margin: 0 0 12px 0;">${trip.motivo}</p>
-        <p style="color: #475569; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 4px 0;">Motivo del retraso</p>
-        <p style="color: #2e2827; font-size: 14px; margin: 0;">${reason.trim()}</p>
-      </div>
-      <p style="color: #475569; font-size: 13px; margin: 0;">
-        Ingresa al sistema para aprobar o rechazar esta solicitud.
-      </p>
+      ${emailService.emailParagraph(`<strong>${employeeName}</strong> solicita autorización para seguir registrando gastos fuera del plazo de tolerancia.`)}
+      ${emailService.emailInfoBox([
+        {label: 'Viaje', value: trip.motivo},
+        {label: 'Motivo del retraso', value: reason.trim()},
+      ])}
+      ${emailService.emailParagraph('Ingresa al sistema para aprobar o rechazar esta solicitud.')}
+      ${emailService.emailButton()}
     `
-    const html = emailService.buildEmailLayout('Nueva solicitud de plazo', body, '#870002')
+    const html = emailService.buildEmailLayout('Nueva solicitud de plazo', body)
     await emailService.sendEmail(to, `Solicitud de Autorización de Plazo — Viaje de ${trip.Usuario?.nombre}`, html)
   }
   catch (error) {
@@ -199,20 +194,12 @@ const approveRequest = async (requestId, reviewerId) => {
       const startDateStr = formatDate(approvalDate)
       const limitStr = formatDate(addDaysToDate(approvalDate, toleranceDays))
       const body = `
-        <p style="color: #2e2827; font-size: 14px; margin: 0 0 16px 0;">
-          Tu solicitud para seguir registrando gastos fuera del plazo ha sido <strong style="color: #155724;">aprobada</strong>.
-        </p>
-        <div style="background-color: #F3F6FF; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-          <p style="color: #475569; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 4px 0;">Viaje</p>
-          <p style="color: #2e2827; font-size: 14px; margin: 0;">${request.Viaje?.motivo}</p>
-        </div>
-        <div style="background-color: #d4edda; border-radius: 12px; padding: 16px; margin-bottom: 16px; text-align: center;">
-          <p style="color: #155724; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 6px 0;">Nuevo plazo para registrar</p>
-          <p style="color: #155724; font-size: 18px; font-weight: bold; margin: 0;">${startDateStr} — ${limitStr}</p>
-        </div>
-        <p style="color: #475569; font-size: 13px; margin: 0;">
-          Ya puedes continuar registrando tus gastos. Si necesitas más tiempo después de esa fecha, deberás solicitar una nueva autorización.
-        </p>
+        ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+        ${emailService.emailParagraph('Tu solicitud para seguir registrando gastos fuera del plazo fue aprobada.')}
+        ${emailService.emailInfoBox([{label: 'Viaje', value: request.Viaje?.motivo}])}
+        ${emailService.emailHighlightBox('Nuevo plazo para registrar', `${startDateStr} — ${limitStr}`)}
+        ${emailService.emailNote('Si necesitas más tiempo después de esa fecha, deberás solicitar una nueva autorización.')}
+        ${emailService.emailButton()}
       `
       const html = emailService.buildEmailLayout('Autorización de plazo aprobada', body)
       await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Autorización Aprobada — ${request.Viaje?.motivo}`, html)
@@ -254,22 +241,13 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
     const employee = request.Viaje?.Usuario
     if (employee?.email_corporativo) {
       const body = `
-        <p style="color: #2e2827; font-size: 14px; margin: 0 0 16px 0;">
-          Tu solicitud de autorización de plazo fue <strong style="color: #500203;">rechazada</strong>.
-        </p>
-        <div style="background-color: #F3F6FF; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-          <p style="color: #475569; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 4px 0;">Viaje</p>
-          <p style="color: #2e2827; font-size: 14px; margin: 0;">${request.Viaje?.motivo}</p>
-        </div>
-        <div style="background-color: #fde9e9; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-          <p style="color: #500203; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 0 0 6px 0;">Motivo del rechazo</p>
-          <p style="color: #500203; font-size: 14px; margin: 0;">${observation.trim()}</p>
-        </div>
-        <p style="color: #475569; font-size: 13px; margin: 0;">
-          Si consideras que hubo un error, comunícate con tu revisor asignado.
-        </p>
+        ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+        ${emailService.emailParagraph('Tu solicitud de autorización de plazo fue rechazada.')}
+        ${emailService.emailInfoBox([{label: 'Viaje', value: request.Viaje?.motivo}])}
+        ${emailService.emailHighlightBox('Motivo del rechazo', observation.trim())}
+        ${emailService.emailNote('Si consideras que hubo un error, comunícate con tu revisor asignado.')}
       `
-      const html = emailService.buildEmailLayout('Autorización de plazo rechazada', body, '#D20F12')
+      const html = emailService.buildEmailLayout('Autorización de plazo rechazada', body)
       await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Autorización Rechazada — ${request.Viaje?.motivo}`, html)
     }
   }

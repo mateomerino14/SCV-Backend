@@ -40,13 +40,16 @@ const sendDigestToGroup = async (users, title, bodyLines) => {
   if (users.length === 0 || bodyLines.length === 0) {
     return
   }
+  const items = bodyLines
+    .map((line) => `<li style="margin: 0 0 8px 0; color: #2e2827; font-size: 14px;">${line}</li>`)
+    .join('')
   const body = `
-    <p>Hola,</p>
-    <p>Este es tu resumen de pendientes:</p>
-    <ul>
-      ${bodyLines.map((line) => `<li style="margin-bottom: 6px;">${line}</li>`).join('')}
-    </ul>
-    <p>Ingresa al sistema para revisarlos.</p>
+    ${emailService.emailParagraph('Hola, este es tu resumen de pendientes:')}
+    <div style="background-color: #F3F6FF; border-left: 4px solid #870002; border-radius: 8px; padding: 14px 18px 6px 18px; margin: 4px 0 16px 0;">
+      <ul style="margin: 0; padding-left: 18px;">${items}</ul>
+    </div>
+    ${emailService.emailParagraph('Ingresa al sistema para revisarlos.')}
+    ${emailService.emailButton()}
   `
   const html = emailService.buildEmailLayout(title, body)
   await Promise.all(users.map((user) => emailService.sendEmail(
