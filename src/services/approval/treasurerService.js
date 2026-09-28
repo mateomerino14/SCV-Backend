@@ -3,12 +3,13 @@ const emailService = require('../shared/emailService')
 const treasuryDocumentService = require('./treasuryDocumentService')
 const tripCommentService = require('../trip/tripCommentService')
 const tripCodeUtil = require('../../utils/tripCode')
+const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
 
 // Lista los viajes pendientes de aprobacion de fondos
 const getPendingTrips = async (treasurerId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
     .eq('estado', 'EN_REVISION_TESORERO')
     .neq('id_usuario', treasurerId)
   if (filters.fecha_inicio) {
@@ -25,7 +26,7 @@ const getPendingTrips = async (treasurerId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: data || []}
+    return {trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion)}
   }
 };
 
@@ -33,7 +34,7 @@ const getPendingTrips = async (treasurerId, filters) => {
 const getMyTrips = async (treasurerId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, Cargo(nombre)), Comentario(*)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre)), Comentario(*)')
     .eq('id_tesorero_asignado', treasurerId)
     .or('estado.eq.EN_CURSO,and(fue_iniciado.eq.false,estado.in.(EN_REVISION_TESORERO,RECHAZADO))')
   if (filters.fecha_inicio) {
@@ -50,7 +51,7 @@ const getMyTrips = async (treasurerId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: data || []}
+    return {trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion)}
   }
 };
 
