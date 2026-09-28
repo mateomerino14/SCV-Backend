@@ -60,6 +60,8 @@ const getPendingReviews = async (reviewerId, filters) => {
 
 // Lista las revisiones finales asignadas al revisor
 const getMyReviews = async (reviewerId, filters) => {
+  // El revisor es unico: toda rendicion pendiente de revision final le corresponde
+  await hierarchyAssignmentService.claimStageTrips(reviewerId, 'id_revisor_asignado', ['APROBADO_SUPERVISOR'])
   let query = supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)')

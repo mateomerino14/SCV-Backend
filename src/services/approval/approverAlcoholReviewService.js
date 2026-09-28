@@ -55,6 +55,8 @@ const getPendingAlcoholReviews = async (approverId, filters) => {
 
 // Lista los viajes de revision adicional asignados al aprobador
 const getMyAlcoholReviews = async (approverId, filters) => {
+  // El aprobador es unico: toda revision por alcohol pendiente le corresponde
+  await hierarchyAssignmentService.claimStageTrips(approverId, 'id_aprobador_asignado', ['EN_REVISION_APROBADOR'])
   let query = supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')

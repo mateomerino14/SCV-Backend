@@ -95,6 +95,8 @@ const getPendingTrips = async (approverId, filters) => {
 
 // Lista los viajes asignados al aprobador, con filtros opcionales
 const getMyTrips = async (approverId, filters) => {
+  // El aprobador es unico: todo viaje pendiente de su aprobacion le corresponde
+  await hierarchyAssignmentService.claimStageTrips(approverId, 'id_aprobador_asignado', ['APROBADO_VIAJE'])
   let query = supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre)), Comentario(*)')
