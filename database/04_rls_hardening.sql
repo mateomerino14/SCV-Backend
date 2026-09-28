@@ -10,7 +10,7 @@ declare
   policy_record record;
   target_tables text[] := array[
     'Auditoria', 'Cargo', 'Categoria_Gasto', 'Codigo_Verificacion', 'Comentario',
-    'Correlativo_Recibo', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
+    'Correlativo_Recibo', 'Recibo', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Impuesto', 'Proveedor',
     'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Viaje'
   ];
@@ -34,7 +34,7 @@ from pg_policies
 where schemaname = 'public'
   and tablename in (
     'Auditoria', 'Cargo', 'Categoria_Gasto', 'Codigo_Verificacion', 'Comentario',
-    'Correlativo_Recibo', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
+    'Correlativo_Recibo', 'Recibo', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Impuesto', 'Proveedor',
     'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Viaje'
   );

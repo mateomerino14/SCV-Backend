@@ -4,7 +4,7 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 
 ## Orden de ejecucion
 
-1. `01_schema.sql` - crea las 21 tablas, relaciones e indices
+1. `01_schema.sql` - crea las 22 tablas, relaciones e indices
 2. `02_functions.sql` - crea la funcion `incrementar_correlativo_recibo()`, usada por el backend para numerar recibos
 3. `03_seed.sql` - datos iniciales: roles, cargos, impuesto de IVA y categorias de gasto
 4. `04_rls_hardening.sql` - activa seguridad por fila (RLS) en todas las tablas
@@ -55,6 +55,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Comentario | Observaciones sobre un viaje o gasto especifico, y justificaciones (una por dia excedido) |
 | Auditoria | Registro de auditoria (ingreso, salida, cambio de clave) |
 | Correlativo_Recibo | Tabla contador para numerar recibos y documentos PDF generados |
+| Recibo | Numero asignado a cada recibo emitido (individual o agrupado), para reutilizarlo al reenviarlo |
 | Solicitud_Reemplazo | Solicitudes para que un tercero rinda los gastos de un viaje en nombre de otro empleado |
 
 ## Flujo de estados de Viaje

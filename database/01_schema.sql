@@ -233,6 +233,22 @@ insert into "Correlativo_Recibo" (numero)
 select 0
 where not exists (select 1 from "Correlativo_Recibo" where id = 1);
 
+-- Numero asignado a cada recibo emitido, para que al reenviarlo conserve el mismo
+-- numero. Individual: un recibo por gasto (id_gasto). Agrupado: uno por viaje, tipo
+-- (Compra/Servicio) y moneda (id_gasto nulo).
+create table if not exists "Recibo" (
+  id_recibo serial primary key,
+  numero integer not null unique,
+  id_viaje integer not null references "Viaje"(id_viaje) on delete cascade,
+  id_gasto integer references "Gasto"(id_gasto) on delete cascade,
+  tipo char(1) not null check (tipo in ('C', 'S')),
+  es_gasto_internacional boolean not null default false,
+  fecha_emision timestamptz not null default now()
+);
+
+create unique index if not exists recibo_individual_unique on "Recibo"(id_gasto) where id_gasto is not null;
+create unique index if not exists recibo_agrupado_unique on "Recibo"(id_viaje, tipo, es_gasto_internacional) where id_gasto is null;
+
 -- ------------------------------------------------------------
 -- Indices para optimizacion de consultas
 -- ------------------------------------------------------------

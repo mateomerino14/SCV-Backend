@@ -18,15 +18,48 @@ const formatShortDate = (isoString) => {
   return `${day}/${month}/${year}`
 };
 
-// Obtiene el siguiente numero correlativo de recibo, formateado a 6 digitos
-const getNextReceiptNumber = async () => {
+const formatReceiptNumber = (number) => String(number).padStart(6, '0')
+
+// Busca el recibo ya emitido (individual por gasto, o agrupado por viaje/tipo/moneda)
+const findIssuedReceipt = async ({tripId, expenseId, type, isInternational}) => {
+  let query = supabase.from('Recibo').select('numero')
+  if (expenseId) {
+    query = query.eq('id_gasto', expenseId)
+  }
+  else {
+    query = query.eq('id_viaje', tripId).is('id_gasto', null).eq('tipo', type).eq('es_gasto_internacional', isInternational)
+  }
+  const {data} = await query.maybeSingle()
+  return data
+}
+
+// Devuelve el numero del recibo: si ya se emitio, reutiliza el mismo numero (un reenvio
+// no genera un recibo nuevo); si no, toma el siguiente correlativo y lo guarda.
+const getReceiptNumber = async ({tripId, expenseId = null, type, isInternational}) => {
+  const existing = await findIssuedReceipt({tripId, expenseId, type, isInternational})
+  if (existing) {
+    return {receiptNumber: formatReceiptNumber(existing.numero), reissued: true}
+  }
   const {data: correlativeData, error} = await supabase.rpc('incrementar_correlativo_recibo')
   if (error) {
     return {error: 'Error al generar el número de recibo'}
   }
-  else {
-    return {receiptNumber: String(correlativeData).padStart(6, '0')}
+  const {error: insertError} = await supabase.from('Recibo').insert({
+    numero: correlativeData,
+    id_viaje: tripId,
+    id_gasto: expenseId,
+    tipo: type,
+    es_gasto_internacional: isInternational,
+  })
+  if (insertError) {
+    // Dos envios simultaneos del mismo recibo: gana el primero y se usa su numero
+    const concurrent = await findIssuedReceipt({tripId, expenseId, type, isInternational})
+    if (concurrent) {
+      return {receiptNumber: formatReceiptNumber(concurrent.numero), reissued: true}
+    }
+    return {error: 'Error al registrar el número de recibo'}
   }
+  return {receiptNumber: formatReceiptNumber(correlativeData), reissued: false}
 };
 
 // Genera el HTML de un recibo agrupado por tipo de gasto
@@ -448,7 +481,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
     }
     return {error: `No hay gastos ${internationalLabel}de tipo ${typeLabel} sin factura registrados en este viaje`, status: 400}
   }
-  const {receiptNumber, error: numberError} = await getNextReceiptNumber()
+  const {receiptNumber, reissued, error: numberError} = await getReceiptNumber({tripId, type, isInternational})
   if (numberError) {
     return {error: numberError, status: 500}
   }
@@ -483,7 +516,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
     emailHtml,
     attachments
   )
-  return {message: 'Recibo generado y enviado correctamente', expenseCount: expenses.length}
+  return {message: reissued ? 'Recibo reenviado correctamente' : 'Recibo generado y enviado correctamente', expenseCount: expenses.length, numeroRecibo: receiptNumber, reenvio: reissued}
 };
 
 // Genera y envia un recibo individual por un solo gasto
@@ -515,7 +548,7 @@ const sendIndividualReceipt = async (expenseId) => {
       .from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', expense.Viaje.id_supervisor_asignado).single()
     supervisor = supervisorData
   }
-  const {receiptNumber, error: numberError} = await getNextReceiptNumber()
+  const {receiptNumber, reissued, error: numberError} = await getReceiptNumber({tripId: expense.id_viaje, expenseId: expense.id_gasto, type: expense.tipo, isInternational: !!expense.es_gasto_internacional})
   if (numberError) {
     return {error: numberError, status: 500}
   }
@@ -542,7 +575,7 @@ const sendIndividualReceipt = async (expenseId) => {
     emailHtml,
     attachments
   )
-  return {message: 'Recibo generado y enviado correctamente'}
+  return {message: reissued ? 'Recibo reenviado correctamente' : 'Recibo generado y enviado correctamente', numeroRecibo: receiptNumber, reenvio: reissued}
 };
 
 module.exports = {sendGroupedReceipt, sendIndividualReceipt};

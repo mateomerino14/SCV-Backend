@@ -11,6 +11,7 @@
 -- ============================================================
 
 truncate table
+  "Recibo",
   "Comentario",
   "Solicitud_Reemplazo",
   "Solicitud_Autorizacion_Plazo",
