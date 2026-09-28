@@ -139,7 +139,8 @@ const getTripDetail = async (tripId, approverId) => {
 };
 
 // Aprueba un viaje en fase de aprobacion previa
-const approveTrip = async (tripId, approverId) => {
+// Con selfStageSkip se aprueba automaticamente el viaje del propio aprobador (ver selfReviewSkipService)
+const approveTrip = async (tripId, approverId, {selfStageSkip = false} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
@@ -148,13 +149,13 @@ const approveTrip = async (tripId, approverId) => {
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
-  if (trip.id_usuario === approverId) {
+  if (trip.id_usuario === approverId && !selfStageSkip) {
     return {error: 'No puedes aprobar tu propio viaje', status: 403}
   }
   if (trip.estado !== 'APROBADO_VIAJE') {
     return {error: 'Este viaje no está en aprobación previa', status: 400}
   }
-  if (trip.id_aprobador_asignado && trip.id_aprobador_asignado !== approverId) {
+  if (trip.id_aprobador_asignado && trip.id_aprobador_asignado !== approverId && !selfStageSkip) {
     return {error: 'Este viaje ya está asignado a otro aprobador', status: 403}
   }
   const {error} = await supabase

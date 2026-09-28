@@ -187,7 +187,8 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
 };
 
 // Aprueba definitivamente un viaje
-const approveReview = async (tripId, reviewerId) => {
+// Con selfStageSkip se aprueba automaticamente la rendicion del propio revisor (ver selfReviewSkipService)
+const approveReview = async (tripId, reviewerId, {selfStageSkip = false} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd))')
@@ -196,13 +197,13 @@ const approveReview = async (tripId, reviewerId) => {
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
-  if (trip.id_usuario === reviewerId) {
+  if (trip.id_usuario === reviewerId && !selfStageSkip) {
     return {error: 'No puedes aprobar tu propio viaje', status: 403}
   }
   if (trip.estado !== 'APROBADO_SUPERVISOR') {
     return {error: 'Este viaje no está en revisión final', status: 400}
   }
-  if (trip.id_revisor_asignado && trip.id_revisor_asignado !== reviewerId) {
+  if (trip.id_revisor_asignado && trip.id_revisor_asignado !== reviewerId && !selfStageSkip) {
     return {error: 'Este viaje ya está asignado a otro revisor', status: 403}
   }
   const {error} = await supabase.from('Viaje').update({estado: 'APROBADO_FINAL', id_revisor_asignado: reviewerId}).eq('id_viaje', tripId)

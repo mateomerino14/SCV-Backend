@@ -146,6 +146,7 @@ const approveTripReview = async (tripId, supervisorId) => {
   }
   else {
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'APROBADOR', 'id_aprobador_asignado')
+    await require('./selfReviewSkipService').advanceSelfReviewStages(tripId)
     return {message: 'Viaje aprobado por supervisor correctamente'}
   }
 };
@@ -370,10 +371,12 @@ const approveExpenseReview = async (tripId, supervisorId) => {
   }
   else if (trip.tiene_alcohol) {
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'APROBADOR', 'id_aprobador_asignado')
+    await require('./selfReviewSkipService').advanceSelfReviewStages(tripId)
     return {message: 'Gastos aprobados por supervisor, pasan a revisión adicional del aprobador por contener alcohol'}
   }
   else {
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'REVISOR', 'id_revisor_asignado')
+    await require('./selfReviewSkipService').advanceSelfReviewStages(tripId)
     return {message: 'Gastos aprobados por supervisor correctamente'}
   }
 };

@@ -169,26 +169,28 @@ const getAlcoholReviewDetail = async (tripId, approverId) => {
 }
 
 // Aprueba la revision adicional del aprobador, continuando el flujo hacia el revisor final
-const approveAlcoholReview = async (tripId, approverId) => {
+// Con selfStageSkip se aprueba automaticamente la rendicion del propio aprobador (ver selfReviewSkipService)
+const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} = {}) => {
   const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_aprobador_asignado, estado').eq('id_viaje', tripId).single()
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
-  if (trip.id_usuario === approverId) {
+  if (trip.id_usuario === approverId && !selfStageSkip) {
     return {error: 'No puedes aprobar tu propio viaje', status: 403}
   }
-  if (trip.id_aprobador_asignado !== approverId) {
+  if (trip.id_aprobador_asignado !== approverId && !selfStageSkip) {
     return {error: 'No tienes permiso para aprobar este viaje', status: 403}
   }
   if (trip.estado !== 'EN_REVISION_APROBADOR') {
     return {error: 'Este viaje no está en revisión adicional del aprobador', status: 400}
   }
-  const {error} = await supabase.from('Viaje').update({estado: 'APROBADO_SUPERVISOR'}).eq('id_viaje', tripId)
+  const {error} = await supabase.from('Viaje').update({estado: 'APROBADO_SUPERVISOR', id_aprobador_asignado: approverId}).eq('id_viaje', tripId)
   if (error) {
     return {error: error.message, status: 500}
   }
   else {
     await hierarchyAssignmentService.assignNextReviewer(tripId, approverId, 'REVISOR', 'id_revisor_asignado')
+    await require('./selfReviewSkipService').advanceSelfReviewStages(tripId)
     return {message: 'Revisión adicional aprobada, la rendición pasa al revisor final'}
   }
 }
