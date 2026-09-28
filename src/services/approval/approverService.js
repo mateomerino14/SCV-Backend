@@ -177,6 +177,10 @@ const approveTrip = async (tripId, approverId, {selfStageSkip = false} = {}) => 
   catch (emailError) {
     console.error('[approveTrip] Error enviando memo:', emailError)
   }
+  // Si el viaje es del propio tesorero, su etapa se aprueba sola
+  if (!selfStageSkip) {
+    await require('./selfReviewSkipService').advanceSelfReviewStages(tripId)
+  }
   return {message: 'Viaje aprobado, memo enviado a tesorería correctamente'}
 };
 

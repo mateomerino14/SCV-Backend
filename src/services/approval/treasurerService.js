@@ -102,7 +102,9 @@ const updateAmounts = async (tripId, amounts) => {
 };
 
 // Aprueba el fondo de un viaje y notifica al empleado
-const approveTrip = async (tripId, treasurerId) => {
+// Con selfStageSkip se aprueba automaticamente el fondo del propio tesorero, con el monto
+// calculado por el sistema (ver selfReviewSkipService)
+const approveTrip = async (tripId, treasurerId, {selfStageSkip = false} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, Cargo(nombre))')
@@ -111,7 +113,7 @@ const approveTrip = async (tripId, treasurerId) => {
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
-  if (trip.id_usuario === treasurerId) {
+  if (trip.id_usuario === treasurerId && !selfStageSkip) {
     return {error: 'No puedes aprobar tu propio viaje', status: 403}
   }
   if (trip.estado !== 'EN_REVISION_TESORERO') {
@@ -124,7 +126,9 @@ const approveTrip = async (tripId, treasurerId) => {
   if (error) {
     return {error: error.message, status: 500}
   }
-  const {data: treasurer} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre)').eq('id_usuario', treasurerId).single()
+  const {data: treasurerData} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre)').eq('id_usuario', treasurerId).single()
+  // Si es el viaje del propio tesorero, la confirmacion indica aprobacion automatica
+  const treasurer = {...treasurerData, aprobacionAutomatica: selfStageSkip}
   const tripCode = tripCodeUtil.buildTripCode(trip)
   try {
     const employee = trip.Usuario

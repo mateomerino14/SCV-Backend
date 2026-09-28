@@ -1,13 +1,22 @@
 const supabase = require('../../config/supabase')
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
+const userDirectoryService = require('../user/userDirectoryService')
 
-// Etapas atendidas por un rol unico. Si el viaje llega a la etapa de su propio dueño,
-// esa etapa se aprueba automaticamente: nadie revisa lo suyo y no hay otra persona
-// con ese rol que pueda hacerlo.
+// El tesorero no es un rol sino un cargo (unico); devuelve su id o null
+const getTreasurerId = async () => {
+  const users = await userDirectoryService.getActiveUsersWithActivePosition()
+  const treasurers = userDirectoryService.getUsersByPositionName(users, userDirectoryService.treasurerPositionName)
+  return treasurers[0]?.id_usuario || null
+}
+
+// Etapas atendidas por una sola persona (rol o cargo unico). Si el viaje llega a la
+// etapa de su propio dueño, esa etapa se aprueba automaticamente: nadie revisa lo suyo
+// y no hay otra persona que pueda hacerlo.
 const stages = {
-  APROBADO_VIAJE: {role: 'APROBADOR', approve: (tripId, userId) => require('./approverService').approveTrip(tripId, userId, {selfStageSkip: true})},
-  EN_REVISION_APROBADOR: {role: 'APROBADOR', approve: (tripId, userId) => require('./approverAlcoholReviewService').approveAlcoholReview(tripId, userId, {selfStageSkip: true})},
-  APROBADO_SUPERVISOR: {role: 'REVISOR', approve: (tripId, userId) => require('./reviewerService').approveReview(tripId, userId, {selfStageSkip: true})},
+  APROBADO_VIAJE: {label: 'aprobador', getHolder: () => hierarchyAssignmentService.getUniqueRoleHolder('APROBADOR'), approve: (tripId, userId) => require('./approverService').approveTrip(tripId, userId, {selfStageSkip: true})},
+  EN_REVISION_TESORERO: {label: 'tesorero', getHolder: getTreasurerId, approve: (tripId, userId) => require('./treasurerService').approveTrip(tripId, userId, {selfStageSkip: true})},
+  EN_REVISION_APROBADOR: {label: 'aprobador', getHolder: () => hierarchyAssignmentService.getUniqueRoleHolder('APROBADOR'), approve: (tripId, userId) => require('./approverAlcoholReviewService').approveAlcoholReview(tripId, userId, {selfStageSkip: true})},
+  APROBADO_SUPERVISOR: {label: 'revisor', getHolder: () => hierarchyAssignmentService.getUniqueRoleHolder('REVISOR'), approve: (tripId, userId) => require('./reviewerService').approveReview(tripId, userId, {selfStageSkip: true})},
 }
 
 // Avanza el viaje mientras este en una etapa cuyo responsable unico es su propio dueño.
@@ -19,11 +28,11 @@ const advanceSelfReviewStages = async (tripId) => {
     if (!stage) {
       return
     }
-    const holderId = await hierarchyAssignmentService.getUniqueRoleHolder(stage.role)
+    const holderId = await stage.getHolder()
     if (!holderId || holderId !== trip.id_usuario) {
       return
     }
-    console.info(`[Etapa propia] Viaje ${tripId}: ${trip.estado} aprobado automaticamente (el ${stage.role.toLowerCase()} es el dueño del viaje).`)
+    console.info(`[Etapa propia] Viaje ${tripId}: ${trip.estado} aprobado automaticamente (el ${stage.label} es el dueño del viaje).`)
     const result = await stage.approve(tripId, holderId)
     if (result?.error) {
       console.warn(`[Etapa propia] No se pudo avanzar el viaje ${tripId}:`, result.error)
