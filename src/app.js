@@ -4,6 +4,14 @@ const cookieParser = require('cookie-parser')
 const helmet = require('helmet')
 const app = express()
 
+// En Render la aplicacion esta detras de un proxy: se confia en el primero para leer la IP
+// real del usuario (X-Forwarded-For). Sin esto, todos compartirian el limite de intentos de
+// ingreso. Solo se activa en Render (o con TRUST_PROXY=true), porque sin un proxy delante
+// cualquiera podria falsear esa cabecera para evadir el limite.
+if (process.env.RENDER === 'true' || process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', 1)
+}
+
 app.use(helmet())
 
 app.use(cors({
