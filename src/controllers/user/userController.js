@@ -88,29 +88,37 @@ const updateMyPhoto = async (req, res) => {
   }
 };
 
-// Cambia la contrasenia del usuario autenticado
+// Cambia la contrasenia del usuario autenticado. Si tiene una contrasena temporal (recien
+// creado o recuperada con codigo) no se le pide la actual, porque no la eligio el o la olvido.
 const changeMyPassword = async (req, res) => {
   const userId = req.user.id_usuario
   const {contrasenia_actual, contrasenia_nueva} = req.body
-  if (!contrasenia_actual || !contrasenia_nueva) {
+  if (!contrasenia_nueva) {
     return res.status(400).json({error: 'Todos los campos son requeridos'})
   }
   if (contrasenia_nueva.length < 8) {
     return res.status(400).json({error: 'La nueva contraseña debe tener al menos 8 caracteres'})
   }
   const {data: user, error: userError} = await supabase
-    .from('Usuario').select('contrasenia').eq('id_usuario', userId).single()
+    .from('Usuario').select('contrasenia, debe_cambiar_contrasenia').eq('id_usuario', userId).single()
   if (userError || !user) {
     return res.status(404).json({error: 'Usuario no encontrado'})
   }
-  const isPasswordValid = bcrypt.compareSync(contrasenia_actual, user.contrasenia)
-  if (!isPasswordValid) {
-    return res.status(400).json({error: 'La contraseña actual es incorrecta'})
+  if (!user.debe_cambiar_contrasenia) {
+    if (!contrasenia_actual) {
+      return res.status(400).json({error: 'Todos los campos son requeridos'})
+    }
+    if (!bcrypt.compareSync(contrasenia_actual, user.contrasenia)) {
+      return res.status(400).json({error: 'La contraseña actual es incorrecta'})
+    }
+  }
+  if (bcrypt.compareSync(contrasenia_nueva, user.contrasenia)) {
+    return res.status(400).json({error: 'La nueva contraseña no puede ser igual a la actual'})
   }
   const newPasswordHash = bcrypt.hashSync(contrasenia_nueva, saltRounds)
   const {error: updateError} = await supabase
     .from('Usuario')
-    .update({contrasenia: newPasswordHash, ultima_cambio_contrasenia: new Date().toISOString()})
+    .update({contrasenia: newPasswordHash, ultima_cambio_contrasenia: new Date().toISOString(), debe_cambiar_contrasenia: false})
     .eq('id_usuario', userId)
   if (updateError) {
     return res.status(500).json({error: updateError.message})
@@ -153,7 +161,9 @@ const updateUser = async (req, res) => {
     payload.carnet_identidad = payload.carnet_identidad?.trim() || null
   }
   if (payload.contrasenia) {
+    // Una contrasena puesta por el administrador es temporal: el usuario debe cambiarla al entrar
     payload.contrasenia = bcrypt.hashSync(payload.contrasenia, saltRounds)
+    payload.debe_cambiar_contrasenia = true
   }
   let newRole = currentUser?.id_rol
   if (payload.id_rol !== undefined) {
@@ -207,6 +217,8 @@ const createUser = async (req, res) => {
     body.carnet_identidad = body.carnet_identidad?.trim() || null
   }
   body.contrasenia = bcrypt.hashSync(temporaryPassword, saltRounds)
+  // La contrasena temporal enviada por correo se debe cambiar en el primer ingreso
+  body.debe_cambiar_contrasenia = true
   const roleError = await userService.validateUniqueRole(body.id_rol, null)
   if (roleError) {
     return res.status(400).json({error: roleError})

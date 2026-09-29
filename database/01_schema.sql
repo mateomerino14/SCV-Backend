@@ -59,6 +59,9 @@ create table if not exists "Usuario" (
   carnet_identidad varchar(15),
   ultima_cambio_contrasenia timestamptz default now(),
   refresh_token_invalido_desde timestamptz,
+  -- true mientras tenga una contrasena temporal (recien creado, puesta por el administrador
+  -- o recuperada con codigo): debe cambiarla antes de usar el sistema
+  debe_cambiar_contrasenia boolean not null default false,
   id_cargo integer not null references "Cargo"(id_cargo),
   id_rol integer not null references "Rol"(id_rol)
 );

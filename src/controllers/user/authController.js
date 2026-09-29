@@ -23,16 +23,16 @@ const login = async (req, res) => {
   if (!isPasswordValid) {
     return res.status(401).json({error: 'Contraseña incorrecta'})
   }
-  const passwordExpired = tokenService.isPasswordExpired(data.ultima_cambio_contrasenia)
+  const passwordChangeReason = tokenService.getPasswordChangeReason(data)
   await supabase
     .from('Usuario')
     .update({refresh_token_invalido_desde: null})
     .eq('id_usuario', data.id_usuario)
-  const accessToken = tokenService.generateAccessToken(data, passwordExpired)
+  const accessToken = tokenService.generateAccessToken(data, passwordChangeReason)
   const refreshToken = tokenService.generateRefreshToken(data)
   res.cookie('refreshToken', refreshToken, tokenService.cookieOptions)
   await auditLogService.logAudit(data.id_usuario, 'INGRESO')
-  return res.json({token: accessToken, contraseniavencida: passwordExpired})
+  return res.json({token: accessToken, contraseniavencida: !!passwordChangeReason})
 };
 
 // Genera un nuevo access token a partir del refresh token
@@ -60,8 +60,7 @@ const refresh = async (req, res) => {
         return res.status(401).json({error: 'Sesión invalidada, vuelve a iniciar sesión'})
       }
     }
-    const passwordExpired = tokenService.isPasswordExpired(user.ultima_cambio_contrasenia)
-    const newAccessToken = tokenService.generateAccessToken(user, passwordExpired)
+    const newAccessToken = tokenService.generateAccessToken(user, tokenService.getPasswordChangeReason(user))
     return res.json({token: newAccessToken})
   }
   catch (error) {
@@ -193,11 +192,13 @@ const verifyCode = async (req, res) => {
     .select('*')
     .eq('id_usuario', user.id_usuario)
     .single()
+  // Quien entra con un codigo de recuperacion olvido su contrasena: debe crear una nueva
+  // antes de seguir (la ventana de cambio no le pide la actual)
   await supabase
     .from('Usuario')
-    .update({refresh_token_invalido_desde: null})
+    .update({refresh_token_invalido_desde: null, debe_cambiar_contrasenia: true})
     .eq('id_usuario', fullUser.id_usuario)
-  const accessToken = tokenService.generateAccessToken(fullUser)
+  const accessToken = tokenService.generateAccessToken({...fullUser, debe_cambiar_contrasenia: true}, 'TEMPORAL')
   const refreshToken = tokenService.generateRefreshToken(fullUser)
   res.cookie('refreshToken', refreshToken, tokenService.cookieOptions)
   await auditLogService.logAudit(fullUser.id_usuario, 'INGRESO')

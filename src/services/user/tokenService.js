@@ -8,13 +8,16 @@ const cookieOptions = {
 }
 
 // Genera el token de acceso de corta duracion
-const generateAccessToken = (user, isPasswordExpired = false) => {
+// passwordChangeReason: null, 'TEMPORAL' (contrasena temporal o recuperada con codigo)
+// o 'VENCIDA' (mas de 90 dias). Mientras no sea null, la app obliga a cambiarla.
+const generateAccessToken = (user, passwordChangeReason = null) => {
   return jwt.sign(
     {
       id_usuario: user.id_usuario,
       email_corporativo: user.email_corporativo,
       id_rol: user.id_rol,
-      contraseniavencida: isPasswordExpired,
+      contraseniavencida: !!passwordChangeReason,
+      motivo_cambio_contrasenia: passwordChangeReason,
     },
     process.env.JWT_SECRET,
     {expiresIn: '15m'}
@@ -40,4 +43,15 @@ const isPasswordExpired = (lastPasswordChange) => {
   return daysElapsed >= 90
 };
 
-module.exports = {generateAccessToken, generateRefreshToken, isPasswordExpired, cookieOptions};
+// Indica si el usuario debe cambiar su contrasena antes de seguir usando el sistema
+const getPasswordChangeReason = (user) => {
+  if (user.debe_cambiar_contrasenia) {
+    return 'TEMPORAL'
+  }
+  if (isPasswordExpired(user.ultima_cambio_contrasenia)) {
+    return 'VENCIDA'
+  }
+  return null
+};
+
+module.exports = {generateAccessToken, generateRefreshToken, isPasswordExpired, getPasswordChangeReason, cookieOptions};
