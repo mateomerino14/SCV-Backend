@@ -70,17 +70,36 @@ const refresh = async (req, res) => {
   }
 };
 
-// Cierra la sesion del usuario
-const logout = async (req, res) => {
+// Identifica al usuario que cierra sesion: primero por la cookie de refresco y, si el
+// navegador no la envio, por el token de acceso de la cabecera Authorization
+const getLogoutUserId = (req) => {
   const refreshToken = req.cookies?.refreshToken
   if (refreshToken) {
     try {
-      const decodedToken = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET)
-      await auditLogService.logAudit(decodedToken.id_usuario, 'SALIDA')
+      return jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET).id_usuario
     }
     catch (error) {
-      // Token ya vencido o invalido: no hay a quien registrarle la salida
+      // Cookie vencida o invalida: se intenta con el token de acceso
     }
+  }
+  const accessToken = req.headers.authorization?.split(' ')[1]
+  if (accessToken) {
+    try {
+      // Un token de acceso recien vencido sigue identificando a quien cierra la sesion
+      return jwt.verify(accessToken, process.env.JWT_SECRET, {ignoreExpiration: true}).id_usuario
+    }
+    catch (error) {
+      return null
+    }
+  }
+  return null
+}
+
+// Cierra la sesion del usuario y registra la SALIDA en el historial de accesos
+const logout = async (req, res) => {
+  const userId = getLogoutUserId(req)
+  if (userId) {
+    await auditLogService.logAudit(userId, 'SALIDA')
   }
   res.clearCookie('refreshToken', tokenService.cookieOptions)
   return res.json({message: 'Sesión cerrada'})

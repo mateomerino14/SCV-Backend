@@ -189,6 +189,9 @@ const updateUser = async (req, res) => {
     return res.status(500).json({error: error.message})
   }
   else {
+    if (payload.contrasenia) {
+      await auditLogService.logAudit(parseInt(userId), 'CAMBIO_CLAVE')
+    }
     return res.json(data)
   }
 };
