@@ -329,8 +329,8 @@ const canActOnTrip = async (tripId, userId) => {
     .eq('id_viaje', tripId)
     .eq('id_sustituto', userId)
     .eq('estado', 'APROBADA')
-    .maybeSingle()
-  return !!approvedSubstitution
+    .limit(1)
+  return (approvedSubstitution || []).length > 0
 }
 
 // Verifica si un usuario puede registrar, editar o eliminar gastos de un viaje:

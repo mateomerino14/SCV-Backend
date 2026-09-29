@@ -86,11 +86,15 @@ const takeTripReview = async (tripId, supervisorId) => {
   if (trip.id_supervisor_asignado) {
     return {error: 'Este viaje ya fue tomado por otro supervisor', status: 409}
   }
-  const {error} = await supabase.from('Viaje').update({id_supervisor_asignado: supervisorId}).eq('id_viaje', tripId)
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_supervisor_asignado: supervisorId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_VIAJE').is('id_supervisor_asignado', null).select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
   else {
+    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+    if (!updatedRows?.length) {
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+    }
     return {message: 'Viaje tomado correctamente'}
   }
 };
@@ -107,11 +111,15 @@ const returnTripReview = async (tripId, supervisorId) => {
   if (trip.estado !== 'EN_REVISION_VIAJE') {
     return {error: 'No puedes devolver este viaje', status: 400}
   }
-  const {error} = await supabase.from('Viaje').update({id_supervisor_asignado: null}).eq('id_viaje', tripId)
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_supervisor_asignado: null}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_VIAJE').select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
   else {
+    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+    if (!updatedRows?.length) {
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+    }
     return {message: 'Viaje devuelto correctamente'}
   }
 };
@@ -153,11 +161,15 @@ const approveTripReview = async (tripId, supervisorId) => {
   if (trip.estado !== 'EN_REVISION_VIAJE') {
     return {error: 'Este viaje no está en revisión previa', status: 400}
   }
-  const {error} = await supabase.from('Viaje').update({estado: 'APROBADO_VIAJE'}).eq('id_viaje', tripId)
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'APROBADO_VIAJE'}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_VIAJE').select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
   else {
+    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+    if (!updatedRows?.length) {
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+    }
     await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.tripReview, 'APROBADO')
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'APROBADOR', 'id_aprobador_asignado')
     await require('./selfReviewSkipService').advanceSelfReviewStages(tripId)
@@ -190,11 +202,15 @@ const rejectTripReview = async (tripId, supervisorId) => {
   if (!existingComments || existingComments.length === 0) {
     return {error: 'Debes agregar al menos una observación antes de rechazar', status: 400}
   }
-  const {error} = await supabase.from('Viaje').update({estado: 'RECHAZADO'}).eq('id_viaje', tripId)
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'RECHAZADO'}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_VIAJE').select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
   else {
+    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+    if (!updatedRows?.length) {
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+    }
     await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.tripReview, 'RECHAZADO')
     await emailService.sendRejectionNotice(trip.Usuario)
     return {message: 'Viaje rechazado correctamente'}
@@ -259,7 +275,8 @@ const getMyExpenseReviews = async (supervisorId, filters) => {
     .from('Viaje')
     .select(selectFields)
     .eq('id_supervisor_asignado', supervisorId)
-    .in('estado', ['EN_REVISION', 'APROBADO_SUPERVISOR', 'RECHAZADO'])
+    // Solo rechazos de la fase de gastos (fue_iniciado); los previos al viaje no son de esta lista
+    .or('estado.in.(EN_REVISION,APROBADO_SUPERVISOR),and(estado.eq.RECHAZADO,fue_iniciado.eq.true)')
   if (filters.fecha_inicio) {
     query = query.gte('fecha_inicio', filters.fecha_inicio)
   }
@@ -304,11 +321,15 @@ const takeExpenseReview = async (tripId, supervisorId) => {
   if (trip.id_supervisor_asignado) {
     return {error: 'Este viaje ya fue tomado por otro supervisor', status: 409}
   }
-  const {error} = await supabase.from('Viaje').update({id_supervisor_asignado: supervisorId}).eq('id_viaje', tripId)
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_supervisor_asignado: supervisorId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION').is('id_supervisor_asignado', null).select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
   else {
+    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+    if (!updatedRows?.length) {
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+    }
     return {message: 'Viaje tomado correctamente'}
   }
 };
@@ -325,11 +346,15 @@ const returnExpenseReview = async (tripId, supervisorId) => {
   if (trip.estado !== 'EN_REVISION') {
     return {error: 'No puedes devolver un viaje ya procesado', status: 400}
   }
-  const {error} = await supabase.from('Viaje').update({id_supervisor_asignado: null}).eq('id_viaje', tripId)
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_supervisor_asignado: null}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION').select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
   else {
+    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+    if (!updatedRows?.length) {
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+    }
     return {message: 'Viaje devuelto correctamente'}
   }
 };
@@ -395,9 +420,13 @@ const approveExpenseReview = async (tripId, supervisorId) => {
     return {error: 'No puedes aprobar una rendición que registraste como reemplazo', status: 403}
   }
   const nextState = trip.tiene_alcohol ? 'EN_REVISION_APROBADOR' : 'APROBADO_SUPERVISOR'
-  const {error} = await supabase.from('Viaje').update({estado: nextState}).eq('id_viaje', tripId)
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: nextState}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION').select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
+  }
+  // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+  if (!updatedRows?.length) {
+    return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
   }
   await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.expenseReview, 'APROBADO')
   if (trip.tiene_alcohol) {
@@ -438,11 +467,15 @@ const rejectExpenseReview = async (tripId, supervisorId) => {
   if (!existingComments || existingComments.length === 0) {
     return {error: 'Debes agregar al menos una observación a algún gasto antes de rechazar', status: 400}
   }
-  const {error} = await supabase.from('Viaje').update({estado: 'RECHAZADO'}).eq('id_viaje', tripId)
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'RECHAZADO'}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION').select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
   else {
+    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+    if (!updatedRows?.length) {
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+    }
     await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.expenseReview, 'RECHAZADO')
     await emailService.sendRejectionNotice(trip.Usuario)
     return {message: 'Viaje rechazado correctamente'}

@@ -29,11 +29,14 @@ const addDays = (isoDate, days) => {
   return date
 };
 
-// Valida si una fecha de evento esta dentro del plazo permitido del viaje
+// Valida si una fecha de evento esta dentro del plazo permitido del viaje.
+// El plazo de registro (fin del viaje + tolerancia) solo corre mientras el viaje esta en
+// curso: si un revisor rechazo la rendicion, el empleado puede corregir sus gastos sin pedir
+// autorizacion (la fecha del gasto igual debe estar dentro del periodo del viaje).
 async function validateTripDeadline(tripId, eventDate) {
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('fecha_inicio, fecha_fin')
+    .select('fecha_inicio, fecha_fin, estado')
     .eq('id_viaje', tripId)
     .single()
   if (!trip) {
@@ -42,7 +45,7 @@ async function validateTripDeadline(tripId, eventDate) {
   const today = getBoliviaToday()
   const toleranceEndDate = addDays(trip.fecha_fin, toleranceDays)
   const toleranceEndDateStr = toleranceEndDate.toISOString().split('T')[0]
-  if (today > toleranceEndDateStr) {
+  if (trip.estado !== 'RECHAZADO' && today > toleranceEndDateStr) {
     const {data: approvedRequest} = await supabase
       .from('Solicitud_Autorizacion_Plazo')
       .select('id_solicitud, fecha_respuesta')

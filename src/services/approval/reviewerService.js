@@ -216,9 +216,13 @@ const approveReview = async (tripId, reviewerId, {selfStageSkip = false} = {}) =
   if (trip.id_revisor_asignado && trip.id_revisor_asignado !== reviewerId && !selfStageSkip) {
     return {error: 'Este viaje ya está asignado a otro revisor', status: 403}
   }
-  const {error} = await supabase.from('Viaje').update({estado: 'APROBADO_FINAL', id_revisor_asignado: reviewerId}).eq('id_viaje', tripId)
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'APROBADO_FINAL', id_revisor_asignado: reviewerId}).eq('id_viaje', tripId).eq('estado', 'APROBADO_SUPERVISOR').select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
+  }
+  // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+  if (!updatedRows?.length) {
+    return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
   }
   await reviewLogService.recordReview(tripId, reviewerId, reviewLogService.reviewStages.finalReview, 'APROBADO', {automatic: selfStageSkip})
   const {data: reviewer} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre, monto_diario, monto_diario_usd)').eq('id_usuario', reviewerId).single()
@@ -247,7 +251,7 @@ const approveReview = async (tripId, reviewerId, {selfStageSkip = false} = {}) =
 
 // Rechaza definitivamente un viaje
 const rejectReview = async (tripId, reviewerId) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, ciclo_revision, id_revisor_asignado').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, ciclo_revision, id_revisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo)').eq('id_viaje', tripId).single()
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
@@ -271,12 +275,18 @@ const rejectReview = async (tripId, reviewerId) => {
   if (!existingComments || existingComments.length === 0) {
     return {error: 'Debes agregar al menos una observación a algún gasto antes de rechazar', status: 400}
   }
-  const {error} = await supabase.from('Viaje').update({estado: 'RECHAZADO', id_revisor_asignado: reviewerId}).eq('id_viaje', tripId)
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'RECHAZADO', id_revisor_asignado: reviewerId}).eq('id_viaje', tripId).eq('estado', 'APROBADO_SUPERVISOR').select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
   else {
+    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+    if (!updatedRows?.length) {
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+    }
     await reviewLogService.recordReview(tripId, reviewerId, reviewLogService.reviewStages.finalReview, 'RECHAZADO')
+    // Igual que en las demas etapas, el empleado recibe el aviso para corregir
+    await emailService.sendRejectionNotice(trip.Usuario)
     return {message: 'Viaje rechazado correctamente'}
   }
 };

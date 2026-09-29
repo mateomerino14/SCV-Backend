@@ -1,17 +1,7 @@
 const supabase = require('../../config/supabase')
 const tripService = require('../../services/trip/tripService')
 const tripStatementService = require('../../services/trip/tripStatementService')
-
-// Lista todos los viajes
-const getAllTrips = async (req, res) => {
-  const {data, error} = await supabase.from('Viaje').select('*')
-  if (error) {
-    return res.status(500).json({error: error.message})
-  }
-  else {
-    return res.json(data)
-  }
-};
+const tripAccessService = require('../../services/trip/tripAccessService')
 
 // Obtiene los datos del dashboard del usuario autenticado
 const getDashboard = async (req, res) => {
@@ -40,6 +30,9 @@ const getHistory = async (req, res) => {
 
 // Obtiene el detalle de un viaje
 const getTripDetail = async (req, res) => {
+  if (!(await tripAccessService.canViewTrip(req.params.id, req.user.id_usuario))) {
+    return res.status(403).json({error: 'No tienes permiso para ver este viaje'})
+  }
   const result = await tripService.getTripDetail(req.params.id, req.user.id_usuario)
   if (result.error) {
     return res.status(500).json({error: result.error})
@@ -85,21 +78,6 @@ const createTrip = async (req, res) => {
   }
 };
 
-// Actualiza un viaje existente con los campos enviados
-const updateTrip = async (req, res) => {
-  const {data, error} = await supabase
-    .from('Viaje')
-    .update(req.body)
-    .eq('id_viaje', req.params.id)
-    .select()
-  if (error) {
-    return res.status(500).json({error: error.message})
-  }
-  else {
-    return res.json(data)
-  }
-};
-
 // Edita un viaje en borrador o rechazado
 const editTrip = async (req, res) => {
   const userId = req.user.id_usuario
@@ -137,23 +115,11 @@ const confirmCompletion = async (req, res) => {
   }
 };
 
-// Elimina un viaje existente
-const deleteTrip = async (req, res) => {
-  const {data, error} = await supabase
-    .from('Viaje')
-    .delete()
-    .eq('id_viaje', req.params.id)
-    .select()
-  if (error) {
-    return res.status(500).json({error: error.message})
-  }
-  else {
-    return res.json(data)
-  }
-};
-
 // Genera y descarga la planilla de rendicion de cuentas en PDF
 const downloadStatementPdf = async (req, res) => {
+  if (!(await tripAccessService.canViewTrip(req.params.id, req.user.id_usuario))) {
+    return res.status(403).json({error: 'No tienes permiso para ver este viaje'})
+  }
   const result = await tripStatementService.generateStatementPdf(req.params.id)
   if (result.error) {
     return res.status(result.status || 500).json({error: result.error})
@@ -163,4 +129,4 @@ const downloadStatementPdf = async (req, res) => {
   return res.send(result.buffer)
 };
 
-module.exports = {getAllTrips, getDashboard, getHistory, getTripDetail, createTrip, updateTrip, editTrip, submitToReview, confirmCompletion, deleteTrip, downloadStatementPdf};
+module.exports = {getDashboard, getHistory, getTripDetail, createTrip, editTrip, submitToReview, confirmCompletion, downloadStatementPdf};

@@ -84,13 +84,16 @@ const getTripDetail = async (tripId, treasurerId) => {
 };
 
 // Actualiza los montos asignados de un viaje
-const updateAmounts = async (tripId, amounts) => {
+const updateAmounts = async (tripId, amounts, treasurerId) => {
   if (amounts.monto_asignado === undefined || isNaN(parseFloat(amounts.monto_asignado)) || parseFloat(amounts.monto_asignado) < 0) {
     return {error: 'El monto asignado en Bs debe ser un número válido', status: 400}
   }
-  const {data: trip} = await supabase.from('Viaje').select('estado').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('estado, id_usuario').eq('id_viaje', tripId).single()
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
+  }
+  if (trip.id_usuario === treasurerId) {
+    return {error: 'No puedes modificar los montos de tu propio viaje', status: 403}
   }
   if (trip.estado !== 'EN_REVISION_TESORERO') {
     return {error: 'Este viaje no está en revisión de tesorería', status: 400}
@@ -103,6 +106,7 @@ const updateAmounts = async (tripId, amounts) => {
     .from('Viaje')
     .update({monto_asignado: parseFloat(amounts.monto_asignado), monto_asignado_usd: assignedAmountUsd})
     .eq('id_viaje', tripId)
+    .eq('estado', 'EN_REVISION_TESORERO')
   if (error) {
     return {error: error.message, status: 500}
   }
@@ -129,12 +133,18 @@ const approveTrip = async (tripId, treasurerId, {selfStageSkip = false} = {}) =>
   if (trip.estado !== 'EN_REVISION_TESORERO') {
     return {error: 'Este viaje no está en revisión de tesorería', status: 400}
   }
-  const {error} = await supabase
+  const {data: updatedRows, error} = await supabase
     .from('Viaje')
     .update({estado: 'EN_CURSO', fue_iniciado: true, id_tesorero_asignado: treasurerId})
     .eq('id_viaje', tripId)
+    .eq('estado', 'EN_REVISION_TESORERO')
+    .select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
+  }
+  // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+  if (!updatedRows?.length) {
+    return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
   }
   await reviewLogService.recordReview(tripId, treasurerId, reviewLogService.reviewStages.fundAssignment, 'APROBADO', {automatic: selfStageSkip})
   const {data: treasurerData} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre)').eq('id_usuario', treasurerId).single()
@@ -174,7 +184,7 @@ const approveTrip = async (tripId, treasurerId, {selfStageSkip = false} = {}) =>
 
 // Rechaza el fondo de un viaje
 const rejectTrip = async (tripId, treasurerId) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, ciclo_revision').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, ciclo_revision, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo)').eq('id_viaje', tripId).single()
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
@@ -194,12 +204,18 @@ const rejectTrip = async (tripId, treasurerId) => {
   if (!existingComments || existingComments.length === 0) {
     return {error: 'Debes agregar al menos una observación antes de rechazar', status: 400}
   }
-  const {error} = await supabase.from('Viaje').update({estado: 'RECHAZADO', id_tesorero_asignado: treasurerId}).eq('id_viaje', tripId)
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'RECHAZADO', id_tesorero_asignado: treasurerId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_TESORERO').select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
   else {
+    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+    if (!updatedRows?.length) {
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+    }
     await reviewLogService.recordReview(tripId, treasurerId, reviewLogService.reviewStages.fundAssignment, 'RECHAZADO')
+    // Igual que en las demas etapas, el empleado recibe el aviso para corregir
+    await emailService.sendRejectionNotice(trip.Usuario)
     return {message: 'Viaje rechazado correctamente'}
   }
 };

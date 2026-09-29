@@ -5,6 +5,11 @@ const tokenService = require('../../services/user/tokenService')
 const emailService = require('../../services/shared/emailService')
 const auditLogService = require('../../services/shared/auditLogService')
 
+// Intentos fallidos por codigo de verificacion (en memoria): al llegar al maximo el codigo
+// se anula, para que no se pueda adivinar probando combinaciones
+const maxCodeAttempts = 5
+const failedCodeAttempts = new Map()
+
 // Inicia sesion con correo corporativo y contrasenia
 const login = async (req, res) => {
   const {email_corporativo, contrasenia} = req.body
@@ -13,21 +18,22 @@ const login = async (req, res) => {
     .select('*')
     .eq('email_corporativo', email_corporativo)
     .single()
+  // Mismo mensaje si el correo no existe o la contrasena no coincide, para no revelar
+  // que cuentas existen; el aviso de suspension solo se da con la contrasena correcta
+  const invalidCredentials = 'Correo o contraseña incorrectos'
   if (error || !data) {
-    return res.status(401).json({error: 'Usuario no encontrado'})
+    return res.status(401).json({error: invalidCredentials})
+  }
+  const isPasswordValid = await bcrypt.compare(contrasenia || '', data.contrasenia)
+  if (!isPasswordValid) {
+    return res.status(401).json({error: invalidCredentials})
   }
   if (!data.activo) {
     return res.status(401).json({error: 'Tu cuenta está suspendida'})
   }
-  const isPasswordValid = await bcrypt.compare(contrasenia, data.contrasenia)
-  if (!isPasswordValid) {
-    return res.status(401).json({error: 'Contraseña incorrecta'})
-  }
+  // refresh_token_invalido_desde no se limpia: los tokens emitidos antes de un cambio de rol
+  // o suspension siguen invalidos; el token nuevo es posterior y funciona normalmente
   const passwordChangeReason = tokenService.getPasswordChangeReason(data)
-  await supabase
-    .from('Usuario')
-    .update({refresh_token_invalido_desde: null})
-    .eq('id_usuario', data.id_usuario)
   const accessToken = tokenService.generateAccessToken(data, passwordChangeReason)
   const refreshToken = tokenService.generateRefreshToken(data)
   res.cookie('refreshToken', refreshToken, tokenService.cookieOptions)
@@ -184,8 +190,17 @@ const verifyCode = async (req, res) => {
     return res.status(400).json({error: 'Código expirado'})
   }
   if (codeData.codigo !== codigo) {
+    // Tras varios intentos fallidos el codigo se anula y hay que pedir uno nuevo
+    const attempts = (failedCodeAttempts.get(codeData.id_codigo) || 0) + 1
+    failedCodeAttempts.set(codeData.id_codigo, attempts)
+    if (attempts >= maxCodeAttempts) {
+      failedCodeAttempts.delete(codeData.id_codigo)
+      await supabase.from('Codigo_Verificacion').update({activo: false}).eq('id_codigo', codeData.id_codigo)
+      return res.status(400).json({error: 'Código expirado'})
+    }
     return res.status(400).json({error: 'Código incorrecto'})
   }
+  failedCodeAttempts.delete(codeData.id_codigo)
   await supabase.from('Codigo_Verificacion').update({activo: false}).eq('id_codigo', codeData.id_codigo)
   const {data: fullUser} = await supabase
     .from('Usuario')
@@ -196,7 +211,7 @@ const verifyCode = async (req, res) => {
   // antes de seguir (la ventana de cambio no le pide la actual)
   await supabase
     .from('Usuario')
-    .update({refresh_token_invalido_desde: null, debe_cambiar_contrasenia: true})
+    .update({debe_cambiar_contrasenia: true})
     .eq('id_usuario', fullUser.id_usuario)
   const accessToken = tokenService.generateAccessToken({...fullUser, debe_cambiar_contrasenia: true}, 'TEMPORAL')
   const refreshToken = tokenService.generateRefreshToken(fullUser)

@@ -207,11 +207,10 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   if (!access.allowed) {
     return {error: access.error, status: access.status}
   }
-  if (invoiceData.id_viaje) {
-    const deadlineValidation = await deadlineService.validateTripDeadline(invoiceData.id_viaje, invoiceData.fecha_emision)
-    if (!deadlineValidation.valid) {
-      return {error: deadlineValidation.error, status: 400, requiereAutorizacion: !!deadlineValidation.requiereAutorizacion}
-    }
+  // Siempre con el viaje real del gasto (no el que envie el cliente) para que no se salte el plazo
+  const deadlineValidation = await deadlineService.validateTripDeadline(existingExpense.id_viaje, invoiceData.fecha_emision)
+  if (!deadlineValidation.valid) {
+    return {error: deadlineValidation.error, status: 400, requiereAutorizacion: !!deadlineValidation.requiereAutorizacion}
   }
   const supplierName = invoiceData.proveedor.trim()
   const {data: existingSupplier} = await supabase
@@ -293,9 +292,9 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
       await attachIvaTax(existingInvoice.id_factura, invoiceData.iva)
     }
   }
-  if (invoiceData.id_viaje) {
+  {
     try {
-      await alcoholDetectionService.updateAlcoholInTrip(invoiceData.id_viaje)
+      await alcoholDetectionService.updateAlcoholInTrip(existingExpense.id_viaje)
     }
     catch (error) {
       console.warn('Error alcohol:', error.message)

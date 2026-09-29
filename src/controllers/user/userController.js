@@ -17,6 +17,18 @@ const generateTemporaryPassword = () => {
 };
 
 // Obtiene el perfil del usuario autenticado
+// Columnas que se devuelven al administrar usuarios (nunca el hash de la contrasena ni
+// datos internos de sesion)
+const userPublicColumns = 'id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, id_rol, id_cargo, id_seccion, id_jefe_directo, carnet_identidad, foto_perfil'
+
+// Campos que el administrador puede enviar al crear o editar un usuario
+const editableUserFields = ['nombre', 'apellido_paterno', 'apellido_materno', 'email_corporativo', 'telefono', 'id_cargo', 'id_rol', 'id_jefe_directo', 'id_seccion', 'carnet_identidad', 'activo']
+
+const pickEditableFields = (body, extraFields = []) => {
+  const allowed = [...editableUserFields, ...extraFields]
+  return Object.fromEntries(Object.entries(body || {}).filter(([key]) => allowed.includes(key)))
+}
+
 const getMe = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
@@ -150,7 +162,7 @@ const updateUser = async (req, res) => {
     .select('id_rol, id_cargo, activo')
     .eq('id_usuario', userId)
     .single()
-  const payload = {...req.body}
+  const payload = pickEditableFields(req.body, ['contrasenia'])
   if (payload.id_jefe_directo !== undefined && parseInt(payload.id_jefe_directo) === parseInt(userId)) {
     return res.status(400).json({error: 'Un usuario no puede ser su propio jefe directo'})
   }
@@ -194,7 +206,7 @@ const updateUser = async (req, res) => {
     await userService.releaseAssignedTrips(userId)
   }
   const {data, error} = await supabase
-    .from('Usuario').update(payload).eq('id_usuario', userId).select()
+    .from('Usuario').update(payload).eq('id_usuario', userId).select(userPublicColumns)
   if (error) {
     return res.status(500).json({error: error.message})
   }
@@ -208,7 +220,7 @@ const updateUser = async (req, res) => {
 
 // Crea un nuevo usuario, validando rol y cargo unicos
 const createUser = async (req, res) => {
-  const body = {...req.body}
+  const body = pickEditableFields(req.body)
   const temporaryPassword = generateTemporaryPassword()
   if (body.telefono !== undefined) {
     body.telefono = body.telefono?.trim() || null
@@ -227,7 +239,7 @@ const createUser = async (req, res) => {
   if (positionError) {
     return res.status(400).json({error: positionError})
   }
-  const {data, error} = await supabase.from('Usuario').insert(body).select()
+  const {data, error} = await supabase.from('Usuario').insert(body).select(userPublicColumns)
   if (error) {
     return res.status(500).json({error: error.message})
   }
@@ -256,7 +268,7 @@ const createUser = async (req, res) => {
 // Elimina un usuario existente
 const deleteUser = async (req, res) => {
   const {data, error} = await supabase
-    .from('Usuario').delete().eq('id_usuario', req.params.id).select()
+    .from('Usuario').delete().eq('id_usuario', req.params.id).select(userPublicColumns)
   if (error) {
     return res.status(500).json({error: error.message})
   }
@@ -317,7 +329,7 @@ const activateUser = async (req, res) => {
     }
   }
   const {data, error} = await supabase
-    .from('Usuario').update({activo: true}).eq('id_usuario', req.params.id).select()
+    .from('Usuario').update({activo: true}).eq('id_usuario', req.params.id).select(userPublicColumns)
   if (error) {
     return res.status(500).json({error: error.message})
   }
@@ -336,7 +348,7 @@ const suspendUser = async (req, res) => {
       refresh_token_invalido_desde: new Date().toISOString(),
     })
     .eq('id_usuario', req.params.id)
-    .select()
+    .select(userPublicColumns)
   if (error) {
     return res.status(500).json({error: error.message})
   }

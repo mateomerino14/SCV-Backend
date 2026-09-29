@@ -160,7 +160,8 @@ const createExpense = async (expenseData, file, userId) => {
       await supabase.from('Imagen').insert({url_archivo: urlData.publicUrl, id_gasto: expense.id_gasto})
     }
   }
-  alcoholDetectionService.updateAlcoholInTrip(expenseData.id_viaje).catch((error) => console.warn('Error alcohol:', error.message))
+  // Se espera para que el viaje ya tenga tiene_alcohol actualizado si se finaliza enseguida
+  await alcoholDetectionService.updateAlcoholInTrip(expenseData.id_viaje).catch((error) => console.warn('Error alcohol:', error.message))
   return {expense}
 };
 
@@ -173,6 +174,11 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
   const access = await substitutionService.canRegisterExpenseOnTrip(existingExpense.id_viaje, userId)
   if (!access.allowed) {
     return {error: access.error, status: access.status}
+  }
+  // Mismo control de plazo y fechas que al registrar, con el viaje real del gasto
+  const deadlineValidation = await deadlineService.validateTripDeadline(existingExpense.id_viaje, expenseData.fecha_gasto)
+  if (!deadlineValidation.valid) {
+    return {error: deadlineValidation.error, status: 400, requiereAutorizacion: !!deadlineValidation.requiereAutorizacion}
   }
   const isInternational = expenseData.es_gasto_internacional || false
   const currencyError = validateCurrencyByDay(access.trip, expenseData.fecha_gasto, isInternational)
@@ -268,7 +274,7 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
   }
   const {data: updatedExpense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single()
   if (updatedExpense?.id_viaje) {
-    alcoholDetectionService.updateAlcoholInTrip(updatedExpense.id_viaje).catch((error) => console.warn('Error alcohol:', error.message))
+    await alcoholDetectionService.updateAlcoholInTrip(updatedExpense.id_viaje).catch((error) => console.warn('Error alcohol:', error.message))
   }
   return {}
 };
@@ -296,7 +302,7 @@ const deleteExpense = async (expenseId, userId) => {
   if (deleteError) {
     return {error: deleteError.message, status: 500}
   }
-  alcoholDetectionService.updateAlcoholInTrip(tripId).catch((error) => console.warn('Error alcohol al eliminar:', error.message))
+  await alcoholDetectionService.updateAlcoholInTrip(tripId).catch((error) => console.warn('Error alcohol al eliminar:', error.message))
   return {}
 };
 

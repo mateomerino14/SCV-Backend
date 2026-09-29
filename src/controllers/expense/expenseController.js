@@ -1,6 +1,7 @@
 const supabase = require('../../config/supabase')
 const expenseService = require('../../services/expense/expenseService')
 const receiptService = require('../../services/expense/receiptService')
+const tripAccessService = require('../../services/trip/tripAccessService')
 
 // Obtiene el detalle completo de un gasto
 const getExpenseDetail = async (req, res) => {
@@ -25,7 +26,7 @@ const getExpenseDetail = async (req, res) => {
         Imagen(url_archivo),
         Gasto_Tramo_Moneda(id_tramo, moneda, monto_origen, tipo_cambio, monto_usd),
         Gasto_Subitem(id_subitem, descripcion, monto),
-        Viaje(fecha_inicio, fecha_fin, estado)
+        Viaje(id_viaje, fecha_inicio, fecha_fin, estado)
       `)
       .eq('id_gasto', expenseId)
       .single()
@@ -34,6 +35,9 @@ const getExpenseDetail = async (req, res) => {
     }
     if (!data) {
       return res.status(404).json({error: 'Gasto no encontrado'})
+    }
+    if (!(await tripAccessService.canViewTrip(data.id_viaje, req.user.id_usuario))) {
+      return res.status(403).json({error: 'No tienes permiso para ver este gasto'})
     }
     return res.json(data)
   }
@@ -47,6 +51,9 @@ const sendGroupedReceipt = async (req, res) => {
   try {
     const {tripId, type} = req.params
     const isInternational = req.query.internacional === 'true'
+    if (!(await tripAccessService.canManageTripReceipts(tripId, req.user.id_usuario))) {
+      return res.status(403).json({error: 'No tienes permiso para emitir recibos de este viaje'})
+    }
     const result = await receiptService.sendGroupedReceipt(tripId, type, isInternational)
     if (result.error) {
       return res.status(result.status || 500).json({error: result.error})
@@ -63,6 +70,13 @@ const sendGroupedReceipt = async (req, res) => {
 const sendIndividualReceipt = async (req, res) => {
   try {
     const {expenseId} = req.params
+    const {data: expense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single()
+    if (!expense) {
+      return res.status(404).json({error: 'Gasto no encontrado'})
+    }
+    if (!(await tripAccessService.canManageTripReceipts(expense.id_viaje, req.user.id_usuario))) {
+      return res.status(403).json({error: 'No tienes permiso para emitir recibos de este viaje'})
+    }
     const result = await receiptService.sendIndividualReceipt(expenseId)
     if (result.error) {
       return res.status(result.status || 500).json({error: result.error})
@@ -97,7 +111,7 @@ const updateExpense = async (req, res) => {
     const {expenseId} = req.params
     const result = await expenseService.updateExpense(expenseId, expenseData, req.file, req.user.id_usuario)
     if (result.error) {
-      return res.status(result.status || 500).json({error: result.error})
+      return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion})
     }
     return res.json({message: 'Gasto actualizado correctamente'})
   }

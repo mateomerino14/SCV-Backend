@@ -49,7 +49,7 @@ const getLatestEntryByTrip = async (tripIds) => {
   }
   const {data} = await supabase
     .from('Revision_Viaje')
-    .select('id_viaje, id_usuario, accion')
+    .select('id_viaje, id_usuario, accion, etapa, fecha')
     .in('id_viaje', tripIds)
     .eq('automatica', false)
     .order('fecha', {ascending: false})
@@ -110,7 +110,9 @@ const mergeReviewedTrips = async ({userId, stage, trips, select, filters}) => {
     }
     else if (own?.accion === 'RECHAZADO' && rejectedCandidates.includes(trip.id_viaje)) {
       const latest = latestByTrip.get(trip.id_viaje)
-      if (latest && latest.id_usuario === userId && latest.accion === 'RECHAZADO') {
+      // El rechazo vigente debe ser exactamente su ultimo registro en esta etapa (no un rechazo
+      // suyo en otra etapa, por ejemplo en gastos, cuando este rechazo previo ya se corrigio)
+      if (latest && latest.id_usuario === userId && latest.accion === 'RECHAZADO' && latest.etapa === stage && latest.fecha === own.fecha) {
         result = 'RECHAZADO'
       }
     }

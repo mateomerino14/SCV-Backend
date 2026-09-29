@@ -168,12 +168,18 @@ const approveTrip = async (tripId, approverId, {selfStageSkip = false} = {}) => 
   if (trip.id_aprobador_asignado && trip.id_aprobador_asignado !== approverId && !selfStageSkip) {
     return {error: 'Este viaje ya está asignado a otro aprobador', status: 403}
   }
-  const {error} = await supabase
+  const {data: updatedRows, error} = await supabase
     .from('Viaje')
     .update({estado: 'EN_REVISION_TESORERO', id_aprobador_asignado: approverId})
     .eq('id_viaje', tripId)
+    .eq('estado', 'APROBADO_VIAJE')
+    .select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
+  }
+  // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+  if (!updatedRows?.length) {
+    return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
   }
   await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.tripApproval, 'APROBADO', {automatic: selfStageSkip})
   const {data: approverData} = await supabase
@@ -220,14 +226,20 @@ const rejectTrip = async (tripId, approverId) => {
   if (!existingComments || existingComments.length === 0) {
     return {error: 'Debes agregar al menos una observación antes de rechazar', status: 400}
   }
-  const {error} = await supabase
+  const {data: updatedRows, error} = await supabase
     .from('Viaje')
     .update({estado: 'RECHAZADO', id_aprobador_asignado: approverId})
     .eq('id_viaje', tripId)
+    .eq('estado', 'APROBADO_VIAJE')
+    .select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
   else {
+    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
+    if (!updatedRows?.length) {
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+    }
     await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.tripApproval, 'RECHAZADO')
     await emailService.sendRejectionNotice(trip.Usuario)
     return {message: 'Viaje rechazado correctamente'}

@@ -40,7 +40,7 @@ const getTripDetail = async (req, res) => {
 // Actualiza los montos asignados de un viaje
 const updateAmounts = async (req, res) => {
   const {tripId} = req.params
-  const result = await treasurerService.updateAmounts(tripId, req.body)
+  const result = await treasurerService.updateAmounts(tripId, req.body, req.user.id_usuario)
   if (result.error) {
     return res.status(result.status).json({error: result.error})
   }

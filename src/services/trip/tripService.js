@@ -143,7 +143,7 @@ const getTripDetail = async (tripId, requesterId) => {
 const editTrip = async (tripId, userId, tripData) => {
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('estado, id_usuario, ciclo_revision')
+    .select('estado, id_usuario, ciclo_revision, fue_iniciado')
     .eq('id_viaje', tripId)
     .single()
   if (!trip) {
@@ -152,8 +152,11 @@ const editTrip = async (tripId, userId, tripData) => {
   if (trip.id_usuario !== userId) {
     return {error: 'No tienes permiso para editar este viaje', status: 403}
   }
-  if (trip.estado !== 'RECHAZADO' && trip.estado !== 'BORRADOR') {
-    return {error: 'Solo puedes editar viajes en borrador o rechazados', status: 400}
+  // Solo se reedita el viaje antes de iniciarlo; si se rechazo en la fase de gastos se
+  // corrigen los gastos y se reenvia con "finalizar", sin volver a la aprobacion previa
+  const isEditableRejection = trip.estado === 'RECHAZADO' && !trip.fue_iniciado
+  if (trip.estado !== 'BORRADOR' && !isEditableRejection) {
+    return {error: 'Solo puedes editar viajes en borrador o rechazados antes de iniciarse', status: 400}
   }
   if (tripData.transporte === 'Vehículo de Empresa' && !tripData.placa_vehiculo?.trim()) {
     return {error: 'La placa del vehículo es requerida', status: 400}
@@ -240,8 +243,10 @@ const confirmCompletion = async (tripId, userId, justifications) => {
       return {error: 'No tienes permiso para finalizar este viaje', status: 403}
     }
   }
-  if (trip.estado !== 'EN_CURSO' && trip.estado !== 'RECHAZADO') {
-    return {error: 'Solo puedes finalizar viajes en curso o rechazados (en fase de gastos)', status: 400}
+  // Un viaje rechazado antes de iniciarse (sin fondos asignados) no puede pasar a rendicion
+  const isExpensePhaseRejection = trip.estado === 'RECHAZADO' && trip.fue_iniciado
+  if (trip.estado !== 'EN_CURSO' && !isExpensePhaseRejection) {
+    return {error: 'Solo puedes finalizar viajes en curso o rechazados en la fase de gastos', status: 400}
   }
   const justificationList = Array.isArray(justifications) ? justifications : []
   for (const item of justificationList) {

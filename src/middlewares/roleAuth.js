@@ -11,7 +11,7 @@ const checkRole = (allowedRoles) => {
       next()
     }
     else {
-      return res.status(402).json({error: 'Acceso denegado, rol no permitido'})
+      return res.status(403).json({error: 'Acceso denegado, rol no permitido'})
     }
   }
 };
