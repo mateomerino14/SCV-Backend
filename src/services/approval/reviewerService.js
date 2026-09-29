@@ -6,6 +6,7 @@ const userDirectoryService = require('../user/userDirectoryService')
 const finalReviewDocumentService = require('./finalReviewDocumentService')
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
 const tripCodeUtil = require('../../utils/tripCode')
+const reviewLogService = require('./reviewLogService')
 
 // Anexa el resumen de gastos y alertas a una lista de viajes
 const attachSummaryToTrips = (trips) => {
@@ -60,11 +61,12 @@ const getPendingReviews = async (reviewerId, filters) => {
 
 // Lista las revisiones finales asignadas al revisor
 const getMyReviews = async (reviewerId, filters) => {
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)'
   // El revisor es unico: toda rendicion pendiente de revision final le corresponde
   await hierarchyAssignmentService.claimStageTrips(reviewerId, 'id_revisor_asignado', ['APROBADO_SUPERVISOR'])
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)')
+    .select(selectFields)
     .eq('id_revisor_asignado', reviewerId)
   if (filters.fecha_inicio) {
     query = query.gte('fecha_inicio', filters.fecha_inicio)
@@ -80,7 +82,15 @@ const getMyReviews = async (reviewerId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion))}
+    // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
+    const merged = await reviewLogService.mergeReviewedTrips({
+      userId: reviewerId, stage: reviewLogService.reviewStages.finalReview, select: selectFields, filters,
+      trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),
+    })
+    if (merged.error) {
+      return {error: merged.error}
+    }
+    return {trips: attachSummaryToTrips(merged.trips)}
   }
 };
 
@@ -210,6 +220,7 @@ const approveReview = async (tripId, reviewerId, {selfStageSkip = false} = {}) =
   if (error) {
     return {error: error.message, status: 500}
   }
+  await reviewLogService.recordReview(tripId, reviewerId, reviewLogService.reviewStages.finalReview, 'APROBADO', {automatic: selfStageSkip})
   const {data: reviewer} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre, monto_diario, monto_diario_usd)').eq('id_usuario', reviewerId).single()
   const {data: expenses} = await supabase
     .from('Gasto').select('*, Categoria_Gasto(nombre), Proveedor(nombre), Factura(numero_factura, monto_parcial)').eq('id_viaje', tripId)
@@ -265,6 +276,7 @@ const rejectReview = async (tripId, reviewerId) => {
     return {error: error.message, status: 500}
   }
   else {
+    await reviewLogService.recordReview(tripId, reviewerId, reviewLogService.reviewStages.finalReview, 'RECHAZADO')
     return {message: 'Viaje rechazado correctamente'}
   }
 };

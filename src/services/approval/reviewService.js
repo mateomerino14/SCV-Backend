@@ -3,6 +3,7 @@ const expenseSummaryService = require('./expenseSummaryService')
 const tripCommentService = require('../trip/tripCommentService')
 const emailService = require('../shared/emailService')
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
+const reviewLogService = require('./reviewLogService')
 
 // Lista los viajes pendientes de revision previa
 const getPendingTripReviews = async (supervisorId, filters) => {
@@ -35,9 +36,10 @@ const getPendingTripReviews = async (supervisorId, filters) => {
 
 // Lista los viajes de revision previa asignados al supervisor
 const getMyTripReviews = async (supervisorId, filters) => {
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Comentario(*)'
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Comentario(*)')
+    .select(selectFields)
     .eq('id_supervisor_asignado', supervisorId)
     .or('estado.eq.EN_CURSO,and(fue_iniciado.eq.false,estado.in.(EN_REVISION_VIAJE,APROBADO_VIAJE,EN_REVISION_TESORERO,RECHAZADO))')
   if (filters.fecha_inicio) {
@@ -54,7 +56,15 @@ const getMyTripReviews = async (supervisorId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion)}
+    // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
+    const merged = await reviewLogService.mergeReviewedTrips({
+      userId: supervisorId, stage: reviewLogService.reviewStages.tripReview, select: selectFields, filters,
+      trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),
+    })
+    if (merged.error) {
+      return {error: merged.error}
+    }
+    return {trips: merged.trips}
   }
 };
 
@@ -148,6 +158,7 @@ const approveTripReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500}
   }
   else {
+    await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.tripReview, 'APROBADO')
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'APROBADOR', 'id_aprobador_asignado')
     await require('./selfReviewSkipService').advanceSelfReviewStages(tripId)
     return {message: 'Viaje aprobado por supervisor correctamente'}
@@ -184,6 +195,7 @@ const rejectTripReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500}
   }
   else {
+    await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.tripReview, 'RECHAZADO')
     await emailService.sendRejectionNotice(trip.Usuario)
     return {message: 'Viaje rechazado correctamente'}
   }
@@ -242,9 +254,10 @@ const getPendingExpenseReviews = async (supervisorId, filters) => {
 
 // Lista los viajes de revision de gastos asignados al supervisor
 const getMyExpenseReviews = async (supervisorId, filters) => {
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)'
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)')
+    .select(selectFields)
     .eq('id_supervisor_asignado', supervisorId)
     .in('estado', ['EN_REVISION', 'APROBADO_SUPERVISOR', 'RECHAZADO'])
   if (filters.fecha_inicio) {
@@ -261,7 +274,15 @@ const getMyExpenseReviews = async (supervisorId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion))}
+    // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
+    const merged = await reviewLogService.mergeReviewedTrips({
+      userId: supervisorId, stage: reviewLogService.reviewStages.expenseReview, select: selectFields, filters,
+      trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),
+    })
+    if (merged.error) {
+      return {error: merged.error}
+    }
+    return {trips: attachSummaryToTrips(merged.trips)}
   }
 };
 
@@ -378,7 +399,8 @@ const approveExpenseReview = async (tripId, supervisorId) => {
   if (error) {
     return {error: error.message, status: 500}
   }
-  else if (trip.tiene_alcohol) {
+  await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.expenseReview, 'APROBADO')
+  if (trip.tiene_alcohol) {
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'APROBADOR', 'id_aprobador_asignado')
     await require('./selfReviewSkipService').advanceSelfReviewStages(tripId)
     return {message: 'Gastos aprobados por supervisor, pasan a revisión adicional del aprobador por contener alcohol'}
@@ -421,6 +443,7 @@ const rejectExpenseReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500}
   }
   else {
+    await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.expenseReview, 'RECHAZADO')
     await emailService.sendRejectionNotice(trip.Usuario)
     return {message: 'Viaje rechazado correctamente'}
   }

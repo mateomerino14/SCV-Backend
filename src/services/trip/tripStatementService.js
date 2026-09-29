@@ -111,6 +111,28 @@ const formatDate = (dateInput) => {
 }
 
 // Genera el HTML de la planilla de rendicion de cuentas
+// Cada reenvio a revision guarda de nuevo las justificaciones; en el documento solo va
+// la mas reciente de cada dia (y la de hoteles al final), igual que en la pantalla.
+// Recibe los comentarios ordenados del mas reciente al mas antiguo.
+const latestJustificationPerDay = (comments) => {
+  const byDay = new Map()
+  comments.forEach((comment) => {
+    const key = comment.fecha_justificada || 'HOTEL'
+    if (!byDay.has(key)) {
+      byDay.set(key, comment)
+    }
+  })
+  return [...byDay.values()].sort((first, second) => {
+    if (!first.fecha_justificada) {
+      return 1
+    }
+    if (!second.fecha_justificada) {
+      return -1
+    }
+    return String(first.fecha_justificada).localeCompare(String(second.fecha_justificada))
+  })
+}
+
 const generateStatementHtml = (trip, expenses, dayJustifications) => {
   const employee = trip.Usuario
   const responsable = `${employee?.nombre || ''} ${employee?.apellido_paterno || ''}`.trim().toUpperCase()
@@ -351,8 +373,8 @@ const generateStatementPdf = async (tripId) => {
     .select('descripcion, fecha_justificada, tipo')
     .eq('id_viaje', tripId)
     .eq('tipo', 'JUSTIFICACION')
-    .order('fecha', {ascending: true})
-  const dayJustifications = comments || []
+    .order('fecha', {ascending: false})
+  const dayJustifications = latestJustificationPerDay(comments || [])
   const html = generateStatementHtml(trip, expenses || [], dayJustifications)
   const pdfBuffer = await pdfService.generatePdf(html)
   return {buffer: pdfBuffer, fileName: `Rendicion_${tripId}_${(trip.motivo || 'viaje').replace(/\s+/g, '_')}.pdf`}

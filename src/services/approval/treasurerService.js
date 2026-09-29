@@ -4,6 +4,7 @@ const treasuryDocumentService = require('./treasuryDocumentService')
 const tripCommentService = require('../trip/tripCommentService')
 const tripCodeUtil = require('../../utils/tripCode')
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
+const reviewLogService = require('./reviewLogService')
 
 // Lista los viajes pendientes de aprobacion de fondos
 const getPendingTrips = async (treasurerId, filters) => {
@@ -32,9 +33,10 @@ const getPendingTrips = async (treasurerId, filters) => {
 
 // Lista los viajes asignados al tesorero
 const getMyTrips = async (treasurerId, filters) => {
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre)), Comentario(*)'
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre)), Comentario(*)')
+    .select(selectFields)
     .eq('id_tesorero_asignado', treasurerId)
     .or('estado.eq.EN_CURSO,and(fue_iniciado.eq.false,estado.in.(EN_REVISION_TESORERO,RECHAZADO))')
   if (filters.fecha_inicio) {
@@ -51,7 +53,15 @@ const getMyTrips = async (treasurerId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion)}
+    // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
+    const merged = await reviewLogService.mergeReviewedTrips({
+      userId: treasurerId, stage: reviewLogService.reviewStages.fundAssignment, select: selectFields, filters,
+      trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),
+    })
+    if (merged.error) {
+      return {error: merged.error}
+    }
+    return {trips: merged.trips}
   }
 };
 
@@ -126,6 +136,7 @@ const approveTrip = async (tripId, treasurerId, {selfStageSkip = false} = {}) =>
   if (error) {
     return {error: error.message, status: 500}
   }
+  await reviewLogService.recordReview(tripId, treasurerId, reviewLogService.reviewStages.fundAssignment, 'APROBADO', {automatic: selfStageSkip})
   const {data: treasurerData} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre)').eq('id_usuario', treasurerId).single()
   // Si es el viaje del propio tesorero, la confirmacion indica aprobacion automatica
   const treasurer = {...treasurerData, aprobacionAutomatica: selfStageSkip}
@@ -188,6 +199,7 @@ const rejectTrip = async (tripId, treasurerId) => {
     return {error: error.message, status: 500}
   }
   else {
+    await reviewLogService.recordReview(tripId, treasurerId, reviewLogService.reviewStages.fundAssignment, 'RECHAZADO')
     return {message: 'Viaje rechazado correctamente'}
   }
 };

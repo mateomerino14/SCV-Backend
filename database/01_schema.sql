@@ -250,6 +250,26 @@ create unique index if not exists recibo_individual_unique on "Recibo"(id_gasto)
 create unique index if not exists recibo_agrupado_unique on "Recibo"(id_viaje, tipo, es_gasto_internacional) where id_gasto is null;
 
 -- ------------------------------------------------------------
+-- Historial de revision
+-- ------------------------------------------------------------
+
+-- Cada aprobacion o rechazo de un viaje: quien lo hizo, en que etapa y cuando.
+-- Alimenta los historiales de revision de supervisor, aprobador, tesorero y revisor.
+-- automatica = true cuando la etapa se aprobo sola porque el revisor era el viajero.
+create table if not exists "Revision_Viaje" (
+  id_revision serial primary key,
+  id_viaje integer not null references "Viaje"(id_viaje) on delete cascade,
+  id_usuario integer not null references "Usuario"(id_usuario),
+  etapa varchar(20) not null check (etapa in ('REVISION_VIAJE', 'APROBACION_VIAJE', 'ASIGNACION_FONDOS', 'REVISION_GASTOS', 'REVISION_ALCOHOL', 'REVISION_FINAL')),
+  accion varchar(10) not null check (accion in ('APROBADO', 'RECHAZADO')),
+  automatica boolean not null default false,
+  fecha timestamptz not null default now()
+);
+
+create index if not exists idx_revision_viaje_usuario_etapa on "Revision_Viaje"(id_usuario, etapa);
+create index if not exists idx_revision_viaje_id_viaje on "Revision_Viaje"(id_viaje);
+
+-- ------------------------------------------------------------
 -- Indices para optimizacion de consultas
 -- ------------------------------------------------------------
 

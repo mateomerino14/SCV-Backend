@@ -12,6 +12,7 @@
 
 truncate table
   "Recibo",
+  "Revision_Viaje",
   "Comentario",
   "Solicitud_Reemplazo",
   "Solicitud_Autorizacion_Plazo",

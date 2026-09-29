@@ -5,6 +5,7 @@ const approvalMemoService = require('./approvalMemoService')
 const textNormalizer = require('../../utils/textNormalizer')
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
 const tripCodeUtil = require('../../utils/tripCode')
+const reviewLogService = require('./reviewLogService')
 
 const memoPositions = [
   'Asistente Administrativo de Seguros y Servicios',
@@ -95,11 +96,12 @@ const getPendingTrips = async (approverId, filters) => {
 
 // Lista los viajes asignados al aprobador, con filtros opcionales
 const getMyTrips = async (approverId, filters) => {
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre)), Comentario(*)'
   // El aprobador es unico: todo viaje pendiente de su aprobacion le corresponde
   await hierarchyAssignmentService.claimStageTrips(approverId, 'id_aprobador_asignado', ['APROBADO_VIAJE'])
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre)), Comentario(*)')
+    .select(selectFields)
     .eq('id_aprobador_asignado', approverId)
     .or('estado.eq.EN_CURSO,and(fue_iniciado.eq.false,estado.in.(APROBADO_VIAJE,EN_REVISION_TESORERO,RECHAZADO))')
   if (filters.fecha_inicio) {
@@ -116,7 +118,15 @@ const getMyTrips = async (approverId, filters) => {
     return {error: error.message}
   }
   else {
-    return {trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion)}
+    // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
+    const merged = await reviewLogService.mergeReviewedTrips({
+      userId: approverId, stage: reviewLogService.reviewStages.tripApproval, select: selectFields, filters,
+      trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),
+    })
+    if (merged.error) {
+      return {error: merged.error}
+    }
+    return {trips: merged.trips}
   }
 };
 
@@ -165,6 +175,7 @@ const approveTrip = async (tripId, approverId, {selfStageSkip = false} = {}) => 
   if (error) {
     return {error: error.message, status: 500}
   }
+  await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.tripApproval, 'APROBADO', {automatic: selfStageSkip})
   const {data: approverData} = await supabase
     .from('Usuario').select('nombre, apellido_paterno, email_corporativo, Cargo(nombre)').eq('id_usuario', approverId).single()
   // Si es el viaje del propio aprobador, el memorandum indica aprobacion automatica
@@ -217,6 +228,7 @@ const rejectTrip = async (tripId, approverId) => {
     return {error: error.message, status: 500}
   }
   else {
+    await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.tripApproval, 'RECHAZADO')
     await emailService.sendRejectionNotice(trip.Usuario)
     return {message: 'Viaje rechazado correctamente'}
   }
