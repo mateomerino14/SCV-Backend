@@ -68,6 +68,7 @@ const getLatestEntryByTrip = async (tripIds) => {
 // - RECHAZADO: lo rechazo el y el viaje sigue rechazado; cuando el empleado lo corrige
 //   y lo reenvia, deja de mostrarse.
 // - null: pendiente o sin revision propia.
+// Un viaje aprobado antes que hoy revisa otra persona sigue en su historial (asignado_a_mi = false).
 const mergeReviewedTrips = async ({userId, stage, trips, select, filters}) => {
   const {data: entries, error} = await supabase
     .from('Revision_Viaje')
@@ -113,7 +114,8 @@ const mergeReviewedTrips = async ({userId, stage, trips, select, filters}) => {
         result = 'RECHAZADO'
       }
     }
-    return {...trip, resultado_revision: result, fecha_revision: own?.fecha || null}
+    // asignado_a_mi: el viaje esta en su lista de trabajo (no solo en su historial)
+    return {...trip, resultado_revision: result, fecha_revision: own?.fecha || null, asignado_a_mi: baseIds.has(trip.id_viaje)}
   })
   // Los viajes que solo llegaron por el historial y ya no tienen un resultado vigente
   // (rechazos ya corregidos por el empleado) no se muestran
