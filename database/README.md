@@ -21,6 +21,14 @@ Estos cuatro archivos reflejan siempre el estado final y completo del esquema: a
 
 Si tu base ya tiene datos cargados con una version anterior del esquema, **no vuelvas a correr `01_schema.sql`**: en su lugar, compara tu esquema actual contra este archivo y aplica manualmente (`alter table`, etc.) las columnas o tablas que te falten. Los scripts de migracion incremental que se usaron durante el desarrollo ya se incorporaron a estos cuatro archivos y no se conservan por separado, para no acumular decenas de archivos con el tiempo.
 
+## Cambios recientes para bases existentes
+
+Si tu base es anterior, aplica estos cambios (ya incluidos en `01_schema.sql` y `04_rls_hardening.sql`):
+
+- Tabla `Revision_Viaje` con sus dos índices y RLS activado.
+- Columna `Usuario.debe_cambiar_contrasenia boolean not null default false`.
+- Relación `Comentario.id_gasto` con `on delete set null`.
+
 ## Scripts de prueba
 
 | Script | Uso |
@@ -98,6 +106,12 @@ El perfil de **Tesorero** no es un rol: se determina por el cargo del usuario.
 
 **Retenciones persistidas.** Las columnas `base_imponible`, `retencion_rc_iva`, `retencion_iue`, `retencion_it` e `importe_costo` guardan el calculo hecho al registrar el gasto, en lugar de recalcularse en cada consulta. Asi los reportes historicos no varian si cambian las alicuotas.
 
+**Contraseña temporal.** `Usuario.debe_cambiar_contrasenia` queda en `true` al crear un usuario, cuando el administrador le pone una contraseña o cuando entra con un código de recuperación; se apaga cuando el usuario elige su propia contraseña. `refresh_token_invalido_desde` marca el momento desde el que las sesiones anteriores dejan de valer (cambio de rol, suspensión o cambio de contraseña).
+
+**Observaciones.** `Comentario.id_gasto` usa `on delete set null`: si el empleado borra un gasto observado, la observación del revisor se conserva.
+
+**Historial de revisión.** `Revision_Viaje` guarda cada aprobación o rechazo (persona, etapa, fecha). `automatica = true` marca las etapas aprobadas solas porque el responsable era el viajero; no cuentan en los historiales.
+
 **RLS.** El backend se conecta con la service_role key, que ignora las politicas de seguridad por fila. Activarlas impide que alguien lea o escriba la base directamente con la anon key.
 
 ## Verificacion posterior
@@ -108,7 +122,7 @@ Contar las tablas creadas:
 select count(*) from information_schema.tables where table_schema = 'public';
 ```
 
-Debe devolver 20.
+Debe devolver 23.
 
 Comprobar que las columnas temporales quedaron bien tipadas:
 
@@ -119,7 +133,7 @@ where table_schema = 'public' and data_type like 'timestamp%'
 order by table_name, column_name;
 ```
 
-Las nueve filas deben indicar `timestamp with time zone`.
+Las once filas deben indicar `timestamp with time zone`.
 
 ## Variables de entorno necesarias
 

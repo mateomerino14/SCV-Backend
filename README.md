@@ -39,7 +39,11 @@ FRONTEND_URL=...
 | `GEMINI_API_KEY` | Extracción de comprobantes y detección de alcohol (Google Generative AI) |
 | `BREVO_API_KEY` | Envío de correo transaccional |
 | `ABSTRACT_EMAIL_API_KEY` | Validación de existencia de direcciones de correo |
-| `FRONTEND_URL` | URL del cliente web, usada en el enlace del correo de bienvenida a un usuario nuevo |
+| `FRONTEND_URL` | URL del cliente web, usada en el botón "Ingresar al sistema" de los correos |
+| `TRUST_PROXY` | Opcional. `true` si el servidor está detrás de un proxy (en Render no hace falta: se detecta solo con la variable `RENDER`) |
+| `PUPPETEER_EXECUTABLE_PATH` | Opcional. Ruta a un Chrome/Chromium propio si no se usa el que descarga `puppeteer` al instalar |
+
+En Render el servidor confía en el proxy de la plataforma (`trust proxy`) para leer la IP real de cada usuario; así el límite de intentos de ingreso se aplica por persona y no a todos juntos.
 
 ## Ejecución
 
@@ -62,7 +66,7 @@ Al arrancar, se programa además una tarea (`node-cron`) que envía un resumen d
 | Jimp + qrcode-reader | Lectura de códigos QR en comprobantes |
 | Cheerio + Axios | Consulta y análisis del portal del SIAT |
 | Google Generative AI | Extracción de datos de comprobantes y detección de alcohol |
-| html-pdf-node | Generación de recibos y planilla en PDF |
+| Puppeteer | Generación de PDF (memorándum, confirmación de fondos, rendición, planilla y recibos) |
 | node-cron | Resumen de pendientes por correo, tres veces al día |
 | Brevo | Correo transaccional |
 | Helmet + CORS | Cabeceras de seguridad y control de orígenes |
@@ -117,47 +121,49 @@ const takeExpenseReview = async (req, res) => {
 src/
 ├── config/supabase.js       Cliente de conexión
 ├── routes/                  Declaración de rutas
-│   ├── admin/                admin
+│   ├── admin/                 admin
 │   ├── approval/              review, reviewer, approver, treasurer,
 │   │                          deadlineAuthorization, substitution
-│   ├── catalog/               role, position, expenseCategory, tax, audit
-│   ├── expense/               expense, invoice, invoiceDetail,
-│   │                          image, supplier, comment
+│   ├── catalog/               role, position, section, expenseCategory, tax, audit
+│   ├── expense/               expense, invoice, supplier
 │   ├── trip/                  trip
 │   └── user/                  user, auth
-├── controllers/              Misma división que routes
+├── controllers/             Misma división que routes
 ├── services/
-│   ├── approval/               reviewService, reviewerService,
-│   │                           approverService, approverAlcoholReviewService,
-│   │                           treasurerService, deadlineAuthorizationService,
-│   │                           substitutionService, expenseSummaryService,
-│   │                           approvalMemoService, finalReviewDocumentService,
-│   │                           treasuryDocumentService
-│   ├── expense/                expenseService, invoiceService,
-│   │                           invoiceExtractionService,
-│   │                           receiptService, supplierService
-│   ├── trip/                   tripService, tripCommentService,
-│   │                           tripStatementService
-│   ├── user/                   Autenticación y gestión de usuarios
-│   ├── admin/                  Métricas del panel
-│   └── shared/                 alcoholDetectionService,
-│                               commentModerationService,
-│                               dependencyAssignmentService,
-│                               dailyDigestService, deadlineService,
-│                               emailService, pdfService
+│   ├── approval/              reviewService (supervisor), reviewerService,
+│   │                          approverService, approverAlcoholReviewService,
+│   │                          treasurerService, reviewLogService,
+│   │                          selfReviewSkipService, deadlineAuthorizationService,
+│   │                          substitutionService, expenseSummaryService,
+│   │                          approvalMemoService, finalReviewDocumentService,
+│   │                          treasuryDocumentService
+│   ├── catalog/               positionService, sectionService
+│   ├── expense/               expenseService, invoiceService,
+│   │                          invoiceExtractionService, receiptService,
+│   │                          supplierService
+│   ├── trip/                  tripService, tripAccessService,
+│   │                          tripCommentService, tripStatementService
+│   ├── user/                  tokenService, userService, userDirectoryService
+│   └── shared/                alcoholDetectionService, auditLogService,
+│                              commentModerationService, dailyDigestService,
+│                              deadlineService, emailService, geminiService,
+│                              hierarchyAssignmentService, pdfService
 ├── middlewares/
-│   ├── auth.js                     Verificación del token
+│   ├── auth.js                     Token, cuenta activa, rol vigente, sesión invalidada
+│   │                               y cambio de contraseña pendiente
 │   ├── roleAuth.js                 Autorización por rol
-│   ├── loginRateLimiter.js         Límite de intentos de inicio de sesión
-│   ├── passwordResetRateLimiter.js Límite de envío/verificación de código de recuperación
-│   ├── invoiceExtractRateLimiter.js Límite de extracciones de factura por usuario
-│   └── treasurerPosition.js        Restricción por cargo
+│   ├── treasurerPosition.js        Restricción por cargo (tesorero)
+│   ├── loginRateLimiter.js         Intentos fallidos de inicio de sesión
+│   ├── passwordResetRateLimiter.js Envío y verificación de códigos de recuperación
+│   └── invoiceExtractRateLimiter.js Extracciones de factura por usuario
 ├── utils/
 │   ├── forbiddenWords.js     Catálogo de términos vedados
+│   ├── htmlEscape.js         Escape de textos de usuario en correos y PDF
 │   ├── numberToWords.js      Importes en letras
-│   └── textNormalizer.js     Normalización para comparaciones
+│   ├── textNormalizer.js     Normalización para comparaciones
+│   └── tripCode.js           Código legible de cada viaje
 ├── app.js                    Configuración de Express
-└── index.js                  Arranque del servidor y del cron de resumenes
+└── index.js                  Arranque del servidor y del cron de resúmenes
 
 database/                     Scripts SQL del esquema (ver su README.md)
 ```
@@ -166,23 +172,22 @@ database/                     Scripts SQL del esquema (ver su README.md)
 
 | Prefijo | Archivo | Alcance |
 |---|---|---|
-| `/auth` | `user/auth.js` | Inicio de sesión y recuperación |
-| `/user` | `user/user.js` | Perfil y gestión de usuarios |
-| `/trip` | `trip/trip.js` | Ciclo de vida del viaje, planilla en PDF |
+| `/auth` | `user/auth.js` | Inicio y cierre de sesión, renovación, recuperación por código |
+| `/user` | `user/user.js` | Perfil, cambio de contraseña y gestión de usuarios |
+| `/trip` | `trip/trip.js` | Ciclo de vida del viaje y planilla en PDF |
 | `/expense` | `expense/expense.js` | Gastos y recibos |
 | `/invoice` | `expense/invoice.js` | Extracción y registro de facturas |
-| `/invoice-detail` | `expense/invoiceDetail.js` | Detalle de productos |
-| `/image` | `expense/image.js` | Comprobantes adjuntos |
-| `/supplier` | `expense/supplier.js` | Proveedores |
-| `/comment` | `expense/comment.js` | Comentarios |
+| `/supplier` | `expense/supplier.js` | Proveedores (solo administrador) |
 | `/review` | `approval/review.js` | Revisión previa y de gastos del supervisor |
-| `/reviewer` | `approval/reviewer.js` | Revisión final |
 | `/approver` | `approval/approver.js` | Aprobación del viaje y revisión adicional por alcohol |
 | `/treasurer` | `approval/treasurer.js` | Asignación de fondos |
+| `/reviewer` | `approval/reviewer.js` | Revisión final |
 | `/deadline-authorization` | `approval/deadlineAuthorization.js` | Extensiones de plazo |
 | `/substitution` | `approval/substitution.js` | Rendición por terceros |
-| `/role`, `/position`, `/expense-category`, `/tax`, `/audit` | `catalog/` | Entidades maestras |
-| `/admin` | `admin/admin.js` | Panel administrativo |
+| `/role`, `/position`, `/section`, `/expense-category`, `/tax`, `/audit` | `catalog/` | Catálogos e historial de accesos |
+| `/admin` | `admin/admin.js` | Resumen general del administrador |
+
+Las imágenes de comprobantes y los productos de cada factura no tienen rutas propias: se gestionan solo a través de `/expense` y `/invoice`, que verifican dueño, etapa y plazo.
 
 ## Autorización
 
@@ -195,9 +200,24 @@ router.post('/expense-review/:tripId/take',
   reviewController.takeExpenseReview)
 ```
 
-El perfil de **Tesorero** no es un rol del sistema sino un cargo dentro de la organización; su verificación usa `treasurerPosition`, que contrasta el puesto asignado al usuario.
+El perfil de **Tesorero** no es un rol del sistema sino un cargo (`asistente de caja y tesorería`); su verificación usa `treasurerPosition`.
 
-Los viajes pendientes se muestran solo a los supervisores y aprobadores que comparten `numero_dependencia` con el empleado (`dependencyAssignmentService`); si ninguno de esa dependencia existe, el viaje se muestra a todos para que no quede sin asignar. No aplica a tesorero ni revisor.
+**Aprobador y revisor son roles únicos**: todo viaje de su etapa se les asigna directamente. **Supervisor** se resuelve por jerarquía (`hierarchyAssignmentService`): primero el jefe directo del empleado; si no lo hay, los supervisores de su sección; y si tampoco, cualquier supervisor. Un supervisor solo ve, toma u observa viajes que le corresponden por esa jerarquía, que tiene asignados o que ya revisó.
+
+**Acceso a un viaje** (`tripAccessService`): el detalle, los gastos y el PDF los ven solo el dueño, su reemplazo aprobado, el tesorero, administrador, aprobador, revisor y el supervisor que corresponda. Los recibos los emiten el dueño, su reemplazo o el tesorero.
+
+**Observaciones** (`tripCommentService`): solo las agrega quien tiene la etapa actual del viaje (por rol o cargo, y asignado cuando la etapa lo exige). No se editan ni borran una vez decidida la etapa ni en un ciclo anterior. Al borrar un gasto, sus observaciones se conservan.
+
+## Sesión y seguridad
+
+- **Tokens**: acceso de 15 minutos (en memoria del cliente) y refresco de 7 días en cookie `httpOnly`.
+- **Validación en cada petición** (`auth.js`): cuenta activa, rol igual al del token y sesión no invalidada. Cambiar el rol o suspender a un usuario invalida sus sesiones al instante.
+- **Contraseña temporal**: la cuenta nueva, una clave puesta por el administrador o un ingreso con código de recuperación marcan `debe_cambiar_contrasenia`. Mientras esté marcada, o la clave tenga más de 90 días, el servidor solo permite `/user/me` y el cambio de contraseña. Con clave temporal no se pide la actual.
+- **Cambio de contraseña**: cierra las demás sesiones y entrega una nueva al dispositivo que la cambió. Queda registrado en `Auditoria` (`CAMBIO_CLAVE`), igual que cada ingreso y salida.
+- **Ingreso**: mismo mensaje si el correo no existe o la clave es incorrecta. Límite de 10 intentos fallidos cada 15 minutos por IP; los ingresos correctos no cuentan. Cada código de recuperación se anula tras 5 intentos fallidos.
+- **Concurrencia**: aprobar, rechazar, tomar, devolver, enviar y resolver solicitudes exigen el estado esperado al escribir. Si otra persona se adelantó, se responde 409 y no se duplican correos ni registros.
+- **Documentos**: todo texto escrito por usuarios se escapa antes de insertarse en correos y PDF (`htmlEscape`); los PDF se generan con JavaScript desactivado y el navegador se cierra siempre.
+- **Administración de usuarios**: solo se aceptan los campos del formulario y nunca se devuelve el hash de la contraseña.
 
 ## Flujos de aprobación
 
@@ -219,7 +239,15 @@ Cuando la rendición contiene alcohol (`Gasto.tiene_alcohol` en algún gasto, ag
 
 El rechazo conduce a `RECHAZADO` e incrementa `ciclo_revision`. Solo las observaciones del ciclo vigente se consideran para validar un nuevo rechazo; el sistema exige al menos una antes de permitirlo. Esta regla se aplica de forma idéntica en las 6 instancias de rechazo del sistema (supervisor ×2, aprobador, aprobador por alcohol, revisor).
 
-La asignación de un viaje verifica que el campo de revisor asignado esté vacío antes de establecerlo, evitando que dos usuarios tomen la misma solicitud.
+Un viaje rechazado antes de iniciarse se corrige editándolo y vuelve a `EN_REVISION_VIAJE`; uno rechazado en la fase de gastos se corrige en sus gastos y se reenvía con "finalizar", directo a `EN_REVISION`. Ninguno puede saltar al otro flujo.
+
+### Aprobación automática de etapas propias
+
+Si el responsable de una etapa única (aprobador, tesorero o revisor) es el mismo viajero, esa etapa se aprueba sola (`selfReviewSkipService`) y los documentos lo indican como "aprobación automática". No aplica a supervisores: el viaje pasa a otro según la jerarquía.
+
+### Historial de revisión
+
+Cada aprobación o rechazo queda en `Revision_Viaje` con persona, etapa y fecha (`reviewLogService`). Las bandejas de cada revisor muestran en **Aprobados** todo lo que esa persona aprobó, con su estado actual, y en **Rechazados** solo lo que rechazó y sigue rechazado; al reenviarlo el empleado, sale de la lista. Las aprobaciones automáticas no cuentan.
 
 ### Rendición por terceros
 
@@ -229,14 +257,16 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 
 | Servicio | Responsabilidad |
 |---|---|
-| `deadlineService` | Valida la fecha del gasto contra el período del viaje y el plazo de carga, considerando extensiones vigentes |
-| `alcoholDetectionService` | Detecta bebidas alcohólicas en los productos facturados o en la descripción libre del gasto, a nivel de gasto individual y agregado por viaje |
+| `hierarchyAssignmentService` | Resuelve quién revisa cada etapa (jefe directo, sección o roles únicos) |
+| `deadlineService` | Valida la fecha del gasto contra el período del viaje y el plazo de carga, considerando extensiones; no bloquea las correcciones de un rechazo |
+| `alcoholDetectionService` | Detecta bebidas alcohólicas en los productos facturados o en la descripción del gasto, por gasto y agregado por viaje |
+| `geminiService` | Llamadas al modelo con reintentos y modelo de respaldo ante cuota agotada |
 | `commentModerationService` | Verifica que el texto no contenga términos prohibidos |
-| `dependencyAssignmentService` | Filtra la asignación de viajes por dependencia organizacional |
+| `auditLogService` | Registra ingresos, salidas y cambios de contraseña |
 | `dailyDigestService` | Arma y envía el resumen de pendientes por rol, tres veces al día |
 | `emailService` | Correo transaccional mediante Brevo, con plantilla institucional común (`buildEmailLayout`) |
-| `pdfService` | Conversión de HTML a PDF mediante `html-pdf-node`, consumida por recibos, planilla y memorándum |
-| `expenseSummaryService` | Calcula el control de gasto diario, el exceso contra el total (hoteles), y las alertas; consumido por la vista del empleado, supervisor, aprobador (revisión por alcohol) y revisor por igual |
+| `pdfService` | Conversión de HTML a PDF con Puppeteer |
+| `expenseSummaryService` | Control de gasto diario, exceso en hoteles y alertas; usado por empleado y revisores por igual |
 
 ### Retenciones impositivas
 
@@ -245,7 +275,7 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 | `F` | Compra o servicio con factura | Ninguna; genera crédito fiscal de IVA |
 | `R` | Documento sin IVA | Ninguna |
 | `C` | Compra de bien sin factura | IUE 5% e IT 3% sobre base incrementada |
-| `A` | Servicio o alquiler sin factura | RC-IVA 13% e IT 3% sobre base incrementada |
+| `S` | Servicio o alquiler sin factura | RC-IVA 13% e IT 3% sobre base incrementada |
 
 Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal: se imputan íntegros como costo, sin importar el tipo de comprobante. Los valores se calculan al registrar y se persisten, de modo que los reportes históricos no varíen ante cambios de alícuota.
 
@@ -255,7 +285,7 @@ El presupuesto se controla día por día, no contra el total del viaje: cada dí
 
 ### Gestión de plazos
 
-Se conceden cuatro días de tolerancia tras la finalización del viaje. Vencido ese margen, el empleado debe solicitar autorización al revisor, que otorga cuatro días adicionales desde la fecha de respuesta.
+Se conceden cuatro días de tolerancia tras la finalización del viaje. Vencido ese margen, el empleado debe solicitar autorización al revisor, que otorga cuatro días adicionales desde la fecha de respuesta. El plazo no corre mientras el viaje está rechazado: el empleado puede corregir sus gastos sin pedir autorización.
 
 La extensión amplía el margen para **cargar** los gastos, no el rango de fechas admisibles: la fecha del gasto debe seguir perteneciendo al período del viaje.
 
@@ -268,7 +298,7 @@ Estrategia en cascada, de mayor a menor confiabilidad:
 3. Si el QR es genérico, se interpretan sus parámetros.
 4. Como última instancia, análisis de la imagen por el modelo de visión.
 
-La invocación al modelo incorpora reintentos con espera incremental. Si la fecha de emisión extraída no tiene un formato válido, el campo queda editable en el frontend para que el empleado la corrija; si vino bien formada, queda bloqueado.
+La invocación al modelo (`geminiService`) reintenta ante errores temporales y, si el modelo principal falla o agotó su cuota, usa un modelo de respaldo. Si la fecha de emisión extraída no tiene un formato válido, el campo queda editable en el frontend para que el empleado la corrija; si vino bien formada, queda bloqueado.
 
 ## Base de datos
 
