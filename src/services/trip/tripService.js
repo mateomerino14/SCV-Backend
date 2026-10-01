@@ -139,6 +139,41 @@ const getTripDetail = async (tripId, requesterId) => {
   }
 };
 
+const isValidDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) && !isNaN(new Date(value).getTime())
+const isValidAmount = (value) => value !== undefined && value !== null && value !== '' && !isNaN(parseFloat(value)) && parseFloat(value) >= 0
+
+// Valida los datos de un viaje al crearlo o reeditarlo, con los mismos limites de la base
+const validateTripData = (tripData) => {
+  if (!tripData.motivo?.trim() || tripData.motivo.trim().length > 100) {
+    return 'El motivo es requerido y no puede superar los 100 caracteres'
+  }
+  if (!tripData.destino?.trim() || tripData.destino.trim().length > 200) {
+    return 'El destino es requerido y no puede superar los 200 caracteres'
+  }
+  if (tripData.origen && String(tripData.origen).length > 200) {
+    return 'El origen no puede superar los 200 caracteres'
+  }
+  if (!['Nacional', 'Internacional'].includes(tripData.tipo)) {
+    return 'El tipo de viaje debe ser Nacional o Internacional'
+  }
+  if (!isValidDate(tripData.fecha_inicio) || !isValidDate(tripData.fecha_fin)) {
+    return 'Las fechas del viaje no son válidas'
+  }
+  if (tripData.fecha_fin < tripData.fecha_inicio) {
+    return 'La fecha de fin no puede ser anterior a la fecha de inicio'
+  }
+  if (!isValidAmount(tripData.monto_asignado)) {
+    return 'El monto asignado debe ser un número mayor o igual a cero'
+  }
+  if (tripData.monto_asignado_usd !== undefined && tripData.monto_asignado_usd !== null && tripData.monto_asignado_usd !== '' && !isValidAmount(tripData.monto_asignado_usd)) {
+    return 'El monto asignado en USD debe ser un número mayor o igual a cero'
+  }
+  if (tripData.transporte && String(tripData.transporte).length > 50) {
+    return 'El transporte no es válido'
+  }
+  return null
+}
+
 // Reedita un viaje en borrador o rechazado
 const editTrip = async (tripId, userId, tripData) => {
   const {data: trip} = await supabase
@@ -157,6 +192,10 @@ const editTrip = async (tripId, userId, tripData) => {
   const isEditableRejection = trip.estado === 'RECHAZADO' && !trip.fue_iniciado
   if (trip.estado !== 'BORRADOR' && !isEditableRejection) {
     return {error: 'Solo puedes editar viajes en borrador o rechazados antes de iniciarse', status: 400}
+  }
+  const tripDataError = validateTripData(tripData)
+  if (tripDataError) {
+    return {error: tripDataError, status: 400}
   }
   if (tripData.transporte === 'Vehículo de Empresa' && !tripData.placa_vehiculo?.trim()) {
     return {error: 'La placa del vehículo es requerida', status: 400}
@@ -185,12 +224,17 @@ const editTrip = async (tripId, userId, tripData) => {
     updateData.id_tesorero_asignado = null
     updateData.ciclo_revision = (trip.ciclo_revision || 1) + 1
   }
-  const {error} = await supabase
+  const {data: updatedRows, error} = await supabase
     .from('Viaje')
     .update(updateData)
     .eq('id_viaje', tripId)
+    .eq('estado', trip.estado)
+    .select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
+  }
+  if (!updatedRows?.length) {
+    return {error: 'El viaje cambió de estado mientras lo editabas. Actualiza la página.', status: 409}
   }
   let message = 'Borrador actualizado correctamente'
   if (wasRejected) {
@@ -216,12 +260,18 @@ const submitToReview = async (tripId, userId) => {
   if (trip.estado !== 'BORRADOR') {
     return {error: 'Solo puedes enviar a revisión un viaje que esté en borrador', status: 400}
   }
-  const {error} = await supabase
+  const {data: updatedRows, error} = await supabase
     .from('Viaje')
     .update({estado: 'EN_REVISION_VIAJE'})
     .eq('id_viaje', tripId)
+    .eq('estado', 'BORRADOR')
+    .select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
+  }
+  // Un doble clic no debe asignar revisor dos veces
+  if (!updatedRows?.length) {
+    return {error: 'El viaje ya fue enviado a revisión. Actualiza la página.', status: 409}
   }
   await hierarchyAssignmentService.assignNextReviewer(tripId, userId, 'SUPERVISOR', 'id_supervisor_asignado')
   return {message: 'Viaje enviado a revisión correctamente'}
@@ -284,13 +334,6 @@ const confirmCompletion = async (tripId, userId, justifications) => {
   if (wasRejected) {
     updateData.ciclo_revision = (trip.ciclo_revision || 1) + 1
   }
-  const {error: updateError} = await supabase
-    .from('Viaje')
-    .update(updateData)
-    .eq('id_viaje', tripId)
-  if (updateError) {
-    return {error: updateError.message, status: 500}
-  }
   const currentCycle = updateData.ciclo_revision || trip.ciclo_revision || 1
   const commentsToInsert = justificationList
     .filter((item) => item.descripcion?.trim())
@@ -303,11 +346,33 @@ const confirmCompletion = async (tripId, userId, justifications) => {
       tipo: 'JUSTIFICACION',
       ciclo_revision: currentCycle,
     }))
+  // Primero se guardan las justificaciones: si fallan, el viaje no se envia sin ellas
+  let insertedIds = []
   if (commentsToInsert.length > 0) {
-    await supabase.from('Comentario').insert(commentsToInsert)
+    const {data: inserted, error: commentsError} = await supabase.from('Comentario').insert(commentsToInsert).select('id_comentario')
+    if (commentsError) {
+      return {error: 'No se pudieron guardar las justificaciones. Intenta nuevamente.', status: 500}
+    }
+    insertedIds = (inserted || []).map((row) => row.id_comentario)
+  }
+  // Se exige el mismo estado leido, para que un doble envio no reasigne revisores dos veces
+  const {data: updatedRows, error: updateError} = await supabase
+    .from('Viaje')
+    .update(updateData)
+    .eq('id_viaje', tripId)
+    .eq('estado', trip.estado)
+    .select('id_viaje')
+  if (updateError || !updatedRows?.length) {
+    if (insertedIds.length > 0) {
+      await supabase.from('Comentario').delete().in('id_comentario', insertedIds)
+    }
+    if (updateError) {
+      return {error: updateError.message, status: 500}
+    }
+    return {error: 'El viaje ya fue enviado a revisión. Actualiza la página.', status: 409}
   }
   await hierarchyAssignmentService.assignNextReviewer(tripId, trip.id_usuario, 'SUPERVISOR', 'id_supervisor_asignado')
   return {message: 'Viaje enviado a revisión de gastos correctamente'}
 };
 
-module.exports = {getDashboardData, getHistory, getTripDetail, editTrip, submitToReview, confirmCompletion};
+module.exports = {getDashboardData, getHistory, getTripDetail, editTrip, submitToReview, confirmCompletion, validateTripData};

@@ -46,6 +46,10 @@ const getTripDetail = async (req, res) => {
 const createTrip = async (req, res) => {
   const {motivo, origen, destino, fecha_inicio, fecha_fin, tipo, transporte, placa_vehiculo, monto_asignado, monto_asignado_usd} = req.body
   const userId = req.user.id_usuario
+  const tripDataError = tripService.validateTripData(req.body)
+  if (tripDataError) {
+    return res.status(400).json({error: tripDataError})
+  }
   if (transporte === 'Vehículo de Empresa' && !placa_vehiculo?.trim()) {
     return res.status(400).json({error: 'La placa del vehículo es requerida'})
   }
@@ -55,9 +59,9 @@ const createTrip = async (req, res) => {
   const {data, error} = await supabase
     .from('Viaje')
     .insert({
-      motivo,
-      origen: origen || null,
-      destino,
+      motivo: motivo.trim(),
+      origen: origen?.trim() || null,
+      destino: destino.trim(),
       fecha_inicio,
       fecha_fin,
       tipo,

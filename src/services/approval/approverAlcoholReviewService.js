@@ -131,7 +131,7 @@ const returnAlcoholReview = async (tripId, approverId) => {
   if (trip.estado !== 'EN_REVISION_APROBADOR') {
     return {error: 'No puedes devolver un viaje ya procesado', status: 400}
   }
-  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_aprobador_asignado: null}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').select('id_viaje')
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_aprobador_asignado: null}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').eq('id_aprobador_asignado', approverId).select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }

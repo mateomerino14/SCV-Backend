@@ -59,9 +59,9 @@ const refresh = async (req, res) => {
       return res.status(401).json({error: 'Usuario no válido'})
     }
     if (user.refresh_token_invalido_desde) {
-      const tokenIssuedAt = new Date(decodedToken.iat * 1000)
-      const invalidSince = new Date(user.refresh_token_invalido_desde)
-      if (tokenIssuedAt < invalidSince) {
+      // iat viene en segundos enteros: se compara al segundo
+      const invalidSinceSeconds = Math.floor(new Date(user.refresh_token_invalido_desde).getTime() / 1000)
+      if (decodedToken.iat < invalidSinceSeconds) {
         res.clearCookie('refreshToken', tokenService.cookieOptions)
         return res.status(401).json({error: 'Sesión invalidada, vuelve a iniciar sesión'})
       }

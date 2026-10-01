@@ -4,6 +4,7 @@ const tripCommentService = require('../trip/tripCommentService')
 const emailService = require('../shared/emailService')
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
 const reviewLogService = require('./reviewLogService')
+const tripAccessService = require('../trip/tripAccessService')
 
 // Lista los viajes pendientes de revision previa
 const getPendingTripReviews = async (supervisorId, filters) => {
@@ -86,6 +87,9 @@ const takeTripReview = async (tripId, supervisorId) => {
   if (trip.id_supervisor_asignado) {
     return {error: 'Este viaje ya fue tomado por otro supervisor', status: 409}
   }
+  if (!(await tripAccessService.isInSupervisorScope({id_viaje: parseInt(tripId), id_usuario: trip.id_usuario}, supervisorId))) {
+    return {error: 'Este viaje no corresponde a tu área de revisión', status: 403}
+  }
   const {data: updatedRows, error} = await supabase.from('Viaje').update({id_supervisor_asignado: supervisorId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_VIAJE').is('id_supervisor_asignado', null).select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
@@ -111,7 +115,7 @@ const returnTripReview = async (tripId, supervisorId) => {
   if (trip.estado !== 'EN_REVISION_VIAJE') {
     return {error: 'No puedes devolver este viaje', status: 400}
   }
-  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_supervisor_asignado: null}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_VIAJE').select('id_viaje')
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_supervisor_asignado: null}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_VIAJE').eq('id_supervisor_asignado', supervisorId).select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
@@ -137,9 +141,12 @@ const getTripReviewDetail = async (tripId, supervisorId) => {
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
-  if (trip.id_supervisor_asignado && trip.id_supervisor_asignado !== supervisorId) {
-    const {data: supervisor} = await supabase.from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', trip.id_supervisor_asignado).single()
-    return {error: `Este viaje está siendo revisado por ${supervisor?.nombre} ${supervisor?.apellido_paterno}`, status: 403}
+  if (!(await tripAccessService.canSupervisorAccessTrip(trip, supervisorId))) {
+    if (trip.id_supervisor_asignado) {
+      const {data: supervisor} = await supabase.from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', trip.id_supervisor_asignado).single()
+      return {error: `Este viaje está siendo revisado por ${supervisor?.nombre} ${supervisor?.apellido_paterno}`, status: 403}
+    }
+    return {error: 'Este viaje no corresponde a tu área de revisión', status: 403}
   }
   const {data: comments} = await supabase
     .from('Comentario').select('*').eq('id_viaje', tripId).order('fecha', {ascending: false})
@@ -321,6 +328,9 @@ const takeExpenseReview = async (tripId, supervisorId) => {
   if (trip.id_supervisor_asignado) {
     return {error: 'Este viaje ya fue tomado por otro supervisor', status: 409}
   }
+  if (!(await tripAccessService.isInSupervisorScope({id_viaje: parseInt(tripId), id_usuario: trip.id_usuario}, supervisorId))) {
+    return {error: 'Este viaje no corresponde a tu área de revisión', status: 403}
+  }
   const {data: updatedRows, error} = await supabase.from('Viaje').update({id_supervisor_asignado: supervisorId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION').is('id_supervisor_asignado', null).select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
@@ -346,7 +356,7 @@ const returnExpenseReview = async (tripId, supervisorId) => {
   if (trip.estado !== 'EN_REVISION') {
     return {error: 'No puedes devolver un viaje ya procesado', status: 400}
   }
-  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_supervisor_asignado: null}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION').select('id_viaje')
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_supervisor_asignado: null}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION').eq('id_supervisor_asignado', supervisorId).select('id_viaje')
   if (error) {
     return {error: error.message, status: 500}
   }
@@ -372,9 +382,12 @@ const getExpenseReviewDetail = async (tripId, supervisorId) => {
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
-  if (trip.id_supervisor_asignado && trip.id_supervisor_asignado !== supervisorId) {
-    const {data: supervisor} = await supabase.from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', trip.id_supervisor_asignado).single()
-    return {error: `Este viaje está siendo revisado por ${supervisor?.nombre} ${supervisor?.apellido_paterno}`, status: 403}
+  if (!(await tripAccessService.canSupervisorAccessTrip(trip, supervisorId))) {
+    if (trip.id_supervisor_asignado) {
+      const {data: supervisor} = await supabase.from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', trip.id_supervisor_asignado).single()
+      return {error: `Este viaje está siendo revisado por ${supervisor?.nombre} ${supervisor?.apellido_paterno}`, status: 403}
+    }
+    return {error: 'Este viaje no corresponde a tu área de revisión', status: 403}
   }
   const {data: expenses} = await supabase
     .from('Gasto')

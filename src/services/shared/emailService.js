@@ -1,5 +1,6 @@
 const SibApiV3Sdk = require('sib-api-v3-sdk')
 const axios = require('axios')
+const {escapeHtml} = require('../../utils/htmlEscape')
 const defaultClient = SibApiV3Sdk.ApiClient.instance
 defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY
 
@@ -98,7 +99,7 @@ const emailNote = (content) => {
   return `<p style="margin: 14px 0 0 0; color: ${BRAND.labels}; font-size: 13px; line-height: 1.5;">${content}</p>`
 };
 
-// Caja de datos con pares etiqueta / valor
+// Caja de datos con pares etiqueta / valor (los valores son texto plano y se escapan)
 const emailInfoBox = (rows) => {
   const items = rows
     .filter((row) => row.value !== undefined && row.value !== null && row.value !== '')
@@ -106,19 +107,19 @@ const emailInfoBox = (rows) => {
       const marginBottom = index < list.length - 1 ? '12px' : '0'
       return `
         <p style="margin: 0 0 3px 0; color: ${BRAND.labels}; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">${row.label}</p>
-        <p style="margin: 0 0 ${marginBottom} 0; color: ${BRAND.text}; font-size: 14px;">${row.value}</p>
+        <p style="margin: 0 0 ${marginBottom} 0; color: ${BRAND.text}; font-size: 14px;">${escapeHtml(row.value)}</p>
       `
     })
     .join('')
   return `<div style="background-color: ${BRAND.backgroundHeader}; border-radius: 10px; padding: 16px 18px; margin: 4px 0 16px 0;">${items}</div>`
 };
 
-// Caja destacada en rojo institucional, para el dato principal del correo
+// Caja destacada en rojo institucional, para el dato principal del correo (valor en texto plano)
 const emailHighlightBox = (label, value) => {
   return `
     <div style="background-color: ${BRAND.softRed}; border-left: 4px solid ${BRAND.primary}; border-radius: 8px; padding: 14px 18px; margin: 4px 0 16px 0;">
       <p style="margin: 0 0 4px 0; color: ${BRAND.primary}; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">${label}</p>
-      <p style="margin: 0; color: ${BRAND.title}; font-size: 17px; font-weight: bold;">${value}</p>
+      <p style="margin: 0; color: ${BRAND.title}; font-size: 17px; font-weight: bold;">${escapeHtml(value)}</p>
     </div>
   `
 };
@@ -143,7 +144,7 @@ const emailButton = (text = 'Ingresar al sistema', url = process.env.FRONTEND_UR
 const sendVerificationCode = async (toEmail, userName, code) => {
   const api = new SibApiV3Sdk.TransactionalEmailsApi()
   const body = `
-    ${emailParagraph(`Hola <strong>${userName}</strong>,`)}
+    ${emailParagraph(`Hola <strong>${escapeHtml(userName)}</strong>,`)}
     ${emailParagraph('Usa este código para continuar con la recuperación de tu cuenta:')}
     <div style="background-color: ${BRAND.primary}; color: #ffffff; font-size: 32px; font-weight: bold; text-align: center; padding: 16px; border-radius: 10px; letter-spacing: 8px; margin: 8px 0 16px 0;">
       ${code}
@@ -183,7 +184,7 @@ const sendRejectionNotice = async (employee) => {
   }
   try {
     const body = `
-      ${emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+      ${emailParagraph(`Hola <strong>${escapeHtml(employee.nombre)}</strong>,`)}
       ${emailParagraph('Tu solicitud fue rechazada. Ingresa al sistema para revisar las observaciones y corregirla.')}
       ${emailButton()}
     `

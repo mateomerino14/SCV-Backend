@@ -220,7 +220,8 @@ create table if not exists "Comentario" (
   fecha_justificada date,
   id_usuario integer not null references "Usuario"(id_usuario),
   id_viaje integer not null references "Viaje"(id_viaje),
-  id_gasto integer references "Gasto"(id_gasto) on delete cascade
+  -- Si se elimina el gasto, la observacion se conserva (queda como observacion general)
+  id_gasto integer references "Gasto"(id_gasto) on delete set null
 );
 
 -- ------------------------------------------------------------

@@ -37,8 +37,10 @@ async function authMiddleware(req, res, next) {
   }
   // El administrador le cambio el rol (o lo suspendio y reactivo) despues de emitir este
   // token: debe volver a entrar para trabajar con su rol actual
-  const tokenIssuedAt = new Date(decodedToken.iat * 1000)
-  const invalidatedAfterIssue = user.refresh_token_invalido_desde && tokenIssuedAt < new Date(user.refresh_token_invalido_desde)
+  // iat viene en segundos enteros: se compara al segundo para no rechazar un ingreso hecho
+  // en el mismo segundo en que se invalido la sesion
+  const invalidatedAfterIssue = user.refresh_token_invalido_desde &&
+    decodedToken.iat < Math.floor(new Date(user.refresh_token_invalido_desde).getTime() / 1000)
   if (invalidatedAfterIssue || user.id_rol !== decodedToken.id_rol) {
     return res.status(401).json({error: sessionInvalidatedMessage})
   }

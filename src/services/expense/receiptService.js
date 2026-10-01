@@ -3,35 +3,11 @@ const numberToWords = require('../../utils/numberToWords')
 const emailService = require('../shared/emailService')
 const pdfService = require('../shared/pdfService')
 const {buildTripCode} = require('../../utils/tripCode')
+const {escapeDeep, escapeHtml: escapeText} = require('../../utils/htmlEscape')
 
 // Escapa caracteres especiales de HTML para prevenir inyeccion
-const escapeHtml = (text) => {
-  return (text || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-};
-
-// Formatea una fecha ISO a formato dia/mes/anio
-const formatShortDate = (isoString) => {
-  const [year, month, day] = isoString.split('-')
-  return `${day}/${month}/${year}`
-};
-
-const formatReceiptNumber = (number) => String(number).padStart(6, '0')
-
-// Busca el recibo ya emitido (individual por gasto, o agrupado por viaje/tipo/moneda)
-const findIssuedReceipt = async ({tripId, expenseId, type, isInternational}) => {
-  let query = supabase.from('Recibo').select('numero')
-  if (expenseId) {
-    query = query.eq('id_gasto', expenseId)
-  }
-  else {
-    query = query.eq('id_viaje', tripId).is('id_gasto', null).eq('tipo', type).eq('es_gasto_internacional', isInternational)
-  }
-  const {data} = await query.maybeSingle()
-  return data
-}
+// Los datos se escapan al entrar a cada plantilla (escapeDeep); aqui solo se normaliza el vacio
+const escapeHtml = (text) => text || ''
 
 // Devuelve el numero del recibo: si ya se emitio, reutiliza el mismo numero (un reenvio
 // no genera un recibo nuevo); si no, toma el siguiente correlativo y lo guarda.
@@ -63,7 +39,11 @@ const getReceiptNumber = async ({tripId, expenseId = null, type, isInternational
 };
 
 // Genera el HTML de un recibo agrupado por tipo de gasto
-const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isInternational, tripCode, motivo, supervisor) => {
+const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, type, isInternational, tripCode, rawMotivo, rawSupervisor) => {
+  const expenses = escapeDeep(rawExpenses)
+  const employee = escapeDeep(rawEmployee)
+  const motivo = escapeDeep(rawMotivo)
+  const supervisor = escapeDeep(rawSupervisor)
   const today = new Date()
   const day = today.getDate()
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -251,7 +231,11 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
 };
 
 // Genera el HTML de un recibo individual por un solo gasto
-const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripCode, motivo, supervisor) => {
+const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, tripCode, rawMotivo, rawSupervisor) => {
+  const expense = escapeDeep(rawExpense)
+  const employee = escapeDeep(rawEmployee)
+  const motivo = escapeDeep(rawMotivo)
+  const supervisor = escapeDeep(rawSupervisor)
   const today = new Date()
   const day = today.getDate()
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -506,7 +490,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
     internationalEmailSuffix = ' Internacional'
   }
   const emailHtml = emailService.buildEmailLayout(`${emailTitle}${internationalEmailSuffix}`, `
-    ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+    ${emailService.emailParagraph(`Hola <strong>${escapeText(employee.nombre)}</strong>,`)}
     ${emailService.emailParagraph(`Se adjunta el recibo consolidado de ${typeName.toLowerCase()}, con ${expenses.length} gasto(s) registrado(s).`)}
     ${emailService.emailHighlightBox('Recibo', `Nº ${receiptNumber}`)}
   `)
@@ -565,7 +549,7 @@ const sendIndividualReceipt = async (expenseId) => {
     emailTitle = 'Recibo de Pago de Servicio'
   }
   const emailHtml = emailService.buildEmailLayout(emailTitle, `
-    ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+    ${emailService.emailParagraph(`Hola <strong>${escapeText(employee.nombre)}</strong>,`)}
     ${emailService.emailParagraph('Se adjunta el recibo correspondiente al gasto registrado.')}
     ${emailService.emailHighlightBox('Recibo', `Nº ${receiptNumber}`)}
   `)

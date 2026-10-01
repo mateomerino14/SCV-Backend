@@ -1,11 +1,11 @@
 const supabase = require('../../config/supabase')
-const commentModerationService = require('../shared/commentModerationService')
 const emailService = require('../shared/emailService')
 const approvalMemoService = require('./approvalMemoService')
 const textNormalizer = require('../../utils/textNormalizer')
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
 const tripCodeUtil = require('../../utils/tripCode')
 const reviewLogService = require('./reviewLogService')
+const tripCommentService = require('../trip/tripCommentService')
 
 const memoPositions = [
   'Asistente Administrativo de Seguros y Servicios',
@@ -246,77 +246,9 @@ const rejectTrip = async (tripId, approverId) => {
   }
 };
 
-// Agrega un comentario de observacion a un viaje
-const addComment = async (tripId, userId, description) => {
-  if (!description?.trim()) {
-    return {error: 'La descripción es requerida', status: 400}
-  }
-  if (description.length > 300) {
-    return {error: 'El comentario no puede superar los 300 caracteres', status: 400}
-  }
-  if (commentModerationService.containsForbiddenWords(description)) {
-    return {error: 'El comentario contiene palabras inapropiadas', status: 400}
-  }
-  const {data: trip} = await supabase.from('Viaje').select('ciclo_revision').eq('id_viaje', tripId).single()
-  const {error} = await supabase.from('Comentario').insert({
-    descripcion: description.trim(),
-    fecha: new Date().toISOString(),
-    id_usuario: userId,
-    id_viaje: parseInt(tripId),
-    tipo: 'OBSERVACION',
-    ciclo_revision: trip?.ciclo_revision || 1,
-  })
-  if (error) {
-    return {error: error.message, status: 500}
-  }
-  else {
-    return {message: 'Comentario agregado correctamente'}
-  }
+module.exports = {
+  getPendingTrips, getMyTrips, getTripDetail, approveTrip, rejectTrip,
+  addComment: tripCommentService.addTripComment,
+  editComment: tripCommentService.editTripComment,
+  deleteComment: tripCommentService.deleteTripComment,
 };
-
-// Edita un comentario existente, verificando que pertenezca al usuario
-const editComment = async (tripId, commentId, userId, description) => {
-  if (!description?.trim()) {
-    return {error: 'La descripción es requerida', status: 400}
-  }
-  if (description.length > 300) {
-    return {error: 'El comentario no puede superar los 300 caracteres', status: 400}
-  }
-  if (commentModerationService.containsForbiddenWords(description)) {
-    return {error: 'El comentario contiene palabras inapropiadas', status: 400}
-  }
-  const {data: comment} = await supabase.from('Comentario').select('*').eq('id_comentario', commentId).eq('id_viaje', tripId).single()
-  if (!comment) {
-    return {error: 'Comentario no encontrado', status: 404}
-  }
-  if (comment.id_usuario !== userId) {
-    return {error: 'No tienes permiso para editar este comentario', status: 403}
-  }
-  const {error} = await supabase.from('Comentario').update({descripcion: description.trim()}).eq('id_comentario', commentId)
-  if (error) {
-    return {error: error.message, status: 500}
-  }
-  else {
-    return {message: 'Comentario editado correctamente'}
-  }
-};
-
-// Elimina un comentario existente, verificando que pertenezca al usuario
-const deleteComment = async (tripId, commentId, userId) => {
-  const {data: comment} = await supabase.from('Comentario').select('*').eq('id_comentario', commentId).eq('id_viaje', tripId).single()
-  if (!comment) {
-    return {error: 'Comentario no encontrado', status: 404}
-  }
-  if (comment.id_usuario !== userId) {
-    return {error: 'No tienes permiso para eliminar este comentario', status: 403}
-  }
-  const {error} = await supabase.from('Comentario').delete().eq('id_comentario', commentId)
-  if (error) {
-    return {error: error.message, status: 500}
-  }
-  else {
-    return {message: 'Comentario eliminado correctamente'}
-  }
-};
-
-module.exports = {getPendingTrips, getMyTrips, getTripDetail, approveTrip, rejectTrip, addComment, editComment, deleteComment};

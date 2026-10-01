@@ -4,6 +4,8 @@ const crypto = require('crypto')
 const userService = require('../../services/user/userService')
 const emailService = require('../../services/shared/emailService')
 const auditLogService = require('../../services/shared/auditLogService')
+const tokenService = require('../../services/user/tokenService')
+const {escapeHtml} = require('../../utils/htmlEscape')
 const saltRounds = 10
 
 // Genera una contrasenia temporal legible, sin caracteres ambiguos (0/O, 1/l/I)
@@ -52,10 +54,19 @@ const updateMe = async (req, res) => {
     fieldsToUpdate.telefono = telefono?.trim() || null
   }
   if (email_corporativo !== undefined) {
-    fieldsToUpdate.email_corporativo = email_corporativo
+    const email = String(email_corporativo || '').trim().toLowerCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 100) {
+      return res.status(400).json({error: 'El correo corporativo no es válido'})
+    }
+    const {data: emailOwner} = await supabase.from('Usuario').select('id_usuario').eq('email_corporativo', email).neq('id_usuario', userId).maybeSingle()
+    if (emailOwner) {
+      return res.status(400).json({error: 'Ese correo ya está registrado por otro usuario'})
+    }
+    fieldsToUpdate.email_corporativo = email
   }
-  if (foto_perfil !== undefined) {
-    fieldsToUpdate.foto_perfil = foto_perfil
+  // La foto se sube por /me/photo; aqui solo se permite quitarla (no poner una URL cualquiera)
+  if (foto_perfil === null || foto_perfil === '') {
+    fieldsToUpdate.foto_perfil = null
   }
   const {data, error} = await supabase
     .from('Usuario')
@@ -128,17 +139,25 @@ const changeMyPassword = async (req, res) => {
     return res.status(400).json({error: 'La nueva contraseña no puede ser igual a la actual'})
   }
   const newPasswordHash = bcrypt.hashSync(contrasenia_nueva, saltRounds)
-  const {error: updateError} = await supabase
+  const {data: updatedUser, error: updateError} = await supabase
     .from('Usuario')
-    .update({contrasenia: newPasswordHash, ultima_cambio_contrasenia: new Date().toISOString(), debe_cambiar_contrasenia: false})
+    .update({
+      contrasenia: newPasswordHash,
+      ultima_cambio_contrasenia: new Date().toISOString(),
+      debe_cambiar_contrasenia: false,
+      // Cierra las demas sesiones abiertas (por ejemplo, si alguien mas conocia la clave)
+      refresh_token_invalido_desde: new Date().toISOString(),
+    })
     .eq('id_usuario', userId)
+    .select('id_usuario, email_corporativo, id_rol')
+    .single()
   if (updateError) {
     return res.status(500).json({error: updateError.message})
   }
-  else {
-    await auditLogService.logAudit(userId, 'CAMBIO_CLAVE')
-    return res.json({message: 'Contraseña actualizada correctamente'})
-  }
+  await auditLogService.logAudit(userId, 'CAMBIO_CLAVE')
+  // Este dispositivo sigue conectado con una sesion nueva, emitida despues del cambio
+  res.cookie('refreshToken', tokenService.generateRefreshToken(updatedUser), tokenService.cookieOptions)
+  return res.json({message: 'Contraseña actualizada correctamente', token: tokenService.generateAccessToken(updatedUser, null)})
 };
 
 // Lista todos los usuarios
@@ -199,7 +218,7 @@ const updateUser = async (req, res) => {
       return res.status(400).json({error: positionError})
     }
   }
-  const roleChanged = currentUser && payload.id_rol && payload.id_rol !== currentUser.id_rol
+  const roleChanged = currentUser && payload.id_rol && parseInt(payload.id_rol) !== currentUser.id_rol
   const wasSuspended = currentUser && payload.activo === false && currentUser.activo === true
   if (roleChanged || wasSuspended) {
     payload.refresh_token_invalido_desde = new Date().toISOString()
@@ -248,7 +267,7 @@ const createUser = async (req, res) => {
     try {
       const loginUrl = process.env.FRONTEND_URL || 'https://scv-frontend.vercel.app'
       const emailBody = `
-        ${emailService.emailParagraph(`Hola <strong>${newUser.nombre}</strong>,`)}
+        ${emailService.emailParagraph(`Hola <strong>${escapeHtml(newUser.nombre)}</strong>,`)}
         ${emailService.emailParagraph('Se creó tu cuenta en el Sistema de Control de Viáticos. Estas son tus credenciales de acceso:')}
         ${emailService.emailInfoBox([{label: 'Correo', value: newUser.email_corporativo}])}
         ${emailService.emailHighlightBox('Contraseña temporal', temporaryPassword)}

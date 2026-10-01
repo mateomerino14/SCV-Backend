@@ -1,6 +1,7 @@
 const supabase = require('../../config/supabase')
 const pdfService = require('../shared/pdfService')
 const tripCodeUtil = require('../../utils/tripCode')
+const {escapeDeep} = require('../../utils/htmlEscape')
 
 const vatRate = 0.13
 
@@ -15,12 +16,8 @@ const symbologyRows = [
 ]
 
 // Escapa caracteres especiales de HTML para prevenir inyeccion
-const escapeHtml = (text) => {
-  return (text || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-}
+// Los datos se escapan al entrar a la plantilla (escapeDeep); aqui solo se normaliza el vacio
+const escapeHtml = (text) => text || ''
 
 // Extrae la cuenta contable de Oracle a partir del nombre de la categoria
 const extractOracleAccount = (categoryName) => {
@@ -133,7 +130,11 @@ const latestJustificationPerDay = (comments) => {
   })
 }
 
-const generateStatementHtml = (trip, expenses, dayJustifications) => {
+const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
+  // Datos escritos por usuarios: se escapan antes de armar el documento
+  const trip = escapeDeep(rawTrip)
+  const expenses = escapeDeep(rawExpenses)
+  const dayJustifications = escapeDeep(rawJustifications)
   const employee = trip.Usuario
   const responsable = `${employee?.nombre || ''} ${employee?.apellido_paterno || ''}`.trim().toUpperCase()
   const cargo = employee?.Cargo?.nombre?.toUpperCase() || ''
@@ -377,7 +378,12 @@ const generateStatementPdf = async (tripId) => {
   const dayJustifications = latestJustificationPerDay(comments || [])
   const html = generateStatementHtml(trip, expenses || [], dayJustifications)
   const pdfBuffer = await pdfService.generatePdf(html)
-  return {buffer: pdfBuffer, fileName: `Rendicion_${tripId}_${(trip.motivo || 'viaje').replace(/\s+/g, '_')}.pdf`}
+  // Nombre de archivo solo con letras, numeros, guiones y guion bajo (sin tildes ni comillas),
+  // porque la cabecera de descarga no admite otros caracteres
+  const safeReason = (trip.motivo || 'viaje')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'viaje'
+  return {buffer: pdfBuffer, fileName: `Rendicion_${tripId}_${safeReason}.pdf`}
 }
 
 module.exports = {generateStatementPdf}

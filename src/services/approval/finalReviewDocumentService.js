@@ -1,4 +1,5 @@
 const pdfService = require('../shared/pdfService')
+const {escapeDeep} = require('../../utils/htmlEscape')
 
 // Formatea una fecha ISO a formato dia/mes/anio
 const formatDate = (isoString) => {
@@ -36,7 +37,11 @@ const buildExpenseRow = (expense, isInternational) => {
 };
 
 // Genera el HTML de la rendicion final para tesoreria
-const generateRenditionHtml = (trip, reviewer, tripCode, expenses) => {
+const generateRenditionHtml = (rawTrip, rawReviewer, tripCode, rawExpenses) => {
+  // Datos escritos por usuarios: se escapan antes de armar el documento
+  const trip = escapeDeep(rawTrip)
+  const reviewer = escapeDeep(rawReviewer)
+  const expenses = escapeDeep(rawExpenses)
   const employee = trip.Usuario
   const today = new Date().toLocaleDateString('es-ES', {day: 'numeric', month: 'long', year: 'numeric'})
   const period = `${formatDate(trip.fecha_inicio)} al ${formatDate(trip.fecha_fin)}`
@@ -126,7 +131,8 @@ const generateRenditionHtml = (trip, reviewer, tripCode, expenses) => {
 };
 
 // Genera el HTML del resultado de la rendicion para el empleado
-const generateEmployeeResultHtml = (trip, tripCode, summary) => {
+const generateEmployeeResultHtml = (rawTrip, tripCode, summary) => {
+  const trip = escapeDeep(rawTrip)
   const employee = trip.Usuario
   let internationalBlock = ''
   if (summary.isInternational) {

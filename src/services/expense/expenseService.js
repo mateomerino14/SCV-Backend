@@ -50,6 +50,29 @@ const validateCurrencyByDay = (trip, expenseDate, isInternational) => {
   return null
 };
 
+// Valida tramos de moneda y subgastos antes de escribir nada, para no dejar un gasto a
+// medio guardar si algun dato viene incompleto
+const validateExpenseDetails = (expenseData, isInternational) => {
+  if (isInternational && Array.isArray(expenseData.tramos)) {
+    for (const segment of expenseData.tramos) {
+      if (!segment?.moneda || !String(segment.moneda).trim() || String(segment.moneda).trim().length > 10) {
+        return 'Cada conversión de moneda debe indicar la moneda de origen'
+      }
+      if (!(parseFloat(segment.monto_origen) > 0) || !(parseFloat(segment.tipo_cambio) > 0)) {
+        return 'Cada conversión de moneda debe tener un monto y un tipo de cambio mayores a cero'
+      }
+    }
+  }
+  if (Array.isArray(expenseData.subitems)) {
+    for (const item of expenseData.subitems) {
+      if (!item?.descripcion?.trim() || !(parseFloat(item.monto) > 0)) {
+        return 'Cada subgasto debe tener una descripción y un monto mayor a cero'
+      }
+    }
+  }
+  return null
+}
+
 // Crea un gasto nuevo, con sus tramos de moneda, subitems e imagen asociada
 const createExpense = async (expenseData, file, userId) => {
   if (!expenseData.id_viaje) {
@@ -66,6 +89,10 @@ const createExpense = async (expenseData, file, userId) => {
   }
   const usesSegments = isInternational && Array.isArray(expenseData.tramos) && expenseData.tramos.length > 0
   const usesSubItems = Array.isArray(expenseData.subitems) && expenseData.subitems.length > 0
+  const detailsError = validateExpenseDetails(expenseData, isInternational)
+  if (detailsError) {
+    return {error: detailsError, status: 400}
+  }
   let totalAmount = parseFloat(expenseData.monto_total)
   if (!isInternational && usesSubItems) {
     const subItemsAmount = calculateAmountFromSubitems(expenseData.subitems)
@@ -187,6 +214,10 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
   }
   const usesSegments = isInternational && Array.isArray(expenseData.tramos) && expenseData.tramos.length > 0
   const usesSubItems = Array.isArray(expenseData.subitems) && expenseData.subitems.length > 0
+  const detailsError = validateExpenseDetails(expenseData, isInternational)
+  if (detailsError) {
+    return {error: detailsError, status: 400}
+  }
   let totalAmount = parseFloat(expenseData.monto_total)
   if (!isInternational && usesSubItems) {
     const subItemsAmount = calculateAmountFromSubitems(expenseData.subitems)
@@ -234,6 +265,7 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
   if (expenseError) {
     return {error: expenseError.message, status: 500}
   }
+  const childError = 'El gasto se guardó, pero no se pudieron actualizar todos sus datos. Revísalo y vuelve a guardarlo.'
   if (isInternational) {
     await supabase.from('Gasto_Tramo_Moneda').delete().eq('id_gasto', expenseId)
     if (usesSegments) {
@@ -244,31 +276,41 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
         tipo_cambio: parseFloat(segment.tipo_cambio),
         monto_usd: parseFloat((parseFloat(segment.monto_origen) / parseFloat(segment.tipo_cambio)).toFixed(2)),
       }))
-      await supabase.from('Gasto_Tramo_Moneda').insert(segmentRows)
+      const {error: segmentsError} = await supabase.from('Gasto_Tramo_Moneda').insert(segmentRows)
+      if (segmentsError) {
+        return {error: childError, status: 500}
+      }
     }
   }
   await supabase.from('Gasto_Subitem').delete().eq('id_gasto', expenseId)
   if (usesSubItems) {
-    const subItemRows = expenseData.subitems
-      .filter((item) => item.descripcion?.trim() && parseFloat(item.monto) > 0)
-      .map((item) => ({
-        id_gasto: parseInt(expenseId),
-        descripcion: item.descripcion.trim(),
-        monto: parseFloat(item.monto),
-      }))
-    if (subItemRows.length > 0) {
-      await supabase.from('Gasto_Subitem').insert(subItemRows)
+    const subItemRows = expenseData.subitems.map((item) => ({
+      id_gasto: parseInt(expenseId),
+      descripcion: item.descripcion.trim(),
+      monto: parseFloat(item.monto),
+    }))
+    const {error: subItemsError} = await supabase.from('Gasto_Subitem').insert(subItemRows)
+    if (subItemsError) {
+      return {error: childError, status: 500}
     }
   }
   if (!expenseData.mantener_imagen) {
-    await supabase.from('Imagen').delete().eq('id_gasto', expenseId)
+    // El comprobante anterior solo se borra si el nuevo se subio bien
+    let newImageUrl = null
     if (file) {
       const fileExtension = file.originalname.split('.').pop()
       const fileName = `gastos/${expenseId}_${Date.now()}.${fileExtension}`
       const {error: storageError} = await supabase.storage.from('facturas').upload(fileName, file.buffer, {contentType: file.mimetype})
-      if (!storageError) {
-        const {data: urlData} = supabase.storage.from('facturas').getPublicUrl(fileName)
-        await supabase.from('Imagen').insert({url_archivo: urlData.publicUrl, id_gasto: expenseId})
+      if (storageError) {
+        return {error: 'No se pudo subir el comprobante. Intenta nuevamente.', status: 500}
+      }
+      newImageUrl = supabase.storage.from('facturas').getPublicUrl(fileName).data.publicUrl
+    }
+    await supabase.from('Imagen').delete().eq('id_gasto', expenseId)
+    if (newImageUrl) {
+      const {error: imageError} = await supabase.from('Imagen').insert({url_archivo: newImageUrl, id_gasto: expenseId})
+      if (imageError) {
+        return {error: childError, status: 500}
       }
     }
   }

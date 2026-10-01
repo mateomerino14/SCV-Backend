@@ -19,12 +19,16 @@ const detectTaxDocType = (taxId) => {
   }
 };
 
+// Escapa los comodines de ilike (% y _) para que el nombre se compare tal cual, sin
+// distinguir mayusculas: "%" no debe coincidir con cualquier proveedor
+const toExactNamePattern = (name) => String(name || '').trim().replace(/[\\%_]/g, (char) => `\\${char}`)
+
 // Busca un proveedor por nombre, o lo crea si no existe
 const findOrCreateSupplier = async (supplierName) => {
   if (!supplierName) {
     return null
   }
-  const {data: existingSupplier} = await supabase.from('Proveedor').select('id_proveedor').ilike('nombre', supplierName.trim()).limit(1).maybeSingle()
+  const {data: existingSupplier} = await supabase.from('Proveedor').select('id_proveedor').ilike('nombre', toExactNamePattern(supplierName)).limit(1).maybeSingle()
   if (existingSupplier) {
     return existingSupplier.id_proveedor
   }
@@ -45,4 +49,4 @@ const updateSupplierTaxId = async (supplierId, taxId) => {
     .eq('id_proveedor', supplierId)
 };
 
-module.exports = {detectTaxDocType, findOrCreateSupplier, updateSupplierTaxId};
+module.exports = {detectTaxDocType, findOrCreateSupplier, updateSupplierTaxId, toExactNamePattern};

@@ -5,6 +5,7 @@ const tripCommentService = require('../trip/tripCommentService')
 const tripCodeUtil = require('../../utils/tripCode')
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
 const reviewLogService = require('./reviewLogService')
+const {escapeHtml} = require('../../utils/htmlEscape')
 
 // Lista los viajes pendientes de aprobacion de fondos
 const getPendingTrips = async (treasurerId, filters) => {
@@ -159,7 +160,7 @@ const approveTrip = async (tripId, treasurerId, {selfStageSkip = false} = {}) =>
       const pdfBase64 = pdfBuffer.toString('base64')
       const attachments = [{content: pdfBase64, name: `Confirmacion_Fondo_${tripCode.replace('/', '-')}.pdf`}]
       const emailHtml = emailService.buildEmailLayout('Fondo aprobado', `
-        ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+        ${emailService.emailParagraph(`Hola <strong>${escapeHtml(employee.nombre)}</strong>,`)}
         ${emailService.emailParagraph(`El fondo para tu viaje <strong>${tripCode}</strong> fue aprobado. Ya puedes registrar tus gastos.`)}
         ${emailService.emailInfoBox([
           {label: 'Viaje', value: `${tripCode} — ${trip.motivo || ''}`},

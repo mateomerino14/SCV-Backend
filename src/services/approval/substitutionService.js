@@ -1,5 +1,6 @@
 const supabase = require('../../config/supabase')
 const emailService = require('../shared/emailService')
+const {escapeHtml} = require('../../utils/htmlEscape')
 
 // Obtiene los revisores activos con correo corporativo
 const getActiveReviewers = async () => {
@@ -98,7 +99,7 @@ const createRequest = async (tripId, requesterId, substituteId) => {
     const employeeName = `${trip.Usuario?.nombre} ${trip.Usuario?.apellido_paterno}`
     const substituteName = `${substitute.nombre} ${substitute.apellido_paterno}`
     const body = `
-      ${emailService.emailParagraph(`<strong>${employeeName}</strong> solicita que otra persona rinda los gastos de su viaje en su nombre.`)}
+      ${emailService.emailParagraph(`<strong>${escapeHtml(employeeName)}</strong> solicita que otra persona rinda los gastos de su viaje en su nombre.`)}
       ${emailService.emailInfoBox([
         {label: 'Viaje', value: trip.motivo},
         {label: 'Reemplazo propuesto', value: substituteName},
@@ -180,12 +181,18 @@ const approveRequest = async (requestId, reviewerId) => {
   if (request.estado !== 'PENDIENTE') {
     return {error: 'Esta solicitud ya fue procesada', status: 400}
   }
-  const {error} = await supabase
+  const {data: updatedRequests, error} = await supabase
     .from('Solicitud_Reemplazo')
     .update({estado: 'APROBADA', id_revisor: reviewerId, fecha_respuesta: new Date().toISOString()})
     .eq('id_solicitud', requestId)
+    .eq('estado', 'PENDIENTE')
+    .select('id_solicitud')
   if (error) {
     return {error: error.message, status: 500}
+  }
+  // Otra persona la resolvio entre la lectura y esta accion
+  if (!updatedRequests?.length) {
+    return {error: 'Esta solicitud ya fue procesada', status: 409}
   }
   try {
     const employee = request.Viaje?.Usuario
@@ -194,7 +201,7 @@ const approveRequest = async (requestId, reviewerId) => {
     const employeeName = `${employee?.nombre} ${employee?.apellido_paterno}`
     if (employee?.email_corporativo) {
       const body = `
-        ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+        ${emailService.emailParagraph(`Hola <strong>${escapeHtml(employee.nombre)}</strong>,`)}
         ${emailService.emailParagraph('Tu solicitud de reemplazo fue aprobada.')}
         ${emailService.emailInfoBox([
           {label: 'Viaje', value: request.Viaje?.motivo},
@@ -206,8 +213,8 @@ const approveRequest = async (requestId, reviewerId) => {
     }
     if (substitute?.email_corporativo) {
       const body = `
-        ${emailService.emailParagraph(`Hola <strong>${substitute.nombre}</strong>,`)}
-        ${emailService.emailParagraph(`Fuiste designado para rendir los gastos de un viaje de <strong>${employeeName}</strong>.`)}
+        ${emailService.emailParagraph(`Hola <strong>${escapeHtml(substitute.nombre)}</strong>,`)}
+        ${emailService.emailParagraph(`Fuiste designado para rendir los gastos de un viaje de <strong>${escapeHtml(employeeName)}</strong>.`)}
         ${emailService.emailInfoBox([
           {label: 'Viaje', value: request.Viaje?.motivo},
           {label: 'Titular', value: employeeName},
@@ -244,18 +251,24 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   if (request.estado !== 'PENDIENTE') {
     return {error: 'Esta solicitud ya fue procesada', status: 400}
   }
-  const {error} = await supabase
+  const {data: updatedRequests, error} = await supabase
     .from('Solicitud_Reemplazo')
     .update({estado: 'RECHAZADA', id_revisor: reviewerId, observacion_revisor: observation.trim(), fecha_respuesta: new Date().toISOString()})
     .eq('id_solicitud', requestId)
+    .eq('estado', 'PENDIENTE')
+    .select('id_solicitud')
   if (error) {
     return {error: error.message, status: 500}
+  }
+  // Otra persona la resolvio entre la lectura y esta accion
+  if (!updatedRequests?.length) {
+    return {error: 'Esta solicitud ya fue procesada', status: 409}
   }
   try {
     const employee = request.Viaje?.Usuario
     if (employee?.email_corporativo) {
       const body = `
-        ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+        ${emailService.emailParagraph(`Hola <strong>${escapeHtml(employee.nombre)}</strong>,`)}
         ${emailService.emailParagraph('Tu solicitud de reemplazo fue rechazada.')}
         ${emailService.emailInfoBox([{label: 'Viaje', value: request.Viaje?.motivo}])}
         ${emailService.emailHighlightBox('Motivo del rechazo', observation.trim())}

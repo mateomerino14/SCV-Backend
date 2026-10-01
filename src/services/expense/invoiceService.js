@@ -60,8 +60,8 @@ const validateInvoiceData = (invoiceData) => {
   if (!invoiceData.fecha_emision) {
     return 'La fecha de emisión es requerida'
   }
-  if (!invoiceData.monto_total || isNaN(parseFloat(invoiceData.monto_total))) {
-    return 'El monto total es requerido y debe ser un número válido'
+  if (!invoiceData.monto_total || isNaN(parseFloat(invoiceData.monto_total)) || parseFloat(invoiceData.monto_total) <= 0) {
+    return 'El monto total es requerido y debe ser mayor a cero'
   }
   if (!invoiceData.tipo_doc || !['F', 'R'].includes(invoiceData.tipo_doc)) {
     return 'El tipo de documento debe ser Factura (F) o Recibo (R)'
@@ -93,7 +93,7 @@ const saveInvoice = async (invoiceData, file, userId) => {
   const {data: existingSupplier} = await supabase
     .from('Proveedor')
     .select('id_proveedor')
-    .ilike('nombre', supplierName)
+    .ilike('nombre', supplierService.toExactNamePattern(supplierName))
     .limit(1)
     .maybeSingle()
   let supplierId = null
@@ -190,8 +190,8 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   if (!invoiceData.fecha_emision) {
     return {error: 'La fecha de emisión es requerida', status: 400}
   }
-  if (!invoiceData.monto_total || isNaN(parseFloat(invoiceData.monto_total))) {
-    return {error: 'El monto total es requerido', status: 400}
+  if (!invoiceData.monto_total || isNaN(parseFloat(invoiceData.monto_total)) || parseFloat(invoiceData.monto_total) <= 0) {
+    return {error: 'El monto total es requerido y debe ser mayor a cero', status: 400}
   }
   if (!Array.isArray(invoiceData.detalle) || invoiceData.detalle.length === 0) {
     return {error: 'Debes agregar al menos un producto al detalle de la factura', status: 400}
@@ -216,7 +216,7 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   const {data: existingSupplier} = await supabase
     .from('Proveedor')
     .select('id_proveedor')
-    .ilike('nombre', supplierName)
+    .ilike('nombre', supplierService.toExactNamePattern(supplierName))
     .limit(1)
     .maybeSingle()
   let supplierId = null

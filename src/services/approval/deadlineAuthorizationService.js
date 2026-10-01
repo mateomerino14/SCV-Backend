@@ -1,5 +1,6 @@
 const supabase = require('../../config/supabase')
 const emailService = require('../shared/emailService')
+const {escapeHtml} = require('../../utils/htmlEscape')
 
 const toleranceDays = 4
 const boliviaOffsetHours = -4
@@ -90,7 +91,7 @@ const createRequest = async (tripId, employeeId, reason) => {
     const to = reviewers.map((reviewer) => ({email: reviewer.email_corporativo, name: `${reviewer.nombre} ${reviewer.apellido_paterno}`}))
     const employeeName = `${trip.Usuario?.nombre} ${trip.Usuario?.apellido_paterno}`
     const body = `
-      ${emailService.emailParagraph(`<strong>${employeeName}</strong> solicita autorización para seguir registrando gastos fuera del plazo de tolerancia.`)}
+      ${emailService.emailParagraph(`<strong>${escapeHtml(employeeName)}</strong> solicita autorización para seguir registrando gastos fuera del plazo de tolerancia.`)}
       ${emailService.emailInfoBox([
         {label: 'Viaje', value: trip.motivo},
         {label: 'Motivo del retraso', value: reason.trim()},
@@ -180,12 +181,18 @@ const approveRequest = async (requestId, reviewerId) => {
     return {error: 'Esta solicitud ya fue procesada', status: 400}
   }
   const responseDate = new Date()
-  const {error} = await supabase
+  const {data: updatedRequests, error} = await supabase
     .from('Solicitud_Autorizacion_Plazo')
     .update({estado: 'APROBADA', id_revisor: reviewerId, fecha_respuesta: responseDate.toISOString()})
     .eq('id_solicitud', requestId)
+    .eq('estado', 'PENDIENTE')
+    .select('id_solicitud')
   if (error) {
     return {error: error.message, status: 500}
+  }
+  // Otra persona la resolvio entre la lectura y esta accion
+  if (!updatedRequests?.length) {
+    return {error: 'Esta solicitud ya fue procesada', status: 409}
   }
   try {
     const employee = request.Viaje?.Usuario
@@ -194,7 +201,7 @@ const approveRequest = async (requestId, reviewerId) => {
       const startDateStr = formatDate(approvalDate)
       const limitStr = formatDate(addDaysToDate(approvalDate, toleranceDays))
       const body = `
-        ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+        ${emailService.emailParagraph(`Hola <strong>${escapeHtml(employee.nombre)}</strong>,`)}
         ${emailService.emailParagraph('Tu solicitud para seguir registrando gastos fuera del plazo fue aprobada.')}
         ${emailService.emailInfoBox([{label: 'Viaje', value: request.Viaje?.motivo}])}
         ${emailService.emailHighlightBox('Nuevo plazo para registrar', `${startDateStr} — ${limitStr}`)}
@@ -230,18 +237,24 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   if (request.estado !== 'PENDIENTE') {
     return {error: 'Esta solicitud ya fue procesada', status: 400}
   }
-  const {error} = await supabase
+  const {data: updatedRequests, error} = await supabase
     .from('Solicitud_Autorizacion_Plazo')
     .update({estado: 'RECHAZADA', id_revisor: reviewerId, observacion_revisor: observation.trim(), fecha_respuesta: new Date().toISOString()})
     .eq('id_solicitud', requestId)
+    .eq('estado', 'PENDIENTE')
+    .select('id_solicitud')
   if (error) {
     return {error: error.message, status: 500}
+  }
+  // Otra persona la resolvio entre la lectura y esta accion
+  if (!updatedRequests?.length) {
+    return {error: 'Esta solicitud ya fue procesada', status: 409}
   }
   try {
     const employee = request.Viaje?.Usuario
     if (employee?.email_corporativo) {
       const body = `
-        ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+        ${emailService.emailParagraph(`Hola <strong>${escapeHtml(employee.nombre)}</strong>,`)}
         ${emailService.emailParagraph('Tu solicitud de autorización de plazo fue rechazada.')}
         ${emailService.emailInfoBox([{label: 'Viaje', value: request.Viaje?.motivo}])}
         ${emailService.emailHighlightBox('Motivo del rechazo', observation.trim())}

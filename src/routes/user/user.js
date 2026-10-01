@@ -1,5 +1,6 @@
 const express = require('express')
 const router = express.Router()
+const {sendCodeRateLimiter} = require('../../middlewares/passwordResetRateLimiter')
 const multer = require('multer')
 const authMiddleware = require('../../middlewares/auth')
 const roleMiddleware = require('../../middlewares/roleAuth')
@@ -25,7 +26,8 @@ router.get('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userControlle
 router.put('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.updateUser)
 router.post('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.createUser)
 router.delete('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.deleteUser)
-router.post('/check-email', userController.checkEmail)
+// Sin sesion (se usa en la recuperacion de contrasena): con el mismo limite que el envio de codigos
+router.post('/check-email', sendCodeRateLimiter, userController.checkEmail)
 router.get('/employees', authMiddleware, roleMiddleware(['SUPERVISOR', 'ADMINISTRADOR', 'REVISOR', 'APROBADOR', 'EMPLEADO']), userController.getEmployees)
 router.get('/all', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.getAllUsersDetailed)
 router.patch('/:id/activate', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.activateUser)

@@ -1,4 +1,5 @@
 const pdfService = require('../shared/pdfService')
+const {escapeDeep} = require('../../utils/htmlEscape')
 
 // Formatea una fecha ISO a formato dia/mes/anio
 const formatDate = (isoString) => {
@@ -7,7 +8,10 @@ const formatDate = (isoString) => {
 };
 
 // Genera el HTML del memorandum de aprobacion de un viaje
-const generateMemoHtml = (trip, approver, tripCode) => {
+const generateMemoHtml = (rawTrip, rawApprover, tripCode) => {
+  // Datos escritos por usuarios: se escapan antes de armar el documento
+  const trip = escapeDeep(rawTrip)
+  const approver = escapeDeep(rawApprover)
   const employee = trip.Usuario
   const today = new Date().toLocaleDateString('es-ES', {day: 'numeric', month: 'long', year: 'numeric'})
   const period = `${formatDate(trip.fecha_inicio)} al ${formatDate(trip.fecha_fin)}`

@@ -7,6 +7,7 @@ const finalReviewDocumentService = require('./finalReviewDocumentService')
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
 const tripCodeUtil = require('../../utils/tripCode')
 const reviewLogService = require('./reviewLogService')
+const {escapeHtml} = require('../../utils/htmlEscape')
 
 // Anexa el resumen de gastos y alertas a una lista de viajes
 const attachSummaryToTrips = (trips) => {
@@ -183,7 +184,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
     bodyText = 'Se te reembolsará el saldo excedido.'
   }
   const emailHtml = emailService.buildEmailLayout('Tu rendición fue aprobada', `
-    ${emailService.emailParagraph(`Hola <strong>${employee.nombre}</strong>,`)}
+    ${emailService.emailParagraph(`Hola <strong>${escapeHtml(employee.nombre)}</strong>,`)}
     ${emailService.emailParagraph(`La rendición de gastos del viaje <strong>${tripCode}</strong> fue aprobada de forma definitiva.`)}
     ${emailService.emailHighlightBox('Resultado', bodyText)}
     ${emailService.emailNote('Revisa el detalle en el documento adjunto.')}
