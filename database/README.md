@@ -37,6 +37,7 @@ Si tu base es anterior, aplica estos cambios (ya incluidos en `01_schema.sql` y 
 
 | Script | Uso |
 |---|---|
+| `testing_00_borrar_todo.sql` | Borra las 23 tablas (estructura y datos) para volver a crear la base desde cero con `01` a `04`. No se puede deshacer |
 | `testing_01_limpieza_completa.sql` | Borra usuarios, viajes, gastos, facturas y solicitudes. No toca los catalogos (Rol, Cargo, Seccion, Categoria_Gasto, Impuesto) |
 | `testing_02_organizacion_prueba.sql` | Carga una organizacion de prueba completa con jerarquia de jefe directo, lista para probar el flujo de revision. Contrasenia de todos los usuarios: `Prueba1234` |
 
@@ -53,7 +54,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Usuario | Usuarios del sistema |
 | Codigo_Verificacion | Codigos temporales de verificacion por correo |
 | Viaje | Viajes registrados, con su flujo de estados y revisores asignados |
-| Solicitud_Autorizacion_Plazo | Solicitudes de extension de plazo para seguir registrando gastos |
+| Solicitud_Autorizacion_Plazo | Solicitudes de extension de plazo para seguir registrando gastos; las puede pedir el titular o su reemplazo (`id_empleado` es quien la pidio) |
 | Categoria_Gasto | Categorias de gasto con su cuenta contable de Oracle |
 | Proveedor | Proveedores/emisores de facturas |
 | Gasto | Gastos individuales de un viaje, con sus retenciones impositivas |
@@ -70,6 +71,10 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Recibo | Numero asignado a cada recibo emitido (individual o agrupado), para reutilizarlo al reenviarlo |
 | Revision_Viaje | Quien aprobo o rechazo cada viaje, en que etapa y cuando (historial de revision de cada revisor) |
 | Solicitud_Reemplazo | Solicitudes para que un tercero rinda los gastos de un viaje en nombre de otro empleado |
+
+## Estados de las solicitudes
+
+`Solicitud_Autorizacion_Plazo` y `Solicitud_Reemplazo` usan `PENDIENTE`, `APROBADA` o `RECHAZADA`. Si el viaje se envía a revisión mientras una solicitud sigue pendiente, el sistema la cierra sola: queda `RECHAZADA` **sin** `id_revisor` y con el motivo del cierre en `observacion_revisor`. Así se distingue de un rechazo hecho por el revisor, y la aplicación la muestra como "Cerrada".
 
 ## Flujo de estados de Viaje
 

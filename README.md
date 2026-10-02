@@ -51,6 +51,7 @@ En Render el servidor confía en el proxy de la plataforma (`trust proxy`) para 
 ```bash
 npm run dev    # con recarga automática (nodemon)
 npm start      # producción
+npm test       # pruebas automáticas (Jest, carpeta tests/)
 ```
 
 Al arrancar, se programa además una tarea (`node-cron`) que envía un resumen de pendientes a supervisores, aprobadores, revisor y tesorero tres veces al día (08:00, 12:00 y 16:00, hora Bolivia), solo a quienes tengan algo pendiente. Cada supervisor recibe solo sus propios pendientes: los que tiene asignados y los sin asignar que le corresponden por jerarquía. Al revisor también se le incluyen las solicitudes de ampliación de plazo y de reemplazo pendientes. La hora se calcula siempre en `America/La_Paz`, aunque el servidor esté en otra zona horaria; si el envío a una persona falla, igual se envía a las demás.
@@ -276,11 +277,13 @@ src/
 │   ├── forbiddenWords.js     Catálogo de términos vedados
 │   ├── htmlEscape.js         Escape de textos de usuario en correos y PDF
 │   ├── numberToWords.js      Importes en letras
+│   ├── requestData.js        Lectura segura de los datos enviados en formularios con archivo
 │   ├── textNormalizer.js     Normalización para comparaciones
 │   └── tripCode.js           Código legible de cada viaje
-├── app.js                    Configuración de Express
+├── app.js                    Configuración de Express (seguridad, CORS, rutas)
 └── index.js                  Arranque del servidor y del cron de resúmenes
 
+scripts/sendDigest.js         Envío manual del resumen de pendientes (npm run resumen)
 database/                     Scripts SQL del esquema (ver su README.md)
 ```
 
@@ -382,7 +385,7 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 | `geminiService` | Llamadas al modelo con reintentos y modelo de respaldo ante cuota agotada |
 | `commentModerationService` | Verifica que el texto no contenga términos prohibidos |
 | `auditLogService` | Registra ingresos, salidas y cambios de contraseña |
-| `dailyDigestService` | Arma y envía el resumen de pendientes por rol, tres veces al día |
+| `dailyDigestService` | Arma y envía el resumen de pendientes por rol, tres veces al día (cada supervisor con lo suyo; el revisor también con las solicitudes de plazo y reemplazo) |
 | `emailService` | Correo transaccional mediante Brevo, con plantilla institucional común (`buildEmailLayout`) |
 | `pdfService` | Conversión de HTML a PDF con Puppeteer |
 | `expenseSummaryService` | Control de gasto diario, exceso en hoteles y alertas; usado por empleado y revisores por igual |
@@ -404,7 +407,7 @@ El presupuesto se controla día por día, no contra el total del viaje: cada dí
 
 ### Gestión de plazos
 
-Se conceden cuatro días de tolerancia tras la finalización del viaje. Vencido ese margen, el empleado debe solicitar autorización al revisor, que otorga cuatro días adicionales desde la fecha de respuesta. El plazo no corre mientras el viaje está rechazado: el empleado puede corregir sus gastos sin pedir autorización.
+Se conceden cuatro días de tolerancia tras la finalización del viaje. Vencido ese margen, el empleado debe solicitar autorización al revisor, que otorga cuatro días adicionales desde la fecha de respuesta. El plazo no corre mientras el viaje está rechazado: el empleado puede corregir sus gastos sin pedir autorización. El plazo es del viaje: la extensión vale para el titular y para su reemplazo aprobado, y cualquiera de los dos puede pedirla; la respuesta se avisa a ambos. Una solicitud que queda pendiente cuando el viaje se envía a revisión se cierra sola (estado `RECHAZADA` sin revisor, con el motivo del cierre).
 
 La extensión amplía el margen para **cargar** los gastos, no el rango de fechas admisibles: la fecha del gasto debe seguir perteneciendo al período del viaje.
 
