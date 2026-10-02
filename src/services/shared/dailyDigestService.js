@@ -17,13 +17,15 @@ const getActiveUsersByRole = async (roleName) => {
 
 // Cuenta cuantos viajes esperan cada tipo de revision
 const getPendingCounts = async () => {
-  const [tripReviews, expenseReviews, approverReviews, alcoholReviews, reviewerReviews, treasurerReviews] = await Promise.all([
+  const [tripReviews, expenseReviews, approverReviews, alcoholReviews, reviewerReviews, treasurerReviews, deadlineRequests, substitutionRequests] = await Promise.all([
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION_VIAJE').is('id_supervisor_asignado', null),
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION').is('id_supervisor_asignado', null),
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'APROBADO_VIAJE'),
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION_APROBADOR'),
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'APROBADO_SUPERVISOR'),
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION_TESORERO'),
+    supabase.from('Solicitud_Autorizacion_Plazo').select('id_solicitud', {count: 'exact', head: true}).eq('estado', 'PENDIENTE'),
+    supabase.from('Solicitud_Reemplazo').select('id_solicitud', {count: 'exact', head: true}).eq('estado', 'PENDIENTE'),
   ])
   return {
     pendingTripReviews: tripReviews.count || 0,
@@ -32,6 +34,8 @@ const getPendingCounts = async () => {
     pendingAlcoholReviews: alcoholReviews.count || 0,
     pendingReviewerReviews: reviewerReviews.count || 0,
     pendingTreasurerReviews: treasurerReviews.count || 0,
+    pendingDeadlineRequests: deadlineRequests.count || 0,
+    pendingSubstitutionRequests: substitutionRequests.count || 0,
   }
 }
 
@@ -50,6 +54,9 @@ const getSupervisorPendingCounts = async (supervisorId) => {
   }
 }
 
+// "1 viaje esperando" / "3 viajes esperando"
+const countLine = (count, singular, plural, rest) => `${count} ${count === 1 ? singular : plural} ${rest}`
+
 // Arma y envia el correo resumen a un grupo de usuarios con un rol
 const sendDigestToGroup = async (users, title, bodyLines) => {
   if (users.length === 0 || bodyLines.length === 0) {
@@ -67,11 +74,17 @@ const sendDigestToGroup = async (users, title, bodyLines) => {
     ${emailService.emailButton()}
   `
   const html = emailService.buildEmailLayout(title, body)
-  await Promise.all(users.map((user) => emailService.sendEmail(
+  // Si falla el envio a una persona, igual se envia a las demas
+  const results = await Promise.allSettled(users.map((user) => emailService.sendEmail(
     [{email: user.email_corporativo, name: `${user.nombre} ${user.apellido_paterno}`}],
     title,
     html
   )))
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      console.warn(`No se pudo enviar el resumen a ${users[index].email_corporativo}:`, result.reason?.message)
+    }
+  })
 }
 
 // Envia el resumen diario de pendientes a supervisores, aprobadores, revisores y tesoreros
@@ -86,10 +99,10 @@ const sendDailyDigest = async () => {
       const supervisorCounts = await getSupervisorPendingCounts(supervisor.id_usuario)
       const supervisorLines = []
       if (supervisorCounts.tripReviews > 0) {
-        supervisorLines.push(`${supervisorCounts.tripReviews} viaje(s) esperando tu revisión previa.`)
+        supervisorLines.push(countLine(supervisorCounts.tripReviews, 'viaje espera', 'viajes esperan', 'tu revisión previa.'))
       }
       if (supervisorCounts.expenseReviews > 0) {
-        supervisorLines.push(`${supervisorCounts.expenseReviews} rendición(es) de gastos esperando tu revisión.`)
+        supervisorLines.push(countLine(supervisorCounts.expenseReviews, 'rendición de gastos espera', 'rendiciones de gastos esperan', 'tu revisión.'))
       }
       await sendDigestToGroup([supervisor], 'Resumen de Pendientes — Supervisión', supervisorLines)
     }
@@ -97,17 +110,23 @@ const sendDailyDigest = async () => {
     const approvers = await getActiveUsersByRole('APROBADOR')
     const approverLines = []
     if (counts.pendingApproverReviews > 0) {
-      approverLines.push(`${counts.pendingApproverReviews} viaje(s) esperando tu aprobación previa a tesorería.`)
+      approverLines.push(countLine(counts.pendingApproverReviews, 'viaje espera', 'viajes esperan', 'tu aprobación antes de pasar a tesorería.'))
     }
     if (counts.pendingAlcoholReviews > 0) {
-      approverLines.push(`${counts.pendingAlcoholReviews} rendición(es) con alcohol esperando tu revisión adicional.`)
+      approverLines.push(countLine(counts.pendingAlcoholReviews, 'rendición con alcohol espera', 'rendiciones con alcohol esperan', 'tu revisión adicional.'))
     }
     await sendDigestToGroup(approvers, 'Resumen de Pendientes — Aprobación', approverLines)
 
     const reviewers = await getActiveUsersByRole('REVISOR')
     const reviewerLines = []
     if (counts.pendingReviewerReviews > 0) {
-      reviewerLines.push(`${counts.pendingReviewerReviews} rendición(es) esperando tu revisión final.`)
+      reviewerLines.push(countLine(counts.pendingReviewerReviews, 'rendición espera', 'rendiciones esperan', 'tu revisión final.'))
+    }
+    if (counts.pendingDeadlineRequests > 0) {
+      reviewerLines.push(countLine(counts.pendingDeadlineRequests, 'solicitud de ampliación de plazo espera', 'solicitudes de ampliación de plazo esperan', 'tu respuesta.'))
+    }
+    if (counts.pendingSubstitutionRequests > 0) {
+      reviewerLines.push(countLine(counts.pendingSubstitutionRequests, 'solicitud de reemplazo espera', 'solicitudes de reemplazo esperan', 'tu respuesta.'))
     }
     await sendDigestToGroup(reviewers, 'Resumen de Pendientes — Revisión Final', reviewerLines)
 
@@ -115,7 +134,7 @@ const sendDailyDigest = async () => {
     const treasurers = userDirectoryService.getUsersByPositionName(activeUsers, userDirectoryService.treasurerPositionName)
     const treasurerLines = []
     if (counts.pendingTreasurerReviews > 0) {
-      treasurerLines.push(`${counts.pendingTreasurerReviews} viaje(s) esperando la asignación de fondos.`)
+      treasurerLines.push(countLine(counts.pendingTreasurerReviews, 'viaje espera', 'viajes esperan', 'la asignación de fondos.'))
     }
     await sendDigestToGroup(treasurers, 'Resumen de Pendientes — Tesorería', treasurerLines)
   }
