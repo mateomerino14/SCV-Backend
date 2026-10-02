@@ -54,9 +54,11 @@ npm start      # producción
 npm test       # pruebas automáticas (Jest, carpeta tests/)
 ```
 
-Al arrancar, se programa además una tarea (`node-cron`) que envía un resumen de pendientes a supervisores, aprobadores, revisor y tesorero tres veces al día (08:00, 12:00 y 16:00, hora Bolivia) de lunes a viernes, solo a quienes tengan algo pendiente. Cada supervisor recibe solo sus propios pendientes: los que tiene asignados y los sin asignar que le corresponden por jerarquía. Al revisor también se le incluyen las solicitudes de ampliación de plazo y de reemplazo pendientes. La hora se calcula siempre en `America/La_Paz`, aunque el servidor esté en otra zona horaria; si el envío a una persona falla, igual se envía a las demás.
+Al arrancar, el servidor programa (`node-cron`) el **resumen de pendientes**: un correo para supervisores, aprobadores, revisor y tesorero, solo a quienes tengan algo pendiente. Cada supervisor recibe solo sus propios pendientes (los asignados y los sin asignar que le corresponden por jerarquía), y al revisor se le incluyen las solicitudes de ampliación de plazo y de reemplazo. Si el envío a una persona falla, igual se envía a las demás.
 
-Para enviarlo en el momento, sin esperar la hora (con el mismo `.env` del servidor):
+**Los días y las horas los elige el administrador** en la pantalla *Recordatorios* (tabla `Configuracion_Recordatorio`): puede activarlos o desactivarlos, marcar los días de la semana y fijar hasta 4 horas por día. Al guardar, los envíos se reprograman en el momento, sin reiniciar el servidor. La configuración de fábrica es de lunes a viernes a las 08:00, 12:00 y 16:00. Las horas se calculan siempre en `America/La_Paz`, aunque el servidor esté en otra zona horaria.
+
+Para enviarlo en el momento hay dos formas: los botones *Vista Previa* y *Enviar Ahora* de esa misma pantalla, o el comando (con el mismo `.env` del servidor):
 
 ```bash
 npm run resumen -- --prueba   # solo muestra a quién le llegaría y qué diría, sin enviar
@@ -183,7 +185,7 @@ Si la versión trae cambios de base de datos, aplicarlos antes en Supabase (ver 
 | Axios | Verificación de correos con AbstractAPI |
 | Google Generative AI | Extracción de datos de comprobantes y detección de alcohol |
 | Puppeteer | Generación de PDF (memorándum, confirmación de fondos, rendición, planilla y recibos) |
-| node-cron | Resumen de pendientes por correo, tres veces al día de lunes a viernes |
+| node-cron | Resumen de pendientes por correo en los días y horas que configura el administrador |
 | Brevo | Correo transaccional |
 | Helmet + CORS | Cabeceras de seguridad y control de orígenes |
 | express-rate-limit | Límite de intentos de acceso, recuperación de contraseña y extracción de facturas |
@@ -263,7 +265,8 @@ src/
 │   └── shared/                alcoholDetectionService, auditLogService,
 │                              commentModerationService, dailyDigestService,
 │                              deadlineService, emailService, geminiService,
-│                              hierarchyAssignmentService, pdfService
+│                              hierarchyAssignmentService, pdfService,
+│                              reminderScheduleService
 ├── middlewares/
 │   ├── auth.js                     Token, cuenta activa, rol vigente, sesión invalidada
 │   │                               y cambio de contraseña pendiente
@@ -280,7 +283,7 @@ src/
 │   ├── textNormalizer.js     Normalización para comparaciones
 │   └── tripCode.js           Código legible de cada viaje
 ├── app.js                    Configuración de Express (seguridad, CORS, rutas)
-└── index.js                  Arranque del servidor y del cron de resúmenes
+└── index.js                  Arranque del servidor y programación del resumen de pendientes
 
 scripts/sendDigest.js         Envío manual del resumen de pendientes (npm run resumen)
 database/                     Scripts SQL del esquema (ver su README.md)
@@ -303,7 +306,7 @@ database/                     Scripts SQL del esquema (ver su README.md)
 | `/deadline-authorization` | `approval/deadlineAuthorization.js` | Extensiones de plazo |
 | `/substitution` | `approval/substitution.js` | Rendición por terceros |
 | `/role`, `/position`, `/section`, `/expense-category`, `/tax`, `/audit` | `catalog/` | Catálogos e historial de accesos |
-| `/admin` | `admin/admin.js` | Resumen general del administrador |
+| `/admin` | `admin/admin.js` | Resumen general del administrador y configuración de recordatorios |
 
 Las imágenes de comprobantes y los productos de cada factura no tienen rutas propias: se gestionan solo a través de `/expense` y `/invoice`, que verifican dueño, etapa y plazo.
 
@@ -384,7 +387,8 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 | `geminiService` | Llamadas al modelo con reintentos y modelo de respaldo ante cuota agotada |
 | `commentModerationService` | Verifica que el texto no contenga términos prohibidos |
 | `auditLogService` | Registra ingresos, salidas y cambios de contraseña |
-| `dailyDigestService` | Arma y envía el resumen de pendientes por rol, tres veces al día de lunes a viernes (cada supervisor con lo suyo; el revisor también con las solicitudes de plazo y reemplazo) |
+| `dailyDigestService` | Arma y envía el resumen de pendientes por rol (cada supervisor con lo suyo; el revisor también con las solicitudes de plazo y reemplazo); en modo prueba solo devuelve a quién le llegaría |
+| `reminderScheduleService` | Guarda los días y horas del resumen, lo reprograma sin reiniciar y permite enviarlo en el momento |
 | `emailService` | Correo transaccional mediante Brevo, con plantilla institucional común (`buildEmailLayout`) |
 | `pdfService` | Conversión de HTML a PDF con Puppeteer |
 | `expenseSummaryService` | Control de gasto diario, exceso en hoteles y alertas; usado por empleado y revisores por igual |

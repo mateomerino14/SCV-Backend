@@ -31,3 +31,7 @@ truncate table
 restart identity cascade;
 
 update "Correlativo_Recibo" set numero = 0;
+
+-- La limpieza de usuarios borra en cascada la configuracion de recordatorios: se repone la de fabrica
+insert into "Configuracion_Recordatorio" (id) values (1)
+on conflict (id) do nothing;

@@ -45,3 +45,7 @@ on conflict (nombre) do nothing;
 update "Categoria_Gasto"
 set requiere_comprobante = false
 where nombre = '626010 TAXIS (VIAJE)';
+
+-- Recordatorios: de lunes a viernes a las 08:00, 12:00 y 16:00 (hora Bolivia)
+insert into "Configuracion_Recordatorio" (id) values (1)
+on conflict (id) do nothing;

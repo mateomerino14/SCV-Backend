@@ -4,9 +4,9 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 
 ## Orden de ejecucion
 
-1. `01_schema.sql` - crea las 23 tablas, relaciones e indices
+1. `01_schema.sql` - crea las 24 tablas, relaciones e indices
 2. `02_functions.sql` - crea la funcion `incrementar_correlativo_recibo()`, usada por el backend para numerar recibos
-3. `03_seed.sql` - datos iniciales: roles, cargos, impuesto de IVA y categorias de gasto
+3. `03_seed.sql` - datos iniciales: roles, cargos, impuesto de IVA, categorias de gasto y la configuracion de recordatorios por defecto
 4. `04_rls_hardening.sql` - activa seguridad por fila (RLS) en todas las tablas
 
 Estos cuatro archivos reflejan siempre el estado final y completo del esquema: alcanza con correrlos en orden para levantar una base nueva desde cero, sin necesidad de aplicar ningun cambio adicional despues.
@@ -19,7 +19,7 @@ Estos cuatro archivos reflejan siempre el estado final y completo del esquema: a
 
 ## Si ya tenes una base de datos existente
 
-Si tu base ya tiene datos cargados con una version anterior del esquema, **no vuelvas a correr `01_schema.sql`**: en su lugar, compara tu esquema actual contra este archivo y aplica manualmente (`alter table`, etc.) las columnas o tablas que te falten. Los scripts de migracion incremental que se usaron durante el desarrollo ya se incorporaron a estos cuatro archivos y no se conservan por separado, para no acumular decenas de archivos con el tiempo. La excepcion es `05_cambios_recientes.sql`, que agrupa los ultimos cambios para bases existentes; una base nueva no lo necesita.
+Si tu base ya tiene datos cargados con una version anterior del esquema, **no vuelvas a correr `01_schema.sql`**: en su lugar, compara tu esquema actual contra este archivo y aplica manualmente (`alter table`, etc.) las columnas o tablas que te falten. Los scripts de migracion incremental que se usaron durante el desarrollo ya se incorporaron a estos cuatro archivos y no se conservan por separado, para no acumular decenas de archivos con el tiempo. Las excepciones son `05_cambios_recientes.sql` y `06_configuracion_recordatorios.sql`, que agrupan los ultimos cambios para bases existentes; una base nueva no los necesita.
 
 ## Cambios recientes para bases existentes
 
@@ -32,13 +32,14 @@ Si tu base es anterior, aplica estos cambios (ya incluidos en `01_schema.sql` y 
   - Relación `Comentario.id_gasto` con `on delete set null`.
   - `Gasto.moneda` con valor por defecto `BOB`.
   - Corrección de datos: facturas y recibos guardados con costo en 0 y gastos en bolivianos marcados como USD.
+- `06_configuracion_recordatorios.sql` (se puede correr más de una vez): tabla `Configuracion_Recordatorio` con su fila por defecto (lunes a viernes, 08:00, 12:00 y 16:00) y RLS activado.
 
 ## Scripts de prueba
 
 | Script | Uso |
 |---|---|
-| `testing_00_borrar_todo.sql` | Borra las 23 tablas (estructura y datos) para volver a crear la base desde cero con `01` a `04`. No se puede deshacer |
-| `testing_01_limpieza_completa.sql` | Borra usuarios, viajes, gastos, facturas y solicitudes. No toca los catalogos (Rol, Cargo, Seccion, Categoria_Gasto, Impuesto) |
+| `testing_00_borrar_todo.sql` | Borra las 24 tablas (estructura y datos) para volver a crear la base desde cero con `01` a `04`. No se puede deshacer |
+| `testing_01_limpieza_completa.sql` | Borra usuarios, viajes, gastos, facturas y solicitudes. No toca los catalogos (Rol, Cargo, Seccion, Categoria_Gasto, Impuesto) y repone la configuracion de recordatorios por defecto |
 | `testing_02_organizacion_prueba.sql` | Carga una organizacion de prueba completa con jerarquia de jefe directo, lista para probar el flujo de revision. Contrasenia de todos los usuarios: `Prueba1234` |
 
 Solo para entornos de prueba, nunca correr en produccion.
@@ -71,6 +72,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Recibo | Numero asignado a cada recibo emitido (individual o agrupado), para reutilizarlo al reenviarlo |
 | Revision_Viaje | Quien aprobo o rechazo cada viaje, en que etapa y cuando (historial de revision de cada revisor) |
 | Solicitud_Reemplazo | Solicitudes para que un tercero rinda los gastos de un viaje en nombre de otro empleado |
+| Configuracion_Recordatorio | Una sola fila con los dias (`0` domingo a `6` sabado) y horas (`HH:MM`, hora Bolivia) del resumen de pendientes, si esta activo y quien lo cambio por ultima vez |
 
 ## Estados de las solicitudes
 
@@ -131,7 +133,7 @@ Contar las tablas creadas:
 select count(*) from information_schema.tables where table_schema = 'public';
 ```
 
-Debe devolver 23.
+Debe devolver 24.
 
 Comprobar que las columnas temporales quedaron bien tipadas:
 
@@ -142,7 +144,7 @@ where table_schema = 'public' and data_type like 'timestamp%'
 order by table_name, column_name;
 ```
 
-Las once filas deben indicar `timestamp with time zone`.
+Las doce filas deben indicar `timestamp with time zone`.
 
 ## Variables de entorno necesarias
 

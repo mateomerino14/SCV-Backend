@@ -329,3 +329,18 @@ create table if not exists "Solicitud_Reemplazo" (
 create index if not exists idx_reemplazo_id_viaje on "Solicitud_Reemplazo"(id_viaje);
 create index if not exists idx_reemplazo_id_sustituto on "Solicitud_Reemplazo"(id_sustituto);
 create index if not exists idx_reemplazo_estado on "Solicitud_Reemplazo"(estado);
+
+-- ------------------------------------------------------------
+-- Configuracion del resumen de pendientes (una sola fila)
+-- ------------------------------------------------------------
+-- Dias (0 = domingo ... 6 = sabado) y horas (HH:MM, hora Bolivia) en que se envia
+-- el resumen de pendientes. La edita el administrador desde la pantalla Recordatorios.
+
+create table if not exists "Configuracion_Recordatorio" (
+  id smallint primary key default 1 check (id = 1),
+  activo boolean not null default true,
+  dias smallint[] not null default '{1,2,3,4,5}',
+  horas text[] not null default '{08:00,12:00,16:00}',
+  fecha_actualizacion timestamptz not null default now(),
+  id_usuario_actualizacion integer references "Usuario"(id_usuario) on delete set null
+);

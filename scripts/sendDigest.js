@@ -1,31 +1,12 @@
-// Envia ahora el resumen de pendientes, sin esperar a las 08:00, 12:00 o 16:00.
-//   npm run resumen           envia los correos de verdad
-//   npm run resumen -- --prueba   solo muestra en la consola a quien le llegaria y que diria
+// Envia ahora el resumen de pendientes, sin esperar a la hora programada.
+//   npm run resumen               envia los correos de verdad
+//   npm run resumen -- --prueba   solo muestra a quien le llegaria y que diria
+// Lo mismo puede hacerse desde la pantalla Recordatorios del administrador.
 require('dotenv').config()
 const supabase = require('../src/config/supabase')
-const emailService = require('../src/services/shared/emailService')
-const dailyDigestService = require('../src/services/shared/dailyDigestService')
+const reminderScheduleService = require('../src/services/shared/reminderScheduleService')
 
 const dryRun = process.argv.includes('--prueba')
-let sentCount = 0
-let failedCount = 0
-
-const originalSendEmail = emailService.sendEmail
-emailService.sendEmail = async (recipients, subject, html, attachments) => {
-  sentCount++
-  const lines = [...html.matchAll(/<li[^>]*>([^<]*)<\/li>/g)].map((match) => `    - ${match[1]}`)
-  console.log(`${dryRun ? '[prueba] ' : ''}${recipients.map((recipient) => recipient.email).join(', ')} | ${subject}`)
-  console.log(lines.join('\n'))
-  if (!dryRun) {
-    try {
-      await originalSendEmail(recipients, subject, html, attachments)
-    }
-    catch (error) {
-      failedCount++
-      throw error
-    }
-  }
-}
 
 const run = async () => {
   // Sin conexion a la base, el resumen no encontraria pendientes y pareceria que no hay nada
@@ -35,12 +16,27 @@ const run = async () => {
     process.exit(1)
   }
   console.log(dryRun ? 'Resumen de pendientes (modo prueba, no se envía nada):' : 'Enviando resumen de pendientes...')
-  await dailyDigestService.sendDailyDigest()
-  if (sentCount === 0) {
+  const result = await reminderScheduleService.sendNow({dryRun})
+  if (result.error) {
+    console.error(result.error)
+    process.exit(1)
+  }
+  result.mensajes.forEach((message) => {
+    let status = '[prueba]'
+    if (!dryRun) {
+      status = message.enviado ? '[enviado]' : `[error: ${message.error}]`
+    }
+    console.log(`${status} ${message.correo} | ${message.asunto}`)
+    message.lineas.forEach((line) => console.log(`    - ${line}`))
+  })
+  if (result.total === 0) {
     console.log('Nadie tiene pendientes: no se envió ningún correo.')
   }
+  else if (dryRun) {
+    console.log(`${result.total} correo(s) se enviarían.`)
+  }
   else {
-    console.log(dryRun ? `${sentCount} correo(s) se enviarían.` : `Listo: ${sentCount - failedCount} enviado(s), ${failedCount} con error.`)
+    console.log(`Listo: ${result.enviados} enviado(s), ${result.fallidos} con error.`)
   }
   process.exit(0)
 }

@@ -7,6 +7,7 @@
 -- ============================================================
 
 drop table if exists
+  "Configuracion_Recordatorio",
   "Comentario",
   "Solicitud_Reemplazo",
   "Solicitud_Autorizacion_Plazo",

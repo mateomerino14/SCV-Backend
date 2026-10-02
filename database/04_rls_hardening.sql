@@ -12,7 +12,7 @@ declare
     'Auditoria', 'Cargo', 'Categoria_Gasto', 'Codigo_Verificacion', 'Comentario',
     'Correlativo_Recibo', 'Recibo', 'Revision_Viaje', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Impuesto', 'Proveedor',
-    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Viaje'
+    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Viaje', 'Configuracion_Recordatorio'
   ];
 begin
   foreach table_name in array target_tables
@@ -36,5 +36,5 @@ where schemaname = 'public'
     'Auditoria', 'Cargo', 'Categoria_Gasto', 'Codigo_Verificacion', 'Comentario',
     'Correlativo_Recibo', 'Recibo', 'Revision_Viaje', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Impuesto', 'Proveedor',
-    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Viaje'
+    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Viaje', 'Configuracion_Recordatorio'
   );

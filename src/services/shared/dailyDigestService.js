@@ -58,8 +58,9 @@ const getSupervisorPendingCounts = async (supervisorId) => {
 // "1 viaje esperando" / "3 viajes esperando"
 const countLine = (count, singular, plural, rest) => `${count} ${count === 1 ? singular : plural} ${rest}`
 
-// Arma y envia el correo resumen a un grupo de usuarios con un rol
-const sendDigestToGroup = async (users, title, bodyLines) => {
+// Arma y envia el correo resumen a un grupo de usuarios con un rol. Cada destinatario se
+// agrega al reporte; en modo prueba (dryRun) solo se arma el reporte y no se envia nada
+const sendDigestToGroup = async (users, title, bodyLines, report, dryRun) => {
   if (users.length === 0 || bodyLines.length === 0) {
     return
   }
@@ -75,6 +76,17 @@ const sendDigestToGroup = async (users, title, bodyLines) => {
     ${emailService.emailButton()}
   `
   const html = emailService.buildEmailLayout(title, body)
+  const entries = users.map((user) => ({
+    nombre: `${user.nombre} ${user.apellido_paterno}`,
+    correo: user.email_corporativo,
+    asunto: title,
+    lineas: bodyLines,
+    enviado: false,
+  }))
+  report.push(...entries)
+  if (dryRun) {
+    return
+  }
   // Si falla el envio a una persona, igual se envia a las demas
   const results = await Promise.allSettled(users.map((user) => emailService.sendEmail(
     [{email: user.email_corporativo, name: `${user.nombre} ${user.apellido_paterno}`}],
@@ -83,13 +95,19 @@ const sendDigestToGroup = async (users, title, bodyLines) => {
   )))
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
+      entries[index].error = result.reason?.message || 'No se pudo enviar'
       console.warn(`No se pudo enviar el resumen a ${users[index].email_corporativo}:`, result.reason?.message)
+    }
+    else {
+      entries[index].enviado = true
     }
   })
 }
 
-// Envia el resumen diario de pendientes a supervisores, aprobadores, revisores y tesoreros
-const sendDailyDigest = async () => {
+// Envia el resumen de pendientes a supervisores, aprobadores, revisores y tesoreros.
+// Devuelve a quien se envio (o se enviaria, con dryRun) y que decia cada correo
+const sendDailyDigest = async ({dryRun = false} = {}) => {
+  const report = []
   try {
     const counts = await getPendingCounts()
 
@@ -105,7 +123,7 @@ const sendDailyDigest = async () => {
       if (supervisorCounts.expenseReviews > 0) {
         supervisorLines.push(countLine(supervisorCounts.expenseReviews, 'rendición de gastos espera', 'rendiciones de gastos esperan', 'tu revisión.'))
       }
-      await sendDigestToGroup([supervisor], 'Resumen de Pendientes — Supervisión', supervisorLines)
+      await sendDigestToGroup([supervisor], 'Resumen de Pendientes — Supervisión', supervisorLines, report, dryRun)
     }
 
     const approvers = await getActiveUsersByRole('APROBADOR')
@@ -116,7 +134,7 @@ const sendDailyDigest = async () => {
     if (counts.pendingAlcoholReviews > 0) {
       approverLines.push(countLine(counts.pendingAlcoholReviews, 'rendición con alcohol espera', 'rendiciones con alcohol esperan', 'tu revisión adicional.'))
     }
-    await sendDigestToGroup(approvers, 'Resumen de Pendientes — Aprobación', approverLines)
+    await sendDigestToGroup(approvers, 'Resumen de Pendientes — Aprobación', approverLines, report, dryRun)
 
     const reviewers = await getActiveUsersByRole('REVISOR')
     const reviewerLines = []
@@ -129,7 +147,7 @@ const sendDailyDigest = async () => {
     if (counts.pendingSubstitutionRequests > 0) {
       reviewerLines.push(countLine(counts.pendingSubstitutionRequests, 'solicitud de reemplazo espera', 'solicitudes de reemplazo esperan', 'tu respuesta.'))
     }
-    await sendDigestToGroup(reviewers, 'Resumen de Pendientes — Revisión Final', reviewerLines)
+    await sendDigestToGroup(reviewers, 'Resumen de Pendientes — Revisión Final', reviewerLines, report, dryRun)
 
     const activeUsers = await userDirectoryService.getActiveUsersWithActivePosition()
     const treasurers = userDirectoryService.getUsersByPositionName(activeUsers, userDirectoryService.treasurerPositionName)
@@ -137,11 +155,13 @@ const sendDailyDigest = async () => {
     if (counts.pendingTreasurerReviews > 0) {
       treasurerLines.push(countLine(counts.pendingTreasurerReviews, 'viaje espera', 'viajes esperan', 'la asignación de fondos.'))
     }
-    await sendDigestToGroup(treasurers, 'Resumen de Pendientes — Tesorería', treasurerLines)
+    await sendDigestToGroup(treasurers, 'Resumen de Pendientes — Tesorería', treasurerLines, report, dryRun)
   }
   catch (error) {
     console.warn('Error enviando el resumen diario de pendientes:', error.message)
+    return {mensajes: report, error: 'No se pudo armar el resumen de pendientes'}
   }
+  return {mensajes: report}
 }
 
 module.exports = {getPendingCounts, getSupervisorPendingCounts, sendDailyDigest}
