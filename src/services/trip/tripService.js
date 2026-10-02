@@ -380,6 +380,9 @@ const confirmCompletion = async (tripId, userId, justifications) => {
     return {error: 'El viaje ya fue enviado a revisión. Actualiza la página.', status: 409}
   }
   await hierarchyAssignmentService.assignNextReviewer(tripId, trip.id_usuario, 'SUPERVISOR', 'id_supervisor_asignado')
+  // Las solicitudes de reemplazo o de plazo que quedaron sin responder ya no aplican
+  await substitutionService.closePendingRequests([tripId])
+  await require('../approval/deadlineAuthorizationService').closePendingRequests([tripId])
   return {message: 'Viaje enviado a revisión de gastos correctamente'}
 };
 

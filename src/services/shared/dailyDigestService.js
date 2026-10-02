@@ -24,8 +24,9 @@ const getPendingCounts = async () => {
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION_APROBADOR'),
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'APROBADO_SUPERVISOR'),
     supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION_TESORERO'),
-    supabase.from('Solicitud_Autorizacion_Plazo').select('id_solicitud', {count: 'exact', head: true}).eq('estado', 'PENDIENTE'),
-    supabase.from('Solicitud_Reemplazo').select('id_solicitud', {count: 'exact', head: true}).eq('estado', 'PENDIENTE'),
+    // Solo las solicitudes de viajes donde todavia aplican (no las de viajes ya enviados a revision)
+    supabase.from('Solicitud_Autorizacion_Plazo').select('id_solicitud, Viaje!inner(estado)', {count: 'exact', head: true}).eq('estado', 'PENDIENTE').in('Viaje.estado', ['EN_CURSO']),
+    supabase.from('Solicitud_Reemplazo').select('id_solicitud, Viaje!inner(estado)', {count: 'exact', head: true}).eq('estado', 'PENDIENTE').in('Viaje.estado', ['EN_CURSO', 'RECHAZADO']),
   ])
   return {
     pendingTripReviews: tripReviews.count || 0,

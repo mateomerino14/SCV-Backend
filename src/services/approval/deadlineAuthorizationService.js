@@ -147,19 +147,43 @@ const getRequestStatus = async (tripId, employeeId) => {
   return {request: data || null}
 };
 
+
+// Estado del viaje en el que una ampliacion de plazo todavia tiene sentido: mientras se registran gastos
+const requestableTripStates = ['EN_CURSO']
+const autoCloseObservation = 'Cerrada automáticamente: el viaje ya se envió a revisión antes de que se respondiera la solicitud.'
+
+// Cierra las solicitudes pendientes de esos viajes (por ejemplo, al enviarse el viaje a
+// revision): ya no tienen sentido y no deben quedar en la bandeja del revisor
+const closePendingRequests = async (tripIds) => {
+  const ids = (tripIds || []).map((tripId) => parseInt(tripId)).filter((tripId) => !isNaN(tripId))
+  if (ids.length === 0) {
+    return
+  }
+  const {error} = await supabase
+    .from('Solicitud_Autorizacion_Plazo')
+    .update({estado: 'RECHAZADA', observacion_revisor: autoCloseObservation, fecha_respuesta: new Date().toISOString()})
+    .in('id_viaje', ids)
+    .eq('estado', 'PENDIENTE')
+  if (error) {
+    console.warn('No se pudieron cerrar las solicitudes pendientes:', error.message)
+  }
+};
+
 // Lista las solicitudes pendientes de revision
 const getPendingRequests = async () => {
   const {data, error} = await supabase
     .from('Solicitud_Autorizacion_Plazo')
-    .select('*, Viaje(id_viaje, motivo, origen, destino, fecha_inicio, fecha_fin, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, Cargo(nombre)))')
+    .select('*, Viaje(id_viaje, estado, motivo, origen, destino, fecha_inicio, fecha_fin, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, Cargo(nombre)))')
     .eq('estado', 'PENDIENTE')
     .order('fecha_solicitud', {ascending: false})
   if (error) {
     return {error: error.message}
   }
-  else {
-    return {requests: data || []}
-  }
+  // Las de viajes que ya pasaron a revision se cierran y no se muestran
+  const requests = data || []
+  const staleTripIds = requests.filter((request) => !requestableTripStates.includes(request.Viaje?.estado)).map((request) => request.id_viaje)
+  await closePendingRequests(staleTripIds)
+  return {requests: requests.filter((request) => requestableTripStates.includes(request.Viaje?.estado))}
 };
 
 // Lista el historial de solicitudes ya procesadas
@@ -181,7 +205,7 @@ const getRequestHistory = async () => {
 const approveRequest = async (requestId, reviewerId) => {
   const {data: request} = await supabase
     .from('Solicitud_Autorizacion_Plazo')
-    .select('*, Viaje(motivo, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo))')
+    .select('*, Viaje(estado, motivo, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo))')
     .eq('id_solicitud', requestId)
     .single()
   if (!request) {
@@ -189,6 +213,10 @@ const approveRequest = async (requestId, reviewerId) => {
   }
   if (request.estado !== 'PENDIENTE') {
     return {error: 'Esta solicitud ya fue procesada', status: 400}
+  }
+  if (!requestableTripStates.includes(request.Viaje?.estado)) {
+    await closePendingRequests([request.id_viaje])
+    return {error: 'El viaje ya se envió a revisión, así que esta solicitud se cerró automáticamente.', status: 409}
   }
   const responseDate = new Date()
   const {data: updatedRequests, error} = await supabase
@@ -280,4 +308,4 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   return {message: 'Solicitud rechazada correctamente'}
 };
 
-module.exports = {createRequest, getRequestStatus, getPendingRequests, getRequestHistory, approveRequest, rejectRequest};
+module.exports = {closePendingRequests, requestableTripStates, createRequest, getRequestStatus, getPendingRequests, getRequestHistory, approveRequest, rejectRequest};
