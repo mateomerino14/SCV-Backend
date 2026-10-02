@@ -2,6 +2,7 @@ const supabase = require('../../config/supabase')
 const deadlineService = require('../shared/deadlineService')
 const emailService = require('../shared/emailService')
 const {escapeHtml} = require('../../utils/htmlEscape')
+const substitutionService = require('./substitutionService')
 
 const toleranceDays = 4
 const boliviaOffsetHours = -4
@@ -67,7 +68,8 @@ const createRequest = async (tripId, employeeId, reason) => {
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
-  if (trip.id_usuario !== employeeId) {
+  // La puede pedir el titular o su reemplazo aprobado; la extension vale para el viaje
+  if (!(await substitutionService.canActOnTrip(tripId, employeeId))) {
     return {error: 'No tienes permiso sobre este viaje', status: 403}
   }
   // Solo tiene sentido con el viaje en curso y el plazo de registro vencido (sin una
@@ -100,8 +102,13 @@ const createRequest = async (tripId, employeeId, reason) => {
     const reviewers = await getActiveReviewers()
     const to = reviewers.map((reviewer) => ({email: reviewer.email_corporativo, name: `${reviewer.nombre} ${reviewer.apellido_paterno}`}))
     const employeeName = `${trip.Usuario?.nombre} ${trip.Usuario?.apellido_paterno}`
+    let requesterText = `<strong>${escapeHtml(employeeName)}</strong>`
+    if (trip.id_usuario !== employeeId) {
+      const {data: requester} = await supabase.from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', employeeId).single()
+      requesterText = `<strong>${escapeHtml(`${requester?.nombre} ${requester?.apellido_paterno}`)}</strong>, en reemplazo de ${escapeHtml(employeeName)},`
+    }
     const body = `
-      ${emailService.emailParagraph(`<strong>${escapeHtml(employeeName)}</strong> solicita autorización para seguir registrando gastos fuera del plazo de tolerancia.`)}
+      ${emailService.emailParagraph(`${requesterText} solicita autorización para seguir registrando gastos fuera del plazo de tolerancia.`)}
       ${emailService.emailInfoBox([
         {label: 'Viaje', value: trip.motivo},
         {label: 'Motivo del retraso', value: reason.trim()},
@@ -124,7 +131,8 @@ const getRequestStatus = async (tripId, employeeId) => {
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404}
   }
-  if (trip.id_usuario !== employeeId) {
+  // El plazo es del viaje: lo consultan el titular y su reemplazo aprobado
+  if (!(await substitutionService.canActOnTrip(tripId, employeeId))) {
     return {error: 'No tienes permiso sobre este viaje', status: 403}
   }
   const {data, error} = await supabase
@@ -151,6 +159,14 @@ const getRequestStatus = async (tripId, employeeId) => {
 // Estado del viaje en el que una ampliacion de plazo todavia tiene sentido: mientras se registran gastos
 const requestableTripStates = ['EN_CURSO']
 const autoCloseObservation = 'Cerrada automáticamente: el viaje ya se envió a revisión antes de que se respondiera la solicitud.'
+
+// Destinatarios de la respuesta: quien pidio la extension y el titular del viaje (sin repetir)
+const getRequestRecipients = (request) => {
+  const people = [request.Solicitante, request.Viaje?.Usuario].filter((person) => person?.email_corporativo)
+  return people.filter((person, index) => people.findIndex((other) => other.id_usuario === person.id_usuario) === index)
+};
+
+const requesterName = (request) => `${request.Solicitante?.nombre || ''} ${request.Solicitante?.apellido_paterno || ''}`.trim()
 
 // Mensaje para quien intenta atender una solicitud que ya no esta pendiente
 const describeProcessedRequest = (request) => {
@@ -190,7 +206,7 @@ const closePendingRequests = async (tripIds) => {
 const getPendingRequests = async () => {
   const {data, error} = await supabase
     .from('Solicitud_Autorizacion_Plazo')
-    .select('*, Viaje(id_viaje, estado, motivo, origen, destino, fecha_inicio, fecha_fin, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, Cargo(nombre)))')
+    .select('*, Solicitante:Usuario!id_empleado(id_usuario, nombre, apellido_paterno), Viaje(id_viaje, id_usuario, estado, motivo, origen, destino, fecha_inicio, fecha_fin, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, Cargo(nombre)))')
     .eq('estado', 'PENDIENTE')
     .order('fecha_solicitud', {ascending: false})
   if (error) {
@@ -207,7 +223,7 @@ const getPendingRequests = async () => {
 const getRequestHistory = async () => {
   const {data, error} = await supabase
     .from('Solicitud_Autorizacion_Plazo')
-    .select('*, Viaje(id_viaje, motivo, origen, destino, fecha_inicio, fecha_fin, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, Cargo(nombre)))')
+    .select('*, Solicitante:Usuario!id_empleado(id_usuario, nombre, apellido_paterno), Viaje(id_viaje, id_usuario, motivo, origen, destino, fecha_inicio, fecha_fin, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, Cargo(nombre)))')
     .in('estado', ['APROBADA', 'RECHAZADA'])
     .order('fecha_respuesta', {ascending: false})
   if (error) {
@@ -222,7 +238,7 @@ const getRequestHistory = async () => {
 const approveRequest = async (requestId, reviewerId) => {
   const {data: request} = await supabase
     .from('Solicitud_Autorizacion_Plazo')
-    .select('*, Viaje(estado, motivo, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo))')
+    .select('*, Solicitante:Usuario!id_empleado(id_usuario, nombre, apellido_paterno, email_corporativo), Viaje(estado, motivo, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo))')
     .eq('id_solicitud', requestId)
     .single()
   if (!request) {
@@ -250,14 +266,15 @@ const approveRequest = async (requestId, reviewerId) => {
     return processedRequestError(requestId)
   }
   try {
-    const employee = request.Viaje?.Usuario
-    if (employee?.email_corporativo) {
+    // Se avisa a quien pidio la extension y, si fue su reemplazo, tambien al titular del viaje
+    for (const employee of getRequestRecipients(request)) {
+      const ownRequest = employee.id_usuario === request.id_empleado
       const approvalDate = toBoliviaDate(responseDate.toISOString())
       const startDateStr = formatDate(approvalDate)
       const limitStr = formatDate(addDaysToDate(approvalDate, toleranceDays))
       const body = `
         ${emailService.emailParagraph(`Hola <strong>${escapeHtml(employee.nombre)}</strong>,`)}
-        ${emailService.emailParagraph('Tu solicitud para seguir registrando gastos fuera del plazo fue aprobada.')}
+        ${emailService.emailParagraph(ownRequest ? 'Tu solicitud para seguir registrando gastos fuera del plazo fue aprobada.' : `La solicitud de plazo que hizo <strong>${escapeHtml(requesterName(request))}</strong> para tu viaje fue aprobada.`)}
         ${emailService.emailInfoBox([{label: 'Viaje', value: request.Viaje?.motivo}])}
         ${emailService.emailHighlightBox('Nuevo plazo para registrar', `${startDateStr} — ${limitStr}`)}
         ${emailService.emailNote('Si necesitas más tiempo después de esa fecha, deberás solicitar una nueva autorización.')}
@@ -283,7 +300,7 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   }
   const {data: request} = await supabase
     .from('Solicitud_Autorizacion_Plazo')
-    .select('*, Viaje(estado, motivo, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo))')
+    .select('*, Solicitante:Usuario!id_empleado(id_usuario, nombre, apellido_paterno, email_corporativo), Viaje(estado, motivo, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo))')
     .eq('id_solicitud', requestId)
     .single()
   if (!request) {
@@ -310,11 +327,12 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
     return processedRequestError(requestId)
   }
   try {
-    const employee = request.Viaje?.Usuario
-    if (employee?.email_corporativo) {
+    // Se avisa a quien pidio la extension y, si fue su reemplazo, tambien al titular del viaje
+    for (const employee of getRequestRecipients(request)) {
+      const ownRequest = employee.id_usuario === request.id_empleado
       const body = `
         ${emailService.emailParagraph(`Hola <strong>${escapeHtml(employee.nombre)}</strong>,`)}
-        ${emailService.emailParagraph('Tu solicitud de autorización de plazo fue rechazada.')}
+        ${emailService.emailParagraph(ownRequest ? 'Tu solicitud de autorización de plazo fue rechazada.' : `La solicitud de plazo que hizo <strong>${escapeHtml(requesterName(request))}</strong> para tu viaje fue rechazada.`)}
         ${emailService.emailInfoBox([{label: 'Viaje', value: request.Viaje?.motivo}])}
         ${emailService.emailHighlightBox('Motivo del rechazo', observation.trim())}
         ${emailService.emailNote('Si consideras que hubo un error, comunícate con tu revisor asignado.')}
