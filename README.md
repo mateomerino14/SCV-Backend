@@ -55,6 +55,13 @@ npm start      # producción
 
 Al arrancar, se programa además una tarea (`node-cron`) que envía un resumen de pendientes a supervisores, aprobadores, revisor y tesorero tres veces al día (08:00, 12:00 y 16:00, hora Bolivia), solo a quienes tengan algo pendiente. Cada supervisor recibe solo sus propios pendientes: los que tiene asignados y los sin asignar que le corresponden por jerarquía. Al revisor también se le incluyen las solicitudes de ampliación de plazo y de reemplazo pendientes. La hora se calcula siempre en `America/La_Paz`, aunque el servidor esté en otra zona horaria; si el envío a una persona falla, igual se envía a las demás.
 
+Para enviarlo en el momento, sin esperar la hora (con el mismo `.env` del servidor):
+
+```bash
+npm run resumen -- --prueba   # solo muestra a quién le llegaría y qué diría, sin enviar
+npm run resumen               # envía los correos
+```
+
 ## Despliegue en un VPS
 
 Guía para un servidor Ubuntu 22.04 o 24.04 con el frontend en Vercel (o en otro dominio). A diferencia de Render, en un VPS el proceso queda siempre encendido, por lo que el resumen de pendientes sale siempre a sus horas.

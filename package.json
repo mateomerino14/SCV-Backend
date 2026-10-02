@@ -6,7 +6,8 @@
   "scripts": {
     "test": "jest",
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "resumen": "node scripts/sendDigest.js"
   },
   "repository": {
     "type": "git",
