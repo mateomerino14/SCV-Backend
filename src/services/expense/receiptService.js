@@ -5,9 +5,29 @@ const pdfService = require('../shared/pdfService')
 const {buildTripCode} = require('../../utils/tripCode')
 const {escapeDeep, escapeHtml: escapeText} = require('../../utils/htmlEscape')
 
-// Escapa caracteres especiales de HTML para prevenir inyeccion
 // Los datos se escapan al entrar a cada plantilla (escapeDeep); aqui solo se normaliza el vacio
 const escapeHtml = (text) => text || ''
+
+// Formatea una fecha ISO a formato dia/mes/anio
+const formatShortDate = (isoString) => {
+  const [year, month, day] = String(isoString || '').split('T')[0].split('-')
+  return `${day}/${month}/${year}`
+};
+
+const formatReceiptNumber = (number) => String(number).padStart(6, '0')
+
+// Busca el recibo ya emitido (individual por gasto, o agrupado por viaje/tipo/moneda)
+const findIssuedReceipt = async ({tripId, expenseId, type, isInternational}) => {
+  let query = supabase.from('Recibo').select('numero')
+  if (expenseId) {
+    query = query.eq('id_gasto', expenseId)
+  }
+  else {
+    query = query.eq('id_viaje', tripId).is('id_gasto', null).eq('tipo', type).eq('es_gasto_internacional', isInternational)
+  }
+  const {data} = await query.maybeSingle()
+  return data
+}
 
 // Devuelve el numero del recibo: si ya se emitio, reutiliza el mismo numero (un reenvio
 // no genera un recibo nuevo); si no, toma el siguiente correlativo y lo guarda.

@@ -8,7 +8,8 @@ const cookieOptions = {
 }
 
 // Genera el token de acceso de corta duracion
-// passwordChangeReason: null, 'TEMPORAL' (contrasena temporal o recuperada con codigo)
+// passwordChangeReason: null, 'TEMPORAL' (cuenta nueva o clave puesta por el administrador),
+// 'RECUPERACION' (entro con codigo de recuperacion)
 // o 'VENCIDA' (mas de 90 dias). Mientras no sea null, la app obliga a cambiarla.
 const generateAccessToken = (user, passwordChangeReason = null) => {
   return jwt.sign(
@@ -46,7 +47,9 @@ const isPasswordExpired = (lastPasswordChange) => {
 // Indica si el usuario debe cambiar su contrasena antes de seguir usando el sistema
 const getPasswordChangeReason = (user) => {
   if (user.debe_cambiar_contrasenia) {
-    return 'TEMPORAL'
+    // RECUPERACION: entro con codigo porque olvido su clave; TEMPORAL: cuenta nueva o clave
+    // puesta por el administrador
+    return user.motivo_cambio_contrasenia === 'RECUPERACION' ? 'RECUPERACION' : 'TEMPORAL'
   }
   if (isPasswordExpired(user.ultima_cambio_contrasenia)) {
     return 'VENCIDA'

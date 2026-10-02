@@ -178,15 +178,25 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
   const pdfBuffer = await finalReviewDocumentService.generatePdf(resultHtml)
   const pdfBase64 = pdfBuffer.toString('base64')
   const attachments = [{content: pdfBase64, name: `Resultado_Rendicion_${tripCode.replace('/', '-')}.pdf`}]
-  const exceeds = resultSummary.exceedsNational || resultSummary.exceedsUsd
-  let bodyText = 'Debes devolver el saldo restante a la empresa.'
-  if (exceeds) {
-    bodyText = 'Se te reembolsará el saldo excedido.'
+  // Resultado por moneda: en un viaje internacional puede tocar devolver en una moneda y
+  // recibir reembolso en la otra, asi que cada una se informa por separado
+  const describeBalance = (balance, currency) => {
+    if (Math.abs(balance) < 0.005) {
+      return 'Sin saldo pendiente'
+    }
+    if (balance < 0) {
+      return `Se te reembolsará ${currency} ${Math.abs(balance).toFixed(2)}`
+    }
+    return `Debes devolver ${currency} ${balance.toFixed(2)} a la empresa`
+  }
+  const resultRows = [{label: 'Bolivianos', value: describeBalance(nationalBalance, 'Bs')}]
+  if (isInternational) {
+    resultRows.push({label: 'Dólares', value: describeBalance(usdBalance, 'USD')})
   }
   const emailHtml = emailService.buildEmailLayout('Tu rendición fue aprobada', `
     ${emailService.emailParagraph(`Hola <strong>${escapeHtml(employee.nombre)}</strong>,`)}
     ${emailService.emailParagraph(`La rendición de gastos del viaje <strong>${tripCode}</strong> fue aprobada de forma definitiva.`)}
-    ${emailService.emailHighlightBox('Resultado', bodyText)}
+    ${emailService.emailInfoBox(resultRows)}
     ${emailService.emailNote('Revisa el detalle en el documento adjunto.')}
   `)
   await emailService.sendEmail(
@@ -226,7 +236,9 @@ const approveReview = async (tripId, reviewerId, {selfStageSkip = false} = {}) =
     return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
   }
   await reviewLogService.recordReview(tripId, reviewerId, reviewLogService.reviewStages.finalReview, 'APROBADO', {automatic: selfStageSkip})
-  const {data: reviewer} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre, monto_diario, monto_diario_usd)').eq('id_usuario', reviewerId).single()
+  const {data: reviewerData} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre, monto_diario, monto_diario_usd)').eq('id_usuario', reviewerId).single()
+  // Si es el viaje del propio revisor, el documento indica aprobacion automatica
+  const reviewer = {...reviewerData, aprobacionAutomatica: selfStageSkip}
   const {data: expenses} = await supabase
     .from('Gasto').select('*, Categoria_Gasto(nombre), Proveedor(nombre), Factura(numero_factura, monto_parcial)').eq('id_viaje', tripId)
   const tripCode = tripCodeUtil.buildTripCode(trip)

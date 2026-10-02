@@ -211,9 +211,9 @@ const verifyCode = async (req, res) => {
   // antes de seguir (la ventana de cambio no le pide la actual)
   await supabase
     .from('Usuario')
-    .update({debe_cambiar_contrasenia: true})
+    .update({debe_cambiar_contrasenia: true, motivo_cambio_contrasenia: 'RECUPERACION'})
     .eq('id_usuario', fullUser.id_usuario)
-  const accessToken = tokenService.generateAccessToken({...fullUser, debe_cambiar_contrasenia: true}, 'TEMPORAL')
+  const accessToken = tokenService.generateAccessToken({...fullUser, debe_cambiar_contrasenia: true}, 'RECUPERACION')
   const refreshToken = tokenService.generateRefreshToken(fullUser)
   res.cookie('refreshToken', refreshToken, tokenService.cookieOptions)
   await auditLogService.logAudit(fullUser.id_usuario, 'INGRESO')

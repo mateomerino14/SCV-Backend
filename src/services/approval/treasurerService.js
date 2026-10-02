@@ -164,6 +164,7 @@ const approveTrip = async (tripId, treasurerId, {selfStageSkip = false} = {}) =>
         ${emailService.emailParagraph(`El fondo para tu viaje <strong>${tripCode}</strong> fue aprobado. Ya puedes registrar tus gastos.`)}
         ${emailService.emailInfoBox([
           {label: 'Viaje', value: `${tripCode} — ${trip.motivo || ''}`},
+          {label: 'Origen', value: trip.origen},
           {label: 'Destino', value: trip.destino},
         ])}
         ${emailService.emailNote('Adjuntamos la confirmación del fondo asignado.')}

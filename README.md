@@ -52,7 +52,7 @@ npm run dev    # con recarga automática (nodemon)
 npm start      # producción
 ```
 
-Al arrancar, se programa además una tarea (`node-cron`) que envía un resumen de pendientes a supervisores, aprobadores, revisor y tesorero tres veces al día (08:00, 12:00 y 16:00, hora Bolivia), solo a quienes tengan algo pendiente.
+Al arrancar, se programa además una tarea (`node-cron`) que envía un resumen de pendientes a supervisores, aprobadores, revisor y tesorero tres veces al día (08:00, 12:00 y 16:00, hora Bolivia), solo a quienes tengan algo pendiente. Cada supervisor recibe solo sus propios pendientes: los que tiene asignados y los sin asignar que le corresponden por jerarquía.
 
 ## Stack
 
@@ -212,12 +212,13 @@ El perfil de **Tesorero** no es un rol del sistema sino un cargo (`asistente de 
 
 - **Tokens**: acceso de 15 minutos (en memoria del cliente) y refresco de 7 días en cookie `httpOnly`.
 - **Validación en cada petición** (`auth.js`): cuenta activa, rol igual al del token y sesión no invalidada. Cambiar el rol o suspender a un usuario invalida sus sesiones al instante.
-- **Contraseña temporal**: la cuenta nueva, una clave puesta por el administrador o un ingreso con código de recuperación marcan `debe_cambiar_contrasenia`. Mientras esté marcada, o la clave tenga más de 90 días, el servidor solo permite `/user/me` y el cambio de contraseña. Con clave temporal no se pide la actual.
+- **Contraseña temporal**: la cuenta nueva, una clave puesta por el administrador o un ingreso con código de recuperación marcan `debe_cambiar_contrasenia`, con su motivo en `motivo_cambio_contrasenia` (`TEMPORAL` o `RECUPERACION`) para que la ventana de cambio muestre el texto que corresponde. Mientras esté marcada, o la clave tenga más de 90 días, el servidor solo permite `/user/me` y el cambio de contraseña (403 con `codigo: CAMBIO_CONTRASENIA_REQUERIDO`). Con clave temporal o por recuperación no se pide la actual.
 - **Cambio de contraseña**: cierra las demás sesiones y entrega una nueva al dispositivo que la cambió. Queda registrado en `Auditoria` (`CAMBIO_CLAVE`), igual que cada ingreso y salida.
 - **Ingreso**: mismo mensaje si el correo no existe o la clave es incorrecta. Límite de 10 intentos fallidos cada 15 minutos por IP; los ingresos correctos no cuentan. Cada código de recuperación se anula tras 5 intentos fallidos.
 - **Concurrencia**: aprobar, rechazar, tomar, devolver, enviar y resolver solicitudes exigen el estado esperado al escribir. Si otra persona se adelantó, se responde 409 y no se duplican correos ni registros.
 - **Documentos**: todo texto escrito por usuarios se escapa antes de insertarse en correos y PDF (`htmlEscape`); los PDF se generan con JavaScript desactivado y el navegador se cierra siempre.
 - **Administración de usuarios**: solo se aceptan los campos del formulario y nunca se devuelve el hash de la contraseña.
+- **Imágenes de comprobantes**: se suben al almacenamiento antes de escribir el gasto o la factura; si la subida falla no queda nada a medio guardar, y al editar la imagen anterior solo se reemplaza cuando la nueva ya se subió.
 
 ## Flujos de aprobación
 
@@ -237,7 +238,9 @@ EN_CURSO → EN_REVISION ─────────────┤             
 
 Cuando la rendición contiene alcohol (`Gasto.tiene_alcohol` en algún gasto, agregado en `Viaje.tiene_alcohol`), tras la aprobación del supervisor pasa primero por el aprobador (`approverAlcoholReviewService`) antes de llegar al revisor final.
 
-El rechazo conduce a `RECHAZADO` e incrementa `ciclo_revision`. Solo las observaciones del ciclo vigente se consideran para validar un nuevo rechazo; el sistema exige al menos una antes de permitirlo. Esta regla se aplica de forma idéntica en las 6 instancias de rechazo del sistema (supervisor ×2, aprobador, aprobador por alcohol, revisor).
+El rechazo conduce a `RECHAZADO` e incrementa `ciclo_revision`. Solo las observaciones propias del ciclo vigente se consideran para validar un nuevo rechazo; el sistema exige al menos una antes de permitirlo (las de otros revisores no cuentan). Esta regla se aplica de forma idéntica en las 6 instancias de rechazo del sistema (supervisor ×2, aprobador, aprobador por alcohol, revisor).
+
+Con la aprobación final, el correo y el PDF del empleado muestran el saldo de cada moneda por separado: en un viaje internacional puede corresponder devolver dólares y a la vez recibir un reembolso en bolivianos (o al revés), y cada línea lo dice.
 
 Un viaje rechazado antes de iniciarse se corrige editándolo y vuelve a `EN_REVISION_VIAJE`; uno rechazado en la fase de gastos se corrige en sus gastos y se reenvía con "finalizar", directo a `EN_REVISION`. Ninguno puede saltar al otro flujo.
 
@@ -251,7 +254,7 @@ Cada aprobación o rechazo queda en `Revision_Viaje` con persona, etapa y fecha 
 
 ### Rendición por terceros
 
-Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su nombre (`substitutionService`). El revisor aprueba o rechaza la solicitud; pueden coexistir varias sustituciones activas en el sistema. El viaje aparece en el dashboard del sustituto etiquetado con el nombre del titular, pero los documentos (memorándum, recibos, planilla) siempre conservan el nombre del titular original, ya que se generan a partir de `Viaje.id_usuario`, que nunca cambia.
+Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su nombre (`substitutionService`). El revisor aprueba o rechaza la solicitud; un viaje tiene a lo sumo una sustitución aprobada. El titular conserva siempre el acceso a su viaje (puede seguir registrando gastos y confirmar la finalización); si el sustituto es dado de baja, simplemente ya no puede ingresar y el viaje sigue en manos del titular. El viaje aparece en el dashboard del sustituto etiquetado con el nombre del titular, pero los documentos (memorándum, recibos, planilla) siempre conservan el nombre del titular original, ya que se generan a partir de `Viaje.id_usuario`, que nunca cambia.
 
 ## Servicios transversales
 

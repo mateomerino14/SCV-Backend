@@ -19,7 +19,7 @@ Estos cuatro archivos reflejan siempre el estado final y completo del esquema: a
 
 ## Si ya tenes una base de datos existente
 
-Si tu base ya tiene datos cargados con una version anterior del esquema, **no vuelvas a correr `01_schema.sql`**: en su lugar, compara tu esquema actual contra este archivo y aplica manualmente (`alter table`, etc.) las columnas o tablas que te falten. Los scripts de migracion incremental que se usaron durante el desarrollo ya se incorporaron a estos cuatro archivos y no se conservan por separado, para no acumular decenas de archivos con el tiempo.
+Si tu base ya tiene datos cargados con una version anterior del esquema, **no vuelvas a correr `01_schema.sql`**: en su lugar, compara tu esquema actual contra este archivo y aplica manualmente (`alter table`, etc.) las columnas o tablas que te falten. Los scripts de migracion incremental que se usaron durante el desarrollo ya se incorporaron a estos cuatro archivos y no se conservan por separado, para no acumular decenas de archivos con el tiempo. La excepcion es `05_cambios_recientes.sql`, que agrupa los ultimos cambios para bases existentes; una base nueva no lo necesita.
 
 ## Cambios recientes para bases existentes
 
@@ -27,7 +27,11 @@ Si tu base es anterior, aplica estos cambios (ya incluidos en `01_schema.sql` y 
 
 - Tabla `Revision_Viaje` con sus dos índices y RLS activado.
 - Columna `Usuario.debe_cambiar_contrasenia boolean not null default false`.
-- Relación `Comentario.id_gasto` con `on delete set null`.
+- `05_cambios_recientes.sql` (se puede correr más de una vez):
+  - Columna `Usuario.motivo_cambio_contrasenia` (`TEMPORAL` o `RECUPERACION`).
+  - Relación `Comentario.id_gasto` con `on delete set null`.
+  - `Gasto.moneda` con valor por defecto `BOB`.
+  - Corrección de datos: facturas y recibos guardados con costo en 0 y gastos en bolivianos marcados como USD.
 
 ## Scripts de prueba
 

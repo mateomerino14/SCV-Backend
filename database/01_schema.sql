@@ -62,6 +62,8 @@ create table if not exists "Usuario" (
   -- true mientras tenga una contrasena temporal (recien creado, puesta por el administrador
   -- o recuperada con codigo): debe cambiarla antes de usar el sistema
   debe_cambiar_contrasenia boolean not null default false,
+  -- TEMPORAL (cuenta nueva o clave puesta por el administrador) o RECUPERACION (entro con codigo)
+  motivo_cambio_contrasenia varchar(15) check (motivo_cambio_contrasenia in ('TEMPORAL', 'RECUPERACION')),
   id_cargo integer not null references "Cargo"(id_cargo),
   id_rol integer not null references "Rol"(id_rol)
 );
@@ -143,7 +145,7 @@ create table if not exists "Gasto" (
   tipo char(1) not null check (tipo in ('F', 'R', 'C', 'S')),
   modificado boolean not null default false,
   es_gasto_internacional boolean default false,
-  moneda varchar(10) default 'USD',
+  moneda varchar(10) default 'BOB',
   tipo_cambio numeric(10, 4) default 1,
   monto_moneda_origen numeric(10, 2) default 0,
   base_imponible numeric(10, 2) default 0,

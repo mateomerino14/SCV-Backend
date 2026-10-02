@@ -35,6 +35,21 @@ const getPendingCounts = async () => {
   }
 }
 
+// Pendientes de un supervisor: asignados a el y sin asignar dentro de su alcance
+const getSupervisorPendingCounts = async (supervisorId) => {
+  const reviewService = require('../approval/reviewService')
+  const [assignedTrips, assignedExpenses, unassignedTrips, unassignedExpenses] = await Promise.all([
+    supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION_VIAJE').eq('id_supervisor_asignado', supervisorId),
+    supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION').eq('id_supervisor_asignado', supervisorId),
+    reviewService.getPendingTripReviews(supervisorId, {}),
+    reviewService.getPendingExpenseReviews(supervisorId, {}),
+  ])
+  return {
+    tripReviews: (assignedTrips.count || 0) + (unassignedTrips.trips || []).length,
+    expenseReviews: (assignedExpenses.count || 0) + (unassignedExpenses.trips || []).length,
+  }
+}
+
 // Arma y envia el correo resumen a un grupo de usuarios con un rol
 const sendDigestToGroup = async (users, title, bodyLines) => {
   if (users.length === 0 || bodyLines.length === 0) {
@@ -64,15 +79,20 @@ const sendDailyDigest = async () => {
   try {
     const counts = await getPendingCounts()
 
+    // Cada supervisor recibe sus propios pendientes: lo que tiene asignado y lo que esta sin
+    // asignar dentro de su alcance (jefe directo, seccion), igual que en su bandeja
     const supervisors = await getActiveUsersByRole('SUPERVISOR')
-    const supervisorLines = []
-    if (counts.pendingTripReviews > 0) {
-      supervisorLines.push(`${counts.pendingTripReviews} viaje(s) nuevo(s) esperando revisión.`)
+    for (const supervisor of supervisors) {
+      const supervisorCounts = await getSupervisorPendingCounts(supervisor.id_usuario)
+      const supervisorLines = []
+      if (supervisorCounts.tripReviews > 0) {
+        supervisorLines.push(`${supervisorCounts.tripReviews} viaje(s) esperando tu revisión previa.`)
+      }
+      if (supervisorCounts.expenseReviews > 0) {
+        supervisorLines.push(`${supervisorCounts.expenseReviews} rendición(es) de gastos esperando tu revisión.`)
+      }
+      await sendDigestToGroup([supervisor], 'Resumen de Pendientes — Supervisión', supervisorLines)
     }
-    if (counts.pendingExpenseReviews > 0) {
-      supervisorLines.push(`${counts.pendingExpenseReviews} rendición(es) de gastos esperando revisión.`)
-    }
-    await sendDigestToGroup(supervisors, 'Resumen de Pendientes — Supervisión', supervisorLines)
 
     const approvers = await getActiveUsersByRole('APROBADOR')
     const approverLines = []
@@ -104,4 +124,4 @@ const sendDailyDigest = async () => {
   }
 }
 
-module.exports = {getPendingCounts, sendDailyDigest}
+module.exports = {getPendingCounts, getSupervisorPendingCounts, sendDailyDigest}

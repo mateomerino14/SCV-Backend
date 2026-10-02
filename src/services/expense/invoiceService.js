@@ -38,16 +38,18 @@ const attachIvaTax = async (invoiceId, ivaAmount) => {
 };
 
 // Sube el archivo de imagen de la factura y lo asocia al gasto
-const uploadInvoiceImage = async (expenseId, file) => {
+// Sube la imagen de la factura y devuelve su URL publica (o un error). Se llama antes de
+// escribir, para no dejar una factura sin comprobante si la subida falla.
+const uploadInvoiceImage = async (file) => {
   const fileExtension = file.originalname.split('.').pop()
-  const fileName = `facturas/${expenseId}_${Date.now()}.${fileExtension}`
+  const fileName = `facturas/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExtension}`
   const {error: storageError} = await supabase.storage
     .from('facturas')
     .upload(fileName, file.buffer, {contentType: file.mimetype})
-  if (!storageError) {
-    const {data: urlData} = supabase.storage.from('facturas').getPublicUrl(fileName)
-    await supabase.from('Imagen').insert({url_archivo: urlData.publicUrl, id_gasto: expenseId})
+  if (storageError) {
+    return {error: 'No se pudo subir el comprobante de la factura. Intenta nuevamente.'}
   }
+  return {url: supabase.storage.from('facturas').getPublicUrl(fileName).data.publicUrl}
 };
 
 // Valida los campos requeridos para guardar una factura
@@ -76,6 +78,10 @@ const validateInvoiceData = (invoiceData) => {
   }
   if (!invoiceData.monto_total || isNaN(parseFloat(invoiceData.monto_total)) || parseFloat(invoiceData.monto_total) <= 0) {
     return 'El monto total es requerido y debe ser mayor a cero'
+  }
+  const amountWithoutTax = parseFloat(invoiceData.monto)
+  if (isNaN(amountWithoutTax) || amountWithoutTax <= 0 || amountWithoutTax > parseFloat(invoiceData.monto_total)) {
+    return 'El monto sin impuestos es requerido, mayor a cero y no puede superar el monto total'
   }
   if (!invoiceData.tipo_doc || !['F', 'R'].includes(invoiceData.tipo_doc)) {
     return 'El tipo de documento debe ser Factura (F) o Recibo (R)'
@@ -107,6 +113,14 @@ const saveInvoice = async (invoiceData, file, userId) => {
   const deadlineValidation = await deadlineService.validateTripDeadline(invoiceData.id_viaje, invoiceData.fecha_emision)
   if (!deadlineValidation.valid) {
     return {error: deadlineValidation.error, status: 400, requiereAutorizacion: !!deadlineValidation.requiereAutorizacion}
+  }
+  let imageUrl = null
+  if (file) {
+    const upload = await uploadInvoiceImage(file)
+    if (upload.error) {
+      return {error: upload.error, status: 500}
+    }
+    imageUrl = upload.url
   }
   const supplierName = invoiceData.proveedor.trim()
   const {data: existingSupplier} = await supabase
@@ -200,8 +214,8 @@ const saveInvoice = async (invoiceData, file, userId) => {
   if (!hasAlcohol) {
     await attachIvaTax(invoice.id_factura, invoiceData.iva)
   }
-  if (file) {
-    await uploadInvoiceImage(expense.id_gasto, file)
+  if (imageUrl) {
+    await supabase.from('Imagen').insert({url_archivo: imageUrl, id_gasto: expense.id_gasto})
   }
   return {expense}
 };
@@ -224,12 +238,21 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   if (linesError) {
     return {error: linesError, status: 400}
   }
-  if (!file && !invoiceData.mantener_imagen) {
-    return {error: 'Debes subir el comprobante de la factura', status: 400}
+  const amountWithoutTax = parseFloat(invoiceData.monto)
+  if (isNaN(amountWithoutTax) || amountWithoutTax <= 0 || amountWithoutTax > parseFloat(invoiceData.monto_total)) {
+    return {error: 'El monto sin impuestos es requerido, mayor a cero y no puede superar el monto total', status: 400}
   }
-  const {data: existingExpense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single()
+  const {data: existingExpense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).maybeSingle()
   if (!existingExpense) {
     return {error: 'Gasto no encontrado', status: 404}
+  }
+  // Solo se editan por aqui los gastos que son facturas
+  const {data: existingInvoice} = await supabase.from('Factura').select('id_factura').eq('id_gasto', expenseId).maybeSingle()
+  if (!existingInvoice) {
+    return {error: 'Este gasto no es una factura', status: 400}
+  }
+  if (!file && !invoiceData.mantener_imagen) {
+    return {error: 'Debes subir el comprobante de la factura', status: 400}
   }
   const access = await substitutionService.canRegisterExpenseOnTrip(existingExpense.id_viaje, userId)
   if (!access.allowed) {
@@ -243,6 +266,14 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   const deadlineValidation = await deadlineService.validateTripDeadline(existingExpense.id_viaje, invoiceData.fecha_emision)
   if (!deadlineValidation.valid) {
     return {error: deadlineValidation.error, status: 400, requiereAutorizacion: !!deadlineValidation.requiereAutorizacion}
+  }
+  let newImageUrl = null
+  if (file && !invoiceData.mantener_imagen) {
+    const upload = await uploadInvoiceImage(file)
+    if (upload.error) {
+      return {error: upload.error, status: 500}
+    }
+    newImageUrl = upload.url
   }
   const supplierName = invoiceData.proveedor.trim()
   const {data: existingSupplier} = await supabase
@@ -270,6 +301,18 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
     }
   }
   const hasAlcohol = await alcoholDetectionService.analyzeAlcohol(invoiceData.detalle || [])
+  // Numero de factura repetido para el mismo proveedor y fecha: se avisa antes de cambiar nada
+  const {data: duplicateInvoice} = await supabase
+    .from('Factura')
+    .select('id_factura')
+    .eq('numero_factura', invoiceData.numero_factura)
+    .eq('fecha_emision', invoiceData.fecha_emision)
+    .eq('id_proveedor', supplierId)
+    .neq('id_factura', existingInvoice.id_factura)
+    .limit(1)
+  if ((duplicateInvoice || []).length > 0) {
+    return {error: `La factura número ${invoiceData.numero_factura} de este proveedor ya fue registrada para esta fecha`, status: 400}
+  }
   const {error: expenseError} = await supabase
     .from('Gasto')
     .update({
@@ -288,55 +331,46 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   if (expenseError) {
     return {error: expenseError.message, status: 500}
   }
-  const {data: existingInvoice} = await supabase
+  const {error: invoiceUpdateError} = await supabase
     .from('Factura')
-    .select('id_factura')
-    .eq('id_gasto', expenseId)
-    .single()
-  if (existingInvoice) {
-    const {error: invoiceUpdateError} = await supabase
-      .from('Factura')
-      .update({
-        numero_factura: invoiceData.numero_factura,
-        fecha_emision: invoiceData.fecha_emision,
-        monto_parcial: invoiceData.monto,
-        id_proveedor: supplierId,
-      })
-      .eq('id_factura', existingInvoice.id_factura)
-    if (invoiceUpdateError) {
-      if (invoiceUpdateError.code === '23505') {
-        return {error: `La factura número ${invoiceData.numero_factura} de este proveedor ya fue registrada para esta fecha`, status: 400}
-      }
-      else {
-        return {error: invoiceUpdateError.message, status: 500}
-      }
+    .update({
+      numero_factura: invoiceData.numero_factura,
+      fecha_emision: invoiceData.fecha_emision,
+      monto_parcial: invoiceData.monto,
+      id_proveedor: supplierId,
+    })
+    .eq('id_factura', existingInvoice.id_factura)
+  if (invoiceUpdateError) {
+    if (invoiceUpdateError.code === '23505') {
+      return {error: `La factura número ${invoiceData.numero_factura} de este proveedor ya fue registrada para esta fecha`, status: 400}
     }
-    await supabase.from('Detalle_Factura').delete().eq('id_factura', existingInvoice.id_factura)
-    if (invoiceData.detalle && invoiceData.detalle.length > 0) {
-      const detailRows = invoiceData.detalle.map((item) => ({
-        nombre_producto: item.nombre_producto,
-        cantidad: item.cantidad,
-        precio: item.precio,
-        id_factura: existingInvoice.id_factura,
-      }))
-      await supabase.from('Detalle_Factura').insert(detailRows)
-    }
-    await supabase.from('Factura_Impuestos').delete().eq('id_factura', existingInvoice.id_factura)
-    if (!hasAlcohol) {
-      await attachIvaTax(existingInvoice.id_factura, invoiceData.iva)
+    else {
+      return {error: invoiceUpdateError.message, status: 500}
     }
   }
-  {
-    try {
-      await alcoholDetectionService.updateAlcoholInTrip(existingExpense.id_viaje)
-    }
-    catch (error) {
-      console.warn('Error alcohol:', error.message)
-    }
+  await supabase.from('Detalle_Factura').delete().eq('id_factura', existingInvoice.id_factura)
+  if (invoiceData.detalle && invoiceData.detalle.length > 0) {
+    const detailRows = invoiceData.detalle.map((item) => ({
+      nombre_producto: item.nombre_producto,
+      cantidad: item.cantidad,
+      precio: item.precio,
+      id_factura: existingInvoice.id_factura,
+    }))
+    await supabase.from('Detalle_Factura').insert(detailRows)
   }
-  if (file && !invoiceData.mantener_imagen) {
+  await supabase.from('Factura_Impuestos').delete().eq('id_factura', existingInvoice.id_factura)
+  if (!hasAlcohol) {
+    await attachIvaTax(existingInvoice.id_factura, invoiceData.iva)
+  }
+  try {
+    await alcoholDetectionService.updateAlcoholInTrip(existingExpense.id_viaje)
+  }
+  catch (error) {
+    console.warn('Error alcohol:', error.message)
+  }
+  if (newImageUrl) {
     await supabase.from('Imagen').delete().eq('id_gasto', expenseId)
-    await uploadInvoiceImage(expenseId, file)
+    await supabase.from('Imagen').insert({url_archivo: newImageUrl, id_gasto: expenseId})
   }
   return {}
 };

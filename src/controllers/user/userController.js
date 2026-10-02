@@ -145,6 +145,7 @@ const changeMyPassword = async (req, res) => {
       contrasenia: newPasswordHash,
       ultima_cambio_contrasenia: new Date().toISOString(),
       debe_cambiar_contrasenia: false,
+      motivo_cambio_contrasenia: null,
       // Cierra las demas sesiones abiertas (por ejemplo, si alguien mas conocia la clave)
       refresh_token_invalido_desde: new Date().toISOString(),
     })
@@ -195,6 +196,7 @@ const updateUser = async (req, res) => {
     // Una contrasena puesta por el administrador es temporal: el usuario debe cambiarla al entrar
     payload.contrasenia = bcrypt.hashSync(payload.contrasenia, saltRounds)
     payload.debe_cambiar_contrasenia = true
+    payload.motivo_cambio_contrasenia = 'TEMPORAL'
   }
   let newRole = currentUser?.id_rol
   if (payload.id_rol !== undefined) {
@@ -253,6 +255,7 @@ const createUser = async (req, res) => {
   body.contrasenia = bcrypt.hashSync(temporaryPassword, saltRounds)
   // La contrasena temporal enviada por correo se debe cambiar en el primer ingreso
   body.debe_cambiar_contrasenia = true
+  body.motivo_cambio_contrasenia = 'TEMPORAL'
   const roleError = await userService.validateUniqueRole(body.id_rol, null)
   if (roleError) {
     return res.status(400).json({error: roleError})

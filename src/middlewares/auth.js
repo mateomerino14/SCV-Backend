@@ -29,7 +29,7 @@ async function authMiddleware(req, res, next) {
   }
   const {data: user} = await supabase
     .from('Usuario')
-    .select('id_usuario, activo, id_rol, refresh_token_invalido_desde, debe_cambiar_contrasenia, ultima_cambio_contrasenia')
+    .select('id_usuario, activo, id_rol, refresh_token_invalido_desde, debe_cambiar_contrasenia, motivo_cambio_contrasenia, ultima_cambio_contrasenia')
     .eq('id_usuario', decodedToken.id_usuario)
     .single()
   if (!user || !user.activo) {

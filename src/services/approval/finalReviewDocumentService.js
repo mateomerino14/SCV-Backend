@@ -112,7 +112,7 @@ const generateRenditionHtml = (rawTrip, rawReviewer, tripCode, rawExpenses) => {
     <tr><th>Tipo de Viaje</th><td style="padding:4px 8px;border:1px solid #ddd;">${trip.tipo}</td></tr>
     <tr><th>Transporte</th><td style="padding:4px 8px;border:1px solid #ddd;">${trip.transporte || '—'}</td></tr>
     <tr><th>Fecha Aprobación Final</th><td style="padding:4px 8px;border:1px solid #ddd;">${today}</td></tr>
-    <tr><th>Revisado y aprobado por</th><td style="padding:4px 8px;border:1px solid #ddd;">${reviewer?.nombre} ${reviewer?.apellido_paterno}</td></tr>
+    <tr><th>Revisado y aprobado por</th><td style="padding:4px 8px;border:1px solid #ddd;">${reviewer?.aprobacionAutomatica ? 'Aprobación automática' : `${reviewer?.nombre} ${reviewer?.apellido_paterno}`}</td></tr>
   </table>
   <div class="seccion">Gastos Nacionales (Bs)</div>
   ${nationalTable}
@@ -126,6 +126,7 @@ const generateRenditionHtml = (rawTrip, rawReviewer, tripCode, rawExpenses) => {
   <div class="firma-area">
     <div class="firma-nombre">${reviewer?.nombre} ${reviewer?.apellido_paterno}</div>
     <div class="firma-cargo">REVISOR — MAXAM FANEXA</div>
+    ${reviewer?.aprobacionAutomatica ? '<div style="font-size:9pt;color:#475569;margin-top:4px;">El titular del viaje es el revisor; la revisión final se aprobó automáticamente.</div>' : ''}
   </div>
 </body></html>`
 };
@@ -144,8 +145,17 @@ const generateEmployeeResultHtml = (rawTrip, tripCode, summary) => {
       <span>USD ${Math.abs(summary.usdBalance).toFixed(2)}</span>
     </div>`
   }
-  let closingText = 'Por favor coordina con Tesorería la devolución del saldo pendiente.'
-  if (summary.exceedsNational || summary.exceedsUsd) {
+  // En viajes internacionales puede haber devolucion en una moneda y reembolso en la otra
+  const mustReturn = summary.nationalBalance > 0.005 || (summary.isInternational && summary.usdBalance > 0.005)
+  const getsRefund = summary.exceedsNational || (summary.isInternational && summary.exceedsUsd)
+  let closingText = 'No quedan saldos pendientes.'
+  if (mustReturn && getsRefund) {
+    closingText = 'Por favor coordina con Tesorería la devolución del saldo pendiente y el reembolso correspondiente.'
+  }
+  else if (mustReturn) {
+    closingText = 'Por favor coordina con Tesorería la devolución del saldo pendiente.'
+  }
+  else if (getsRefund) {
     closingText = 'Tesorería se pondrá en contacto para coordinar el reembolso correspondiente.'
   }
   return `<!DOCTYPE html>

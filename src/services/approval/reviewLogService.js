@@ -122,7 +122,9 @@ const mergeReviewedTrips = async ({userId, stage, trips, select, filters}) => {
   // Los viajes que solo llegaron por el historial y ya no tienen un resultado vigente
   // (rechazos ya corregidos por el empleado) no se muestran
   const visible = tagged.filter((trip) => baseIds.has(trip.id_viaje) || trip.resultado_revision)
-  visible.sort((first, second) => String(second.fecha_inicio).localeCompare(String(first.fecha_inicio)))
+  // Lo revisado mas recientemente primero; lo que aun no reviso, por fecha de inicio
+  const sortKey = (trip) => String(trip.fecha_revision || trip.fecha_inicio || '')
+  visible.sort((first, second) => sortKey(second).localeCompare(sortKey(first)))
   return {trips: visible}
 }
 
