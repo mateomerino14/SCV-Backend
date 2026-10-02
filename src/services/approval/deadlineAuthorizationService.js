@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase')
+const deadlineService = require('../shared/deadlineService')
 const emailService = require('../shared/emailService')
 const {escapeHtml} = require('../../utils/htmlEscape')
 
@@ -60,7 +61,7 @@ const createRequest = async (tripId, employeeId, reason) => {
   }
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('id_usuario, motivo, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno)')
+    .select('id_usuario, motivo, estado, fecha_inicio, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno)')
     .eq('id_viaje', tripId)
     .single()
   if (!trip) {
@@ -68,6 +69,15 @@ const createRequest = async (tripId, employeeId, reason) => {
   }
   if (trip.id_usuario !== employeeId) {
     return {error: 'No tienes permiso sobre este viaje', status: 403}
+  }
+  // Solo tiene sentido con el viaje en curso y el plazo de registro vencido (sin una
+  // extension vigente): en otro caso el empleado ya puede registrar o no le corresponde
+  if (trip.estado !== 'EN_CURSO') {
+    return {error: 'Solo puedes pedir una extensión de plazo mientras el viaje está en curso', status: 400}
+  }
+  const deadline = await deadlineService.validateTripDeadline(tripId, trip.fecha_inicio)
+  if (!deadline.requiereAutorizacion) {
+    return {error: 'Todavía estás dentro del plazo para registrar gastos', status: 400}
   }
   const {data: existingRequest} = await supabase
     .from('Solicitud_Autorizacion_Plazo')

@@ -84,6 +84,10 @@ const takeTripReview = async (tripId, supervisorId) => {
   if ((await hierarchyAssignmentService.getTripSubstituteIds(tripId)).includes(supervisorId)) {
     return {error: 'No puedes revisar una rendición que registraste como reemplazo', status: 403}
   }
+  // Si ya lo tiene asignado (por ejemplo, por jefatura directa) tomarlo no es un error
+  if (trip.id_supervisor_asignado === supervisorId) {
+    return {message: 'Ya tienes este viaje asignado'}
+  }
   if (trip.id_supervisor_asignado) {
     return {error: 'Este viaje ya fue tomado por otro supervisor', status: 409}
   }
@@ -324,6 +328,10 @@ const takeExpenseReview = async (tripId, supervisorId) => {
   }
   if ((await hierarchyAssignmentService.getTripSubstituteIds(tripId)).includes(supervisorId)) {
     return {error: 'No puedes revisar una rendición que registraste como reemplazo', status: 403}
+  }
+  // Si ya lo tiene asignado (por ejemplo, por jefatura directa) tomarlo no es un error
+  if (trip.id_supervisor_asignado === supervisorId) {
+    return {message: 'Ya tienes este viaje asignado'}
   }
   if (trip.id_supervisor_asignado) {
     return {error: 'Este viaje ya fue tomado por otro supervisor', status: 409}

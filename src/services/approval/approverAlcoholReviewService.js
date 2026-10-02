@@ -103,6 +103,10 @@ const takeAlcoholReview = async (tripId, approverId) => {
   if (trip.id_usuario === approverId) {
     return {error: 'No puedes revisar tu propio viaje', status: 403}
   }
+  // Si ya lo tiene asignado (por ejemplo, por jefatura directa) tomarlo no es un error
+  if (trip.id_aprobador_asignado === approverId) {
+    return {message: 'Ya tienes este viaje asignado'}
+  }
   if (trip.id_aprobador_asignado) {
     return {error: 'Este viaje ya fue tomado por otro aprobador', status: 409}
   }
@@ -196,11 +200,11 @@ const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} 
   if (trip.id_usuario === approverId && !selfStageSkip) {
     return {error: 'No puedes aprobar tu propio viaje', status: 403}
   }
-  if (trip.id_aprobador_asignado !== approverId && !selfStageSkip) {
-    return {error: 'No tienes permiso para aprobar este viaje', status: 403}
-  }
   if (trip.estado !== 'EN_REVISION_APROBADOR') {
     return {error: 'Este viaje no está en revisión adicional del aprobador', status: 400}
+  }
+  if (trip.id_aprobador_asignado !== approverId && !selfStageSkip) {
+    return {error: 'No tienes permiso para aprobar este viaje', status: 403}
   }
   const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'APROBADO_SUPERVISOR', id_aprobador_asignado: approverId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').select('id_viaje')
   if (error) {
@@ -227,11 +231,11 @@ const rejectAlcoholReview = async (tripId, approverId) => {
   if (trip.id_usuario === approverId) {
     return {error: 'No puedes rechazar tu propio viaje', status: 403}
   }
-  if (trip.id_aprobador_asignado !== approverId) {
-    return {error: 'No tienes permiso para rechazar este viaje', status: 403}
-  }
   if (trip.estado !== 'EN_REVISION_APROBADOR') {
     return {error: 'Este viaje no está en revisión adicional del aprobador', status: 400}
+  }
+  if (trip.id_aprobador_asignado !== approverId) {
+    return {error: 'No tienes permiso para rechazar este viaje', status: 403}
   }
   const {data: existingComments} = await supabase
     .from('Comentario')

@@ -47,9 +47,6 @@ const createRequest = async (tripId, requesterId, substituteId) => {
   if (!substituteId) {
     return {error: 'Debes seleccionar quién rendirá por ti', status: 400}
   }
-  if (parseInt(substituteId) === requesterId) {
-    return {error: 'No puedes designarte a ti mismo como sustituto', status: 400}
-  }
   const {data: trip} = await supabase
     .from('Viaje')
     .select('id_usuario, motivo, estado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno)')
@@ -60,6 +57,9 @@ const createRequest = async (tripId, requesterId, substituteId) => {
   }
   if (trip.id_usuario !== requesterId) {
     return {error: 'No tienes permiso sobre este viaje', status: 403}
+  }
+  if (parseInt(substituteId) === requesterId) {
+    return {error: 'No puedes designarte a ti mismo como sustituto', status: 400}
   }
   if (trip.estado !== 'EN_CURSO' && trip.estado !== 'RECHAZADO') {
     return {error: 'Solo puedes solicitar un reemplazo mientras el viaje está en curso o rechazado', status: 400}
@@ -84,6 +84,17 @@ const createRequest = async (tripId, requesterId, substituteId) => {
     .maybeSingle()
   if (existingRequest) {
     return {error: 'Ya existe una solicitud de reemplazo pendiente para este viaje', status: 400}
+  }
+  // Si esa persona ya fue aprobada como reemplazo de este viaje, no se repite la solicitud
+  const {data: approvedForSubstitute} = await supabase
+    .from('Solicitud_Reemplazo')
+    .select('id_solicitud')
+    .eq('id_viaje', tripId)
+    .eq('id_sustituto', substituteId)
+    .eq('estado', 'APROBADA')
+    .limit(1)
+  if ((approvedForSubstitute || []).length > 0) {
+    return {error: 'Esa persona ya está aprobada como reemplazo de este viaje', status: 400}
   }
   const {data: request, error} = await supabase
     .from('Solicitud_Reemplazo')
@@ -293,7 +304,15 @@ const getActiveSubstitutions = async (substituteId) => {
   if (error) {
     return []
   }
-  const activeTrips = (data || []).filter((row) => row.Viaje && ['EN_CURSO', 'RECHAZADO'].includes(row.Viaje.estado))
+  // Un mismo viaje aparece una sola vez aunque tenga mas de una solicitud aprobada
+  const seenTrips = new Set()
+  const activeTrips = (data || []).filter((row) => {
+    if (!row.Viaje || !['EN_CURSO', 'RECHAZADO'].includes(row.Viaje.estado) || seenTrips.has(row.Viaje.id_viaje)) {
+      return false
+    }
+    seenTrips.add(row.Viaje.id_viaje)
+    return true
+  })
   if (activeTrips.length === 0) {
     return []
   }
@@ -362,8 +381,8 @@ const canRegisterExpenseOnTrip = async (tripId, userId) => {
       .eq('id_viaje', tripId)
       .eq('id_sustituto', userId)
       .eq('estado', 'APROBADA')
-      .maybeSingle()
-    isSubstitute = !!approvedSubstitution
+      .limit(1)
+    isSubstitute = (approvedSubstitution || []).length > 0
   }
   if (!isOwner && !isSubstitute) {
     return {allowed: false, error: 'No tienes permiso sobre este viaje', status: 403}

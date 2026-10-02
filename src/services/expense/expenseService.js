@@ -82,7 +82,8 @@ const createExpense = async (expenseData, file, userId) => {
   if (!access.allowed) {
     return {error: access.error, status: access.status}
   }
-  const isInternational = expenseData.es_gasto_internacional || false
+  // Se acepta true o "true"; cualquier otro valor es un gasto en bolivianos
+  const isInternational = expenseData.es_gasto_internacional === true || expenseData.es_gasto_internacional === 'true'
   const currencyError = validateCurrencyByDay(access.trip, expenseData.fecha_gasto, isInternational)
   if (currencyError) {
     return {error: currencyError, status: 400}
@@ -94,6 +95,10 @@ const createExpense = async (expenseData, file, userId) => {
     return {error: detailsError, status: 400}
   }
   let totalAmount = parseFloat(expenseData.monto_total)
+  // Con conversiones de moneda, el total en USD es la suma de los tramos convertidos
+  if (usesSegments) {
+    totalAmount = parseFloat(expenseData.tramos.reduce((sum, segment) => sum + parseFloat((parseFloat(segment.monto_origen) / parseFloat(segment.tipo_cambio)).toFixed(2)), 0).toFixed(2))
+  }
   if (!isInternational && usesSubItems) {
     const subItemsAmount = calculateAmountFromSubitems(expenseData.subitems)
     if (subItemsAmount !== null) {
@@ -101,7 +106,7 @@ const createExpense = async (expenseData, file, userId) => {
     }
   }
   if (!totalAmount || isNaN(totalAmount) || totalAmount <= 0) {
-    return {error: 'El monto es requerido', status: 400}
+    return {error: 'El monto es requerido y debe ser mayor a cero', status: 400}
   }
   if (expenseData.fecha_gasto) {
     const deadlineValidation = await deadlineService.validateTripDeadline(expenseData.id_viaje, expenseData.fecha_gasto)
@@ -132,7 +137,8 @@ const createExpense = async (expenseData, file, userId) => {
       id_viaje: expenseData.id_viaje,
       id_categoria: expenseData.id_categoria_gasto || null,
       id_proveedor: supplierId,
-      moneda: firstSegment?.moneda || expenseData.moneda || 'USD',
+      // Moneda real del gasto: BOB si es nacional; en internacionales, la del primer tramo
+      moneda: isInternational ? String(firstSegment?.moneda || expenseData.moneda || 'USD').trim().toUpperCase() : 'BOB',
       tipo_cambio: firstSegment ? parseFloat(firstSegment.tipo_cambio) : (expenseData.tipo_cambio || 1),
       monto_moneda_origen: originAmountSum,
       es_gasto_internacional: isInternational,
@@ -207,7 +213,8 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
   if (!deadlineValidation.valid) {
     return {error: deadlineValidation.error, status: 400, requiereAutorizacion: !!deadlineValidation.requiereAutorizacion}
   }
-  const isInternational = expenseData.es_gasto_internacional || false
+  // Se acepta true o "true"; cualquier otro valor es un gasto en bolivianos
+  const isInternational = expenseData.es_gasto_internacional === true || expenseData.es_gasto_internacional === 'true'
   const currencyError = validateCurrencyByDay(access.trip, expenseData.fecha_gasto, isInternational)
   if (currencyError) {
     return {error: currencyError, status: 400}
@@ -219,6 +226,10 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
     return {error: detailsError, status: 400}
   }
   let totalAmount = parseFloat(expenseData.monto_total)
+  // Con conversiones de moneda, el total en USD es la suma de los tramos convertidos
+  if (usesSegments) {
+    totalAmount = parseFloat(expenseData.tramos.reduce((sum, segment) => sum + parseFloat((parseFloat(segment.monto_origen) / parseFloat(segment.tipo_cambio)).toFixed(2)), 0).toFixed(2))
+  }
   if (!isInternational && usesSubItems) {
     const subItemsAmount = calculateAmountFromSubitems(expenseData.subitems)
     if (subItemsAmount !== null) {
@@ -226,7 +237,7 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
     }
   }
   if (!totalAmount || isNaN(totalAmount) || totalAmount <= 0) {
-    return {error: 'El monto es requerido', status: 400}
+    return {error: 'El monto es requerido y debe ser mayor a cero', status: 400}
   }
   const supplierId = await supplierService.findOrCreateSupplier(expenseData.proveedor)
   const type = expenseData.tipo || 'S'
@@ -250,7 +261,8 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
       tipo: type,
       id_categoria: expenseData.id_categoria_gasto || null,
       id_proveedor: supplierId,
-      moneda: firstSegment?.moneda || expenseData.moneda || 'USD',
+      // Moneda real del gasto: BOB si es nacional; en internacionales, la del primer tramo
+      moneda: isInternational ? String(firstSegment?.moneda || expenseData.moneda || 'USD').trim().toUpperCase() : 'BOB',
       tipo_cambio: firstSegment ? parseFloat(firstSegment.tipo_cambio) : (expenseData.tipo_cambio || 1),
       monto_moneda_origen: originAmountSum,
       es_gasto_internacional: isInternational,
@@ -348,4 +360,4 @@ const deleteExpense = async (expenseId, userId) => {
   return {}
 };
 
-module.exports = {calculateRetentions, calculateAmountFromSubitems, createExpense, updateExpense, deleteExpense};
+module.exports = {calculateRetentions, calculateAmountFromSubitems, validateCurrencyByDay, createExpense, updateExpense, deleteExpense};

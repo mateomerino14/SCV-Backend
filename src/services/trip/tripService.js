@@ -139,7 +139,15 @@ const getTripDetail = async (tripId, requesterId) => {
   }
 };
 
-const isValidDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) && !isNaN(new Date(value).getTime())
+// Fecha YYYY-MM-DD que exista en el calendario (rechaza, por ejemplo, 2026-02-30)
+const isValidDate = (value) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''))
+  if (!match) {
+    return false
+  }
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+  return date.getUTCFullYear() === Number(match[1]) && date.getUTCMonth() === Number(match[2]) - 1 && date.getUTCDate() === Number(match[3])
+}
 const isValidAmount = (value) => value !== undefined && value !== null && value !== '' && !isNaN(parseFloat(value)) && parseFloat(value) >= 0
 
 // Valida los datos de un viaje al crearlo o reeditarlo, con los mismos limites de la base

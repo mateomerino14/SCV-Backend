@@ -70,7 +70,7 @@ const getMyTrips = async (treasurerId, filters) => {
 const getTripDetail = async (tripId, treasurerId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
     .eq('id_viaje', tripId)
     .single()
   if (tripError) {

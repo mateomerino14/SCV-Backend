@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase')
+const {parseFormData} = require('../../utils/requestData')
 const expenseService = require('../../services/expense/expenseService')
 const receiptService = require('../../services/expense/receiptService')
 const tripAccessService = require('../../services/trip/tripAccessService')
@@ -29,7 +30,7 @@ const getExpenseDetail = async (req, res) => {
         Viaje(id_viaje, fecha_inicio, fecha_fin, estado)
       `)
       .eq('id_gasto', expenseId)
-      .single()
+      .maybeSingle()
     if (error) {
       return res.status(500).json({error: error.message})
     }
@@ -92,7 +93,10 @@ const sendIndividualReceipt = async (req, res) => {
 // Registra un nuevo gasto
 const registerExpense = async (req, res) => {
   try {
-    const expenseData = JSON.parse(req.body.datos)
+    const expenseData = parseFormData(req.body.datos)
+    if (!expenseData) {
+      return res.status(400).json({error: 'Los datos enviados no son válidos'})
+    }
     const result = await expenseService.createExpense(expenseData, req.file, req.user.id_usuario)
     if (result.error) {
       return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion})
@@ -107,7 +111,10 @@ const registerExpense = async (req, res) => {
 // Actualiza un gasto existente
 const updateExpense = async (req, res) => {
   try {
-    const expenseData = JSON.parse(req.body.datos)
+    const expenseData = parseFormData(req.body.datos)
+    if (!expenseData) {
+      return res.status(400).json({error: 'Los datos enviados no son válidos'})
+    }
     const {expenseId} = req.params
     const result = await expenseService.updateExpense(expenseId, expenseData, req.file, req.user.id_usuario)
     if (result.error) {

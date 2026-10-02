@@ -28,10 +28,19 @@ const getHistory = async (req, res) => {
   }
 };
 
+// Responde 404 si el viaje no existe y 403 si existe pero no le corresponde al usuario
+const denyTripAccess = async (tripId, res) => {
+  const {data: trip} = await supabase.from('Viaje').select('id_viaje').eq('id_viaje', tripId).maybeSingle()
+  if (!trip) {
+    return res.status(404).json({error: 'El viaje no existe'})
+  }
+  return res.status(403).json({error: 'No tienes permiso para ver este viaje'})
+}
+
 // Obtiene el detalle de un viaje
 const getTripDetail = async (req, res) => {
   if (!(await tripAccessService.canViewTrip(req.params.id, req.user.id_usuario))) {
-    return res.status(403).json({error: 'No tienes permiso para ver este viaje'})
+    return denyTripAccess(req.params.id, res)
   }
   const result = await tripService.getTripDetail(req.params.id, req.user.id_usuario)
   if (result.error) {
@@ -122,7 +131,7 @@ const confirmCompletion = async (req, res) => {
 // Genera y descarga la planilla de rendicion de cuentas en PDF
 const downloadStatementPdf = async (req, res) => {
   if (!(await tripAccessService.canViewTrip(req.params.id, req.user.id_usuario))) {
-    return res.status(403).json({error: 'No tienes permiso para ver este viaje'})
+    return denyTripAccess(req.params.id, res)
   }
   const result = await tripStatementService.generateStatementPdf(req.params.id)
   if (result.error) {

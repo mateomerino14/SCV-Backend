@@ -227,6 +227,9 @@ const updateUser = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario').update(payload).eq('id_usuario', userId).select(userPublicColumns)
   if (error) {
+    if (error.code === '23505') {
+      return res.status(400).json({error: 'Ya existe un usuario con ese correo corporativo'})
+    }
     return res.status(500).json({error: error.message})
   }
   else {
@@ -260,6 +263,9 @@ const createUser = async (req, res) => {
   }
   const {data, error} = await supabase.from('Usuario').insert(body).select(userPublicColumns)
   if (error) {
+    if (error.code === '23505') {
+      return res.status(400).json({error: 'Ya existe un usuario con ese correo corporativo'})
+    }
     return res.status(500).json({error: error.message})
   }
   else {
@@ -271,7 +277,7 @@ const createUser = async (req, res) => {
         ${emailService.emailParagraph('Se creó tu cuenta en el Sistema de Control de Viáticos. Estas son tus credenciales de acceso:')}
         ${emailService.emailInfoBox([{label: 'Correo', value: newUser.email_corporativo}])}
         ${emailService.emailHighlightBox('Contraseña temporal', temporaryPassword)}
-        ${emailService.emailNote('Por tu seguridad, te recomendamos cambiar esta contraseña desde tu perfil apenas ingreses al sistema.')}
+        ${emailService.emailNote('Es una contraseña temporal: al ingresar por primera vez, el sistema te pedirá crear una propia.')}
         ${emailService.emailButton('Ingresar al sistema', loginUrl)}
       `
       const emailHtml = emailService.buildEmailLayout('Bienvenido al sistema', emailBody)

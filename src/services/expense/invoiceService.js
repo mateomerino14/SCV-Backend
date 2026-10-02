@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase')
+const expenseService = require('./expenseService')
 const deadlineService = require('../shared/deadlineService')
 const alcoholDetectionService = require('../shared/alcoholDetectionService')
 const supplierService = require('./supplierService')
@@ -50,6 +51,19 @@ const uploadInvoiceImage = async (expenseId, file) => {
 };
 
 // Valida los campos requeridos para guardar una factura
+// Cada producto de la factura con nombre, cantidad mayor a cero y precio no negativo
+const validateInvoiceLines = (lines) => {
+  for (const item of lines) {
+    if (!String(item?.nombre_producto || '').trim()) {
+      return 'Cada producto de la factura debe tener un nombre'
+    }
+    if (!(parseFloat(item.cantidad) > 0) || isNaN(parseFloat(item.precio)) || parseFloat(item.precio) < 0) {
+      return 'Cada producto debe tener una cantidad mayor a cero y un precio válido'
+    }
+  }
+  return null
+}
+
 const validateInvoiceData = (invoiceData) => {
   if (!invoiceData.proveedor) {
     return 'El nombre del proveedor es requerido'
@@ -72,7 +86,7 @@ const validateInvoiceData = (invoiceData) => {
   if (!Array.isArray(invoiceData.detalle) || invoiceData.detalle.length === 0) {
     return 'Debes agregar al menos un producto al detalle de la factura'
   }
-  return null
+  return validateInvoiceLines(invoiceData.detalle)
 };
 
 // Guarda una nueva factura junto con su gasto, proveedor y detalle
@@ -84,6 +98,11 @@ const saveInvoice = async (invoiceData, file, userId) => {
   const access = await substitutionService.canRegisterExpenseOnTrip(invoiceData.id_viaje, userId)
   if (!access.allowed) {
     return {error: access.error, status: access.status}
+  }
+  // Las facturas son en bolivianos: en un viaje internacional solo valen el primer y el ultimo dia
+  const currencyError = expenseService.validateCurrencyByDay(access.trip, invoiceData.fecha_emision, false)
+  if (currencyError) {
+    return {error: currencyError, status: 400}
   }
   const deadlineValidation = await deadlineService.validateTripDeadline(invoiceData.id_viaje, invoiceData.fecha_emision)
   if (!deadlineValidation.valid) {
@@ -127,6 +146,11 @@ const saveInvoice = async (invoiceData, file, userId) => {
       id_proveedor: supplierId,
       id_categoria: invoiceData.id_categoria_gasto || null,
       tiene_alcohol: hasAlcohol,
+      es_gasto_internacional: false,
+      moneda: 'BOB',
+      monto_moneda_origen: parseFloat(invoiceData.monto_total),
+      // Factura o recibo: sin retenciones, el costo es el monto completo
+      ...expenseService.calculateRetentions(invoiceData.monto_total, invoiceData.tipo_doc, false, hasAlcohol),
     })
     .select()
     .single()
@@ -196,6 +220,10 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   if (!Array.isArray(invoiceData.detalle) || invoiceData.detalle.length === 0) {
     return {error: 'Debes agregar al menos un producto al detalle de la factura', status: 400}
   }
+  const linesError = validateInvoiceLines(invoiceData.detalle)
+  if (linesError) {
+    return {error: linesError, status: 400}
+  }
   if (!file && !invoiceData.mantener_imagen) {
     return {error: 'Debes subir el comprobante de la factura', status: 400}
   }
@@ -206,6 +234,10 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   const access = await substitutionService.canRegisterExpenseOnTrip(existingExpense.id_viaje, userId)
   if (!access.allowed) {
     return {error: access.error, status: access.status}
+  }
+  const currencyError = expenseService.validateCurrencyByDay(access.trip, invoiceData.fecha_emision, false)
+  if (currencyError) {
+    return {error: currencyError, status: 400}
   }
   // Siempre con el viaje real del gasto (no el que envie el cliente) para que no se salte el plazo
   const deadlineValidation = await deadlineService.validateTripDeadline(existingExpense.id_viaje, invoiceData.fecha_emision)
@@ -249,6 +281,8 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
       id_proveedor: supplierId,
       id_categoria: invoiceData.id_categoria_gasto || null,
       tiene_alcohol: hasAlcohol,
+      monto_moneda_origen: parseFloat(invoiceData.monto_total),
+      ...expenseService.calculateRetentions(invoiceData.monto_total, invoiceData.tipo_doc || 'F', false, hasAlcohol),
     })
     .eq('id_gasto', expenseId)
   if (expenseError) {
