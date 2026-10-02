@@ -54,7 +54,7 @@ npm start      # producción
 npm test       # pruebas automáticas (Jest, carpeta tests/)
 ```
 
-Al arrancar, se programa además una tarea (`node-cron`) que envía un resumen de pendientes a supervisores, aprobadores, revisor y tesorero tres veces al día (08:00, 12:00 y 16:00, hora Bolivia), solo a quienes tengan algo pendiente. Cada supervisor recibe solo sus propios pendientes: los que tiene asignados y los sin asignar que le corresponden por jerarquía. Al revisor también se le incluyen las solicitudes de ampliación de plazo y de reemplazo pendientes. La hora se calcula siempre en `America/La_Paz`, aunque el servidor esté en otra zona horaria; si el envío a una persona falla, igual se envía a las demás.
+Al arrancar, se programa además una tarea (`node-cron`) que envía un resumen de pendientes a supervisores, aprobadores, revisor y tesorero tres veces al día (08:00, 12:00 y 16:00, hora Bolivia) de lunes a viernes, solo a quienes tengan algo pendiente. Cada supervisor recibe solo sus propios pendientes: los que tiene asignados y los sin asignar que le corresponden por jerarquía. Al revisor también se le incluyen las solicitudes de ampliación de plazo y de reemplazo pendientes. La hora se calcula siempre en `America/La_Paz`, aunque el servidor esté en otra zona horaria; si el envío a una persona falla, igual se envía a las demás.
 
 Para enviarlo en el momento, sin esperar la hora (con el mismo `.env` del servidor):
 
@@ -183,7 +183,7 @@ Si la versión trae cambios de base de datos, aplicarlos antes en Supabase (ver 
 | Axios | Verificación de correos con AbstractAPI |
 | Google Generative AI | Extracción de datos de comprobantes y detección de alcohol |
 | Puppeteer | Generación de PDF (memorándum, confirmación de fondos, rendición, planilla y recibos) |
-| node-cron | Resumen de pendientes por correo, tres veces al día |
+| node-cron | Resumen de pendientes por correo, tres veces al día de lunes a viernes |
 | Brevo | Correo transaccional |
 | Helmet + CORS | Cabeceras de seguridad y control de orígenes |
 | express-rate-limit | Límite de intentos de acceso, recuperación de contraseña y extracción de facturas |
@@ -384,7 +384,7 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 | `geminiService` | Llamadas al modelo con reintentos y modelo de respaldo ante cuota agotada |
 | `commentModerationService` | Verifica que el texto no contenga términos prohibidos |
 | `auditLogService` | Registra ingresos, salidas y cambios de contraseña |
-| `dailyDigestService` | Arma y envía el resumen de pendientes por rol, tres veces al día (cada supervisor con lo suyo; el revisor también con las solicitudes de plazo y reemplazo) |
+| `dailyDigestService` | Arma y envía el resumen de pendientes por rol, tres veces al día de lunes a viernes (cada supervisor con lo suyo; el revisor también con las solicitudes de plazo y reemplazo) |
 | `emailService` | Correo transaccional mediante Brevo, con plantilla institucional común (`buildEmailLayout`) |
 | `pdfService` | Conversión de HTML a PDF con Puppeteer |
 | `expenseSummaryService` | Control de gasto diario, exceso en hoteles y alertas; usado por empleado y revisores por igual |
