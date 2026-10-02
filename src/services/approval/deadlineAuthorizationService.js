@@ -152,6 +152,23 @@ const getRequestStatus = async (tripId, employeeId) => {
 const requestableTripStates = ['EN_CURSO']
 const autoCloseObservation = 'Cerrada automáticamente: el viaje ya se envió a revisión antes de que se respondiera la solicitud.'
 
+// Mensaje para quien intenta atender una solicitud que ya no esta pendiente
+const describeProcessedRequest = (request) => {
+  if (request?.estado === 'APROBADA') {
+    return 'Esta solicitud ya fue aprobada.'
+  }
+  if (request?.estado === 'RECHAZADA' && !request.id_revisor) {
+    return 'El empleado ya envió el viaje a revisión, así que esta solicitud se cerró automáticamente.'
+  }
+  return 'Esta solicitud ya fue rechazada.'
+};
+
+// Vuelve a leer la solicitud cuando otra accion se adelanto, para explicar que paso
+const processedRequestError = async (requestId) => {
+  const {data} = await supabase.from('Solicitud_Autorizacion_Plazo').select('estado, id_revisor').eq('id_solicitud', requestId).maybeSingle()
+  return {error: describeProcessedRequest(data), status: 409}
+};
+
 // Cierra las solicitudes pendientes de esos viajes (por ejemplo, al enviarse el viaje a
 // revision): ya no tienen sentido y no deben quedar en la bandeja del revisor
 const closePendingRequests = async (tripIds) => {
@@ -212,11 +229,11 @@ const approveRequest = async (requestId, reviewerId) => {
     return {error: 'Solicitud no encontrada', status: 404}
   }
   if (request.estado !== 'PENDIENTE') {
-    return {error: 'Esta solicitud ya fue procesada', status: 400}
+    return {error: describeProcessedRequest(request), status: 409}
   }
   if (!requestableTripStates.includes(request.Viaje?.estado)) {
     await closePendingRequests([request.id_viaje])
-    return {error: 'El viaje ya se envió a revisión, así que esta solicitud se cerró automáticamente.', status: 409}
+    return {error: describeProcessedRequest({estado: 'RECHAZADA', id_revisor: null}), status: 409}
   }
   const responseDate = new Date()
   const {data: updatedRequests, error} = await supabase
@@ -230,7 +247,7 @@ const approveRequest = async (requestId, reviewerId) => {
   }
   // Otra persona la resolvio entre la lectura y esta accion
   if (!updatedRequests?.length) {
-    return {error: 'Esta solicitud ya fue procesada', status: 409}
+    return processedRequestError(requestId)
   }
   try {
     const employee = request.Viaje?.Usuario
@@ -266,14 +283,18 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   }
   const {data: request} = await supabase
     .from('Solicitud_Autorizacion_Plazo')
-    .select('*, Viaje(motivo, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo))')
+    .select('*, Viaje(estado, motivo, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo))')
     .eq('id_solicitud', requestId)
     .single()
   if (!request) {
     return {error: 'Solicitud no encontrada', status: 404}
   }
   if (request.estado !== 'PENDIENTE') {
-    return {error: 'Esta solicitud ya fue procesada', status: 400}
+    return {error: describeProcessedRequest(request), status: 409}
+  }
+  if (!requestableTripStates.includes(request.Viaje?.estado)) {
+    await closePendingRequests([request.id_viaje])
+    return {error: describeProcessedRequest({estado: 'RECHAZADA', id_revisor: null}), status: 409}
   }
   const {data: updatedRequests, error} = await supabase
     .from('Solicitud_Autorizacion_Plazo')
@@ -286,7 +307,7 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   }
   // Otra persona la resolvio entre la lectura y esta accion
   if (!updatedRequests?.length) {
-    return {error: 'Esta solicitud ya fue procesada', status: 409}
+    return processedRequestError(requestId)
   }
   try {
     const employee = request.Viaje?.Usuario
