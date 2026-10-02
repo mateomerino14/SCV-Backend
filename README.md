@@ -180,8 +180,7 @@ Si la versión trae cambios de base de datos, aplicarlos antes en Supabase (ver 
 | jsonwebtoken | Emisión y verificación de tokens |
 | bcrypt | Cifrado de contraseñas |
 | Multer | Procesamiento de archivos multiparte |
-| Jimp + qrcode-reader | Lectura de códigos QR en comprobantes |
-| Cheerio + Axios | Consulta y análisis del portal del SIAT |
+| Axios | Verificación de correos con AbstractAPI |
 | Google Generative AI | Extracción de datos de comprobantes y detección de alcohol |
 | Puppeteer | Generación de PDF (memorándum, confirmación de fondos, rendición, planilla y recibos) |
 | node-cron | Resumen de pendientes por correo, tres veces al día |
@@ -413,14 +412,9 @@ La extensión amplía el margen para **cargar** los gastos, no el rango de fecha
 
 ## Extracción de datos de comprobantes
 
-Estrategia en cascada, de mayor a menor confiabilidad:
+La imagen del comprobante se envía al modelo de visión de Gemini (`invoiceExtractionService`) con una instrucción que fija el contexto tributario boliviano: el «Importe» es el total con IVA incluido, el IVA es del 13 % y debe devolverse como monto en dinero, y el resultado es un JSON con proveedor, NIT, número de factura, fecha de emisión, monto sin impuestos, IVA, total, tipo de documento (`F` o `R`) y detalle de productos.
 
-1. Lectura del código QR de la imagen.
-2. Si apunta al SIAT, consulta directa a la autoridad tributaria. Produce datos verificados con detalle de productos.
-3. Si el QR es genérico, se interpretan sus parámetros.
-4. Como última instancia, análisis de la imagen por el modelo de visión.
-
-La invocación al modelo (`geminiService`) reintenta ante errores temporales y, si el modelo principal falla o agotó su cuota, usa un modelo de respaldo. Si la fecha de emisión extraída no tiene un formato válido, el campo queda editable en el frontend para que el empleado la corrija; si vino bien formada, queda bloqueado.
+La invocación (`geminiService`) reintenta ante errores temporales y, si el modelo principal falla o agotó su cuota, usa un modelo de respaldo. La respuesta se normaliza: los datos que faltan quedan como «No Especificado» y la fecha se valida; si no es una fecha real con formato válido, el campo queda editable en el frontend para que el empleado la corrija, y si vino bien formada, queda bloqueado. El empleado revisa y puede corregir todos los datos antes de guardar.
 
 ## Base de datos
 
