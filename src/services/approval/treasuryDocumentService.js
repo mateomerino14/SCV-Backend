@@ -45,7 +45,7 @@ const generateFundConfirmationHtml = (rawTrip, rawTreasurer, tripCode) => {
     ${treasurer?.aprobacionAutomatica
       ? `<div class="firma-nombre">Aprobación automática</div>
     <div class="firma-cargo">Sistema de Control de Viáticos — MAXAM FANEXA</div>
-    <div class="firma-nota">El titular del viaje es el tesorero; el fondo se aprobó automáticamente con el monto calculado por el sistema.</div>`
+    <div class="firma-nota">El titular del viaje es el tesorero; el fondo se aprobó automáticamente con el monto solicitado en el viaje.</div>`
       : `<div class="firma-nombre">${treasurer?.nombre} ${treasurer?.apellido_paterno}</div>
     <div class="firma-cargo">TESORERÍA — MAXAM FANEXA</div>`}
   </div>

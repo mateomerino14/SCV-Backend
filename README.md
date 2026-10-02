@@ -243,7 +243,7 @@ Un viaje rechazado antes de iniciarse se corrige editándolo y vuelve a `EN_REVI
 
 ### Aprobación automática de etapas propias
 
-Si el responsable de una etapa única (aprobador, tesorero o revisor) es el mismo viajero, esa etapa se aprueba sola (`selfReviewSkipService`) y los documentos lo indican como "aprobación automática". No aplica a supervisores: el viaje pasa a otro según la jerarquía.
+Si el responsable de una etapa única (aprobador, tesorero o revisor) es el mismo viajero, esa etapa se aprueba sola (`selfReviewSkipService`) y los documentos lo indican como "aprobación automática". No aplica a supervisores: el viaje pasa a otro según la jerarquía. En el caso del tesorero, el fondo se aprueba con el monto que él mismo solicitó en el viaje.
 
 ### Historial de revisión
 

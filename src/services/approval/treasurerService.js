@@ -118,7 +118,7 @@ const updateAmounts = async (tripId, amounts, treasurerId) => {
 
 // Aprueba el fondo de un viaje y notifica al empleado
 // Con selfStageSkip se aprueba automaticamente el fondo del propio tesorero, con el monto
-// calculado por el sistema (ver selfReviewSkipService)
+// que el mismo solicito en el viaje (ver selfReviewSkipService)
 const approveTrip = async (tripId, treasurerId, {selfStageSkip = false} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
