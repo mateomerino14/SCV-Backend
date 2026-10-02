@@ -220,7 +220,9 @@ const approveRequest = async (requestId, reviewerId) => {
         ])}
       `
       const html = emailService.buildEmailLayout('Reemplazo aprobado', body)
+      // Si falla este correo, igual se avisa al reemplazo
       await emailService.sendEmail([{email: employee.email_corporativo, name: employeeName}], `Reemplazo Aprobado — ${request.Viaje?.motivo}`, html)
+        .catch((employeeEmailError) => console.warn('Error notificando al titular del reemplazo:', employeeEmailError.message))
     }
     if (substitute?.email_corporativo) {
       const body = `
