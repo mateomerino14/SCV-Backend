@@ -40,6 +40,7 @@ FRONTEND_URL=...
 | `BREVO_API_KEY` | Envío de correo transaccional |
 | `ABSTRACT_EMAIL_API_KEY` | Validación de existencia de direcciones de correo |
 | `FRONTEND_URL` | URL del cliente web, usada en el botón "Ingresar al sistema" de los correos |
+| `CORS_ORIGINS` | Opcional. Dominios del cliente web que pueden usar la API, separados por coma. Sin ella se aceptan `localhost:5173` y los dominios de Vercel del proyecto |
 | `TRUST_PROXY` | Opcional. `true` si el servidor está detrás de un proxy (en Render no hace falta: se detecta solo con la variable `RENDER`) |
 | `PUPPETEER_EXECUTABLE_PATH` | Opcional. Ruta a un Chrome/Chromium propio si no se usa el que descarga `puppeteer` al instalar |
 
@@ -53,6 +54,114 @@ npm start      # producción
 ```
 
 Al arrancar, se programa además una tarea (`node-cron`) que envía un resumen de pendientes a supervisores, aprobadores, revisor y tesorero tres veces al día (08:00, 12:00 y 16:00, hora Bolivia), solo a quienes tengan algo pendiente. Cada supervisor recibe solo sus propios pendientes: los que tiene asignados y los sin asignar que le corresponden por jerarquía. Al revisor también se le incluyen las solicitudes de ampliación de plazo y de reemplazo pendientes. La hora se calcula siempre en `America/La_Paz`, aunque el servidor esté en otra zona horaria; si el envío a una persona falla, igual se envía a las demás.
+
+## Despliegue en un VPS
+
+Guía para un servidor Ubuntu 22.04 o 24.04 con el frontend en Vercel (o en otro dominio). A diferencia de Render, en un VPS el proceso queda siempre encendido, por lo que el resumen de pendientes sale siempre a sus horas.
+
+### 1. Node.js y el proyecto
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs git
+git clone https://github.com/mateomerino14/SCV-Backend.git
+cd SCV-Backend
+npm ci
+```
+
+### 2. Librerías para generar los PDF
+
+Los recibos, memorándums y documentos se generan con Chromium sin pantalla (`puppeteer`). `npm ci` lo descarga, pero necesita estas librerías del sistema:
+
+```bash
+sudo apt-get install -y ca-certificates fonts-liberation libatk-bridge2.0-0 libatk1.0-0 \
+  libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgbm1 libglib2.0-0 libgtk-3-0 \
+  libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 libx11-6 libx11-xcb1 libxcb1 \
+  libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 \
+  libxss1 libxtst6 xdg-utils
+# Ubuntu 22.04: libasound2   |   Ubuntu 24.04: libasound2t64
+sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
+```
+
+Para comprobarlo, una vez configurado el `.env`, se puede pedir un recibo desde el sistema: si faltara alguna librería, el registro del servidor muestra el error de Chromium.
+
+### 3. Variables de entorno
+
+Crear el `.env` con los mismos valores que en Render, y además:
+
+```
+NODE_ENV=production
+PORT=5000
+TRUST_PROXY=true
+FRONTEND_URL=https://scv-frontend.vercel.app
+# Solo si el frontend usa otro dominio:
+# CORS_ORIGINS=https://viaticos.tuempresa.com,https://scv-frontend.vercel.app
+```
+
+- `NODE_ENV=production` marca la cookie de sesión como segura, requisito para que funcione con el frontend en otro dominio. Por eso el backend **debe** servirse por HTTPS (paso 5).
+- `TRUST_PROXY=true` porque el servidor queda detrás de Nginx; sin ella el límite de intentos de ingreso trataría a todos los usuarios como una sola IP.
+
+### 4. Mantenerlo encendido con pm2
+
+```bash
+sudo npm install -g pm2
+pm2 start src/index.js --name scv-backend -i 1
+pm2 save
+pm2 startup        # ejecutar el comando que muestra, para que arranque con el VPS
+```
+
+Usar **una sola instancia** (`-i 1`, sin modo cluster): con varias, cada una enviaría el resumen de pendientes y llegaría duplicado. Comandos útiles: `pm2 logs scv-backend`, `pm2 restart scv-backend`.
+
+### 5. Dominio y HTTPS con Nginx
+
+Apuntar un subdominio (por ejemplo `api.tuempresa.com`) a la IP del VPS y luego:
+
+```bash
+sudo apt-get install -y nginx certbot python3-certbot-nginx
+sudo tee /etc/nginx/sites-available/scv-backend > /dev/null <<'NGINX'
+server {
+  server_name api.tuempresa.com;
+  client_max_body_size 15M;
+  location / {
+    proxy_pass http://127.0.0.1:5000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 120s;
+  }
+}
+NGINX
+sudo ln -s /etc/nginx/sites-available/scv-backend /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d api.tuempresa.com
+```
+
+`client_max_body_size` deja pasar los comprobantes (el servidor acepta hasta 8 MB por archivo); `proxy_read_timeout` da tiempo a la extracción de facturas y a la generación de PDF.
+
+### 6. Firewall
+
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 'Nginx Full'
+sudo ufw enable
+```
+
+El puerto 5000 queda cerrado al exterior; solo Nginx lo usa.
+
+### 7. Frontend
+
+En Vercel, cambiar `VITE_API_URL` a `https://api.tuempresa.com` y volver a desplegar. Si el frontend pasa a un dominio propio, ponerlo en `CORS_ORIGINS` y en `FRONTEND_URL`, y reiniciar con `pm2 restart scv-backend`. Al definir `CORS_ORIGINS` se reemplaza la lista por defecto: si Vercel se sigue usando, incluir también su dominio.
+
+### Actualizar a una nueva versión
+
+```bash
+cd SCV-Backend
+git pull
+npm ci
+pm2 restart scv-backend
+```
+
+Si la versión trae cambios de base de datos, aplicarlos antes en Supabase (ver `database/README.md`).
 
 ## Stack
 

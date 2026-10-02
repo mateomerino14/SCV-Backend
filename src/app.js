@@ -14,12 +14,21 @@ if (process.env.RENDER === 'true' || process.env.TRUST_PROXY === 'true') {
 
 app.use(helmet())
 
+// Dominios del cliente web que pueden llamar a la API. Se configuran en CORS_ORIGINS
+// (separados por coma) para cambiar de dominio sin tocar el codigo; sin la variable se
+// usan los de desarrollo y Vercel
+const defaultOrigins = [
+  'http://localhost:5173',
+  'https://scv-frontend.vercel.app',
+  'https://scv-frontend-git-develop-mat13.vercel.app',
+]
+const configuredOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean)
+
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://scv-frontend.vercel.app',
-    'https://scv-frontend-git-develop-mat13.vercel.app'
-  ],
+  origin: configuredOrigins.length > 0 ? configuredOrigins : defaultOrigins,
   credentials: true
 }))
 app.use(express.json())
