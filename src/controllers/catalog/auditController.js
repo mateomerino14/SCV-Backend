@@ -2,6 +2,8 @@ const supabase = require('../../config/supabase');
 
 const auditColumns = 'id_auditoria, fecha, tipo, Usuario(id_usuario, nombre, apellido_paterno, email_corporativo)';
 const maxRowsPerRequest = 1000;
+const boliviaOffset = '-04:00';
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 // Arma la consulta de auditoria con los filtros recibidos
 const buildAuditQuery = (filters, options) => {
@@ -12,11 +14,12 @@ const buildAuditQuery = (filters, options) => {
   if (filters.id_usuario) {
     query = query.eq('id_usuario', filters.id_usuario);
   }
-  if (filters.fecha_inicio) {
-    query = query.gte('fecha', filters.fecha_inicio);
+  // Los dias del filtro son dias de Bolivia, no de UTC
+  if (datePattern.test(filters.fecha_inicio || '')) {
+    query = query.gte('fecha', `${filters.fecha_inicio}T00:00:00${boliviaOffset}`);
   }
-  if (filters.fecha_fin) {
-    query = query.lte('fecha', `${filters.fecha_fin}T23:59:59`);
+  if (datePattern.test(filters.fecha_fin || '')) {
+    query = query.lte('fecha', `${filters.fecha_fin}T23:59:59.999${boliviaOffset}`);
   }
   return query.order('fecha', {ascending: false}).order('id_auditoria', {ascending: false});
 };
