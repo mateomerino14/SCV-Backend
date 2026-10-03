@@ -1,76 +1,76 @@
-const pdfService = require('../shared/pdfService')
-const {escapeDeep} = require('../../utils/htmlEscape')
+const pdfService = require('../shared/pdfService');
+const {escapeDeep} = require('../../utils/htmlEscape');
 
 // Formatea una fecha ISO a formato dia/mes/anio
 const formatDate = (isoString) => {
-  const [year, month, day] = isoString.split('-')
-  return new Date(year, month - 1, day).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric'})
+  const [year, month, day] = isoString.split('-');
+  return new Date(year, month - 1, day).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric'});
 };
 
 // Genera una fila de la tabla de gastos para el documento de rendicion
 const buildExpenseRow = (expense, isInternational) => {
-  let date = ''
+  let date = '';
   if (expense.fecha_gasto) {
-    date = expense.fecha_gasto.split('T')[0]
+    date = expense.fecha_gasto.split('T')[0];
   }
-  const hasInvoice = !!expense.Factura
-  let name = expense.Categoria_Gasto?.nombre || 'Sin categoría'
+  const hasInvoice = !!expense.Factura;
+  let name = expense.Categoria_Gasto?.nombre || 'Sin categoría';
   if (hasInvoice) {
-    name = expense.Proveedor?.nombre || 'Sin proveedor'
+    name = expense.Proveedor?.nombre || 'Sin proveedor';
   }
-  const typeLabels = {F: 'Factura', R: 'Recibo', C: 'Compra', S: 'Servicio'}
-  let type = expense.tipo || ''
+  const typeLabels = {F: 'Factura', R: 'Recibo', C: 'Compra', S: 'Servicio'};
+  let type = expense.tipo || '';
   if (typeLabels[expense.tipo]) {
-    type = typeLabels[expense.tipo]
+    type = typeLabels[expense.tipo];
   }
-  const amount = parseFloat(expense.monto_total || 0).toFixed(2)
-  let currency = 'Bs'
+  const amount = parseFloat(expense.monto_total || 0).toFixed(2);
+  let currency = 'Bs';
   if (isInternational) {
-    currency = 'USD'
+    currency = 'USD';
   }
   return `<tr>
       <td style="padding:4px 8px;border:1px solid #ddd;">${date}</td>
       <td style="padding:4px 8px;border:1px solid #ddd;">${name}</td>
       <td style="padding:4px 8px;border:1px solid #ddd;">${type}</td>
       <td style="padding:4px 8px;border:1px solid #ddd;text-align:right;">${amount} ${currency}</td>
-    </tr>`
+    </tr>`;
 };
 
 // Genera el HTML de la rendicion final para tesoreria
 const generateRenditionHtml = (rawTrip, rawReviewer, tripCode, rawExpenses) => {
   // Datos escritos por usuarios: se escapan antes de armar el documento
-  const trip = escapeDeep(rawTrip)
-  const reviewer = escapeDeep(rawReviewer)
-  const expenses = escapeDeep(rawExpenses)
-  const employee = trip.Usuario
-  const today = new Date().toLocaleDateString('es-ES', {day: 'numeric', month: 'long', year: 'numeric'})
-  const period = `${formatDate(trip.fecha_inicio)} al ${formatDate(trip.fecha_fin)}`
-  const nationalExpenses = (expenses || []).filter((expense) => !expense.es_gasto_internacional)
-  const internationalExpenses = (expenses || []).filter((expense) => !!expense.es_gasto_internacional)
-  const totalNational = nationalExpenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0)
-  const totalUsd = internationalExpenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0)
-  const assignedAmount = parseFloat(trip.monto_asignado)
-  const assignedAmountUsd = parseFloat(trip.monto_asignado_usd || 0)
-  const nationalBalance = assignedAmount - totalNational
-  const usdBalance = assignedAmountUsd - totalUsd
-  const exceedsNational = nationalBalance < 0
-  const exceedsUsd = usdBalance < 0
-  const isInternational = trip.tipo === 'Internacional'
-  let nationalTable = '<p style="font-size:10pt;color:#666;margin-bottom:10px;">No hay gastos nacionales registrados</p>'
+  const trip = escapeDeep(rawTrip);
+  const reviewer = escapeDeep(rawReviewer);
+  const expenses = escapeDeep(rawExpenses);
+  const employee = trip.Usuario;
+  const today = new Date().toLocaleDateString('es-ES', {day: 'numeric', month: 'long', year: 'numeric'});
+  const period = `${formatDate(trip.fecha_inicio)} al ${formatDate(trip.fecha_fin)}`;
+  const nationalExpenses = (expenses || []).filter((expense) => !expense.es_gasto_internacional);
+  const internationalExpenses = (expenses || []).filter((expense) => !!expense.es_gasto_internacional);
+  const totalNational = nationalExpenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
+  const totalUsd = internationalExpenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
+  const assignedAmount = parseFloat(trip.monto_asignado);
+  const assignedAmountUsd = parseFloat(trip.monto_asignado_usd || 0);
+  const nationalBalance = assignedAmount - totalNational;
+  const usdBalance = assignedAmountUsd - totalUsd;
+  const exceedsNational = nationalBalance < 0;
+  const exceedsUsd = usdBalance < 0;
+  const isInternational = trip.tipo === 'Internacional';
+  let nationalTable = '<p style="font-size:10pt;color:#666;margin-bottom:10px;">No hay gastos nacionales registrados</p>';
   if (nationalExpenses.length > 0) {
     nationalTable = `<table>
     <tr><th style="width:15%">Fecha</th><th style="width:40%">Concepto</th><th style="width:20%">Tipo</th><th style="width:25%;text-align:right">Monto</th></tr>
     ${nationalExpenses.map((expense) => buildExpenseRow(expense, false)).join('')}
-  </table>`
+  </table>`;
   }
-  let internationalSection = ''
+  let internationalSection = '';
   if (isInternational) {
-    let internationalTable = '<p style="font-size:10pt;color:#666;margin-bottom:10px;">No hay gastos internacionales registrados</p>'
+    let internationalTable = '<p style="font-size:10pt;color:#666;margin-bottom:10px;">No hay gastos internacionales registrados</p>';
     if (internationalExpenses.length > 0) {
       internationalTable = `<table>
     <tr><th style="width:15%">Fecha</th><th style="width:40%">Concepto</th><th style="width:20%">Tipo</th><th style="width:25%;text-align:right">Monto</th></tr>
     ${internationalExpenses.map((expense) => buildExpenseRow(expense, true)).join('')}
-  </table>`
+  </table>`;
     }
     internationalSection = `<div class="seccion">Gastos Internacionales (USD)</div>
   ${internationalTable}
@@ -79,7 +79,7 @@ const generateRenditionHtml = (rawTrip, rawReviewer, tripCode, rawExpenses) => {
   <div class="resumen-total" style="color:${exceedsUsd ? '#870002' : '#155724'}">
     <span>${exceedsUsd ? 'Exceso a reembolsar (USD)' : 'Saldo a devolver (USD)'}</span>
     <span>USD ${Math.abs(usdBalance).toFixed(2)}</span>
-  </div>`
+  </div>`;
   }
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
@@ -128,14 +128,14 @@ const generateRenditionHtml = (rawTrip, rawReviewer, tripCode, rawExpenses) => {
     <div class="firma-cargo">REVISOR — MAXAM FANEXA</div>
     ${reviewer?.aprobacionAutomatica ? '<div style="font-size:9pt;color:#475569;margin-top:4px;">El titular del viaje es el revisor; la revisión final se aprobó automáticamente.</div>' : ''}
   </div>
-</body></html>`
+</body></html>`;
 };
 
 // Genera el HTML del resultado de la rendicion para el empleado
 const generateEmployeeResultHtml = (rawTrip, tripCode, summary) => {
-  const trip = escapeDeep(rawTrip)
-  const employee = trip.Usuario
-  let internationalBlock = ''
+  const trip = escapeDeep(rawTrip);
+  const employee = trip.Usuario;
+  let internationalBlock = '';
   if (summary.isInternational) {
     internationalBlock = `
     <div class="resultado-fila" style="margin-top:12px;"><span>Fondo asignado (USD)</span><span>USD ${parseFloat(trip.monto_asignado_usd || 0).toFixed(2)}</span></div>
@@ -143,20 +143,20 @@ const generateEmployeeResultHtml = (rawTrip, tripCode, summary) => {
     <div class="resultado-fila total" style="color:${summary.exceedsUsd ? '#870002' : '#155724'}">
       <span>${summary.exceedsUsd ? 'Monto a reembolsarle (USD)' : 'Monto que debe devolver (USD)'}</span>
       <span>USD ${Math.abs(summary.usdBalance).toFixed(2)}</span>
-    </div>`
+    </div>`;
   }
   // En viajes internacionales puede haber devolucion en una moneda y reembolso en la otra
-  const mustReturn = summary.nationalBalance > 0.005 || (summary.isInternational && summary.usdBalance > 0.005)
-  const getsRefund = summary.exceedsNational || (summary.isInternational && summary.exceedsUsd)
-  let closingText = 'No quedan saldos pendientes.'
+  const mustReturn = summary.nationalBalance > 0.005 || (summary.isInternational && summary.usdBalance > 0.005);
+  const getsRefund = summary.exceedsNational || (summary.isInternational && summary.exceedsUsd);
+  let closingText = 'No quedan saldos pendientes.';
   if (mustReturn && getsRefund) {
-    closingText = 'Por favor coordina con Tesorería la devolución del saldo pendiente y el reembolso correspondiente.'
+    closingText = 'Por favor coordina con Tesorería la devolución del saldo pendiente y el reembolso correspondiente.';
   }
   else if (mustReturn) {
-    closingText = 'Por favor coordina con Tesorería la devolución del saldo pendiente.'
+    closingText = 'Por favor coordina con Tesorería la devolución del saldo pendiente.';
   }
   else if (getsRefund) {
-    closingText = 'Tesorería se pondrá en contacto para coordinar el reembolso correspondiente.'
+    closingText = 'Tesorería se pondrá en contacto para coordinar el reembolso correspondiente.';
   }
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
@@ -185,7 +185,7 @@ const generateEmployeeResultHtml = (rawTrip, tripCode, summary) => {
     ${internationalBlock}
   </div>
   <p class="cuerpo">${closingText}</p>
-</body></html>`
+</body></html>`;
 };
 
 module.exports = {formatDate, generateRenditionHtml, generateEmployeeResultHtml, generatePdf: pdfService.generatePdf};

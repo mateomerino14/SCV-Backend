@@ -1,4 +1,4 @@
-const geminiService = require('../shared/geminiService')
+const geminiService = require('../shared/geminiService');
 
 // Construye la instruccion enviada al modelo para interpretar el comprobante
 const buildPrompt = () => {
@@ -23,20 +23,20 @@ IMPORTANTE:
 - El IVA boliviano es del 13% sobre el subtotal — si no aparece explícito, calcúlalo como monto_total / 1.13 * 0.13
 - Si no encuentras algún dato, usa null para números y "No Especificado" para textos
 - La fecha debe estar en formato YYYY-MM-DD obligatoriamente
-- Devuelve SOLO el JSON, sin explicaciones ni texto adicional`
-}
+- Devuelve SOLO el JSON, sin explicaciones ni texto adicional`;
+};
 
 // Verifica si la fecha extraida tiene un formato valido y real
 const isValidEmissionDate = (value) => {
   if (!value || value === 'No Especificado') {
-    return false
+    return false;
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false
+    return false;
   }
-  const date = new Date(`${value}T00:00:00`)
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
-}
+  const date = new Date(`${value}T00:00:00`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+};
 
 // Normaliza la respuesta del modelo al formato que espera el sistema
 const normalizeResult = (parsedData) => {
@@ -51,19 +51,19 @@ const normalizeResult = (parsedData) => {
     monto_total: parsedData.monto_total || 0,
     tipo_doc: parsedData.tipo_doc || 'F',
     detalle: parsedData.detalle || [],
-  }
-}
+  };
+};
 
 // Extrae los datos de una factura enviando la imagen al modelo de vision
 // (con modelo de respaldo si el principal falla o se queda sin cuota)
 const extractInvoiceData = async (file) => {
-  const imageBase64 = file.buffer.toString('base64')
+  const imageBase64 = file.buffer.toString('base64');
   const responseText = await geminiService.generateText([
     {inlineData: {data: imageBase64, mimeType: file.mimetype}},
     buildPrompt(),
-  ], {taskName: 'extraccion de factura'})
-  const cleanJson = responseText.replace(/```json|```/g, '').trim()
-  return normalizeResult(JSON.parse(cleanJson))
-}
+  ], {taskName: 'extraccion de factura'});
+  const cleanJson = responseText.replace(/```json|```/g, '').trim();
+  return normalizeResult(JSON.parse(cleanJson));
+};
 
-module.exports = {extractInvoiceData}
+module.exports = {extractInvoiceData};

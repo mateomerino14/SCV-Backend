@@ -1,13 +1,13 @@
-const supabase = require('../../config/supabase')
-const {parseFormData} = require('../../utils/requestData')
-const expenseService = require('../../services/expense/expenseService')
-const receiptService = require('../../services/expense/receiptService')
-const tripAccessService = require('../../services/trip/tripAccessService')
+const supabase = require('../../config/supabase');
+const {parseFormData} = require('../../utils/requestData');
+const expenseService = require('../../services/expense/expenseService');
+const receiptService = require('../../services/expense/receiptService');
+const tripAccessService = require('../../services/trip/tripAccessService');
 
 // Obtiene el detalle completo de un gasto
 const getExpenseDetail = async (req, res) => {
   try {
-    const {expenseId} = req.params
+    const {expenseId} = req.params;
     const {data, error} = await supabase
       .from('Gasto')
       .select(`
@@ -30,115 +30,115 @@ const getExpenseDetail = async (req, res) => {
         Viaje(id_viaje, fecha_inicio, fecha_fin, estado)
       `)
       .eq('id_gasto', expenseId)
-      .maybeSingle()
+      .maybeSingle();
     if (error) {
-      return res.status(500).json({error: error.message})
+      return res.status(500).json({error: error.message});
     }
     if (!data) {
-      return res.status(404).json({error: 'Gasto no encontrado'})
+      return res.status(404).json({error: 'Gasto no encontrado'});
     }
     if (!(await tripAccessService.canViewTrip(data.id_viaje, req.user.id_usuario))) {
-      return res.status(403).json({error: 'No tienes permiso para ver este gasto'})
+      return res.status(403).json({error: 'No tienes permiso para ver este gasto'});
     }
-    return res.json(data)
+    return res.json(data);
   }
   catch (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
 };
 
 // Genera y envia el recibo agrupado de un viaje por tipo de gasto
 const sendGroupedReceipt = async (req, res) => {
   try {
-    const {tripId, type} = req.params
-    const isInternational = req.query.internacional === 'true'
+    const {tripId, type} = req.params;
+    const isInternational = req.query.internacional === 'true';
     if (!(await tripAccessService.canManageTripReceipts(tripId, req.user.id_usuario))) {
-      return res.status(403).json({error: 'No tienes permiso para emitir recibos de este viaje'})
+      return res.status(403).json({error: 'No tienes permiso para emitir recibos de este viaje'});
     }
-    const result = await receiptService.sendGroupedReceipt(tripId, type, isInternational)
+    const result = await receiptService.sendGroupedReceipt(tripId, type, isInternational);
     if (result.error) {
-      return res.status(result.status || 500).json({error: result.error})
+      return res.status(result.status || 500).json({error: result.error});
     }
-    return res.json(result)
+    return res.json(result);
   }
   catch (error) {
-    console.log('Error generando recibo agrupado:', error.message)
-    return res.status(500).json({error: error.message || 'Error al generar el recibo'})
+    console.log('Error generando recibo agrupado:', error.message);
+    return res.status(500).json({error: error.message || 'Error al generar el recibo'});
   }
 };
 
 // Genera y envia el recibo individual de un gasto
 const sendIndividualReceipt = async (req, res) => {
   try {
-    const {expenseId} = req.params
-    const {data: expense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single()
+    const {expenseId} = req.params;
+    const {data: expense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single();
     if (!expense) {
-      return res.status(404).json({error: 'Gasto no encontrado'})
+      return res.status(404).json({error: 'Gasto no encontrado'});
     }
     if (!(await tripAccessService.canManageTripReceipts(expense.id_viaje, req.user.id_usuario))) {
-      return res.status(403).json({error: 'No tienes permiso para emitir recibos de este viaje'})
+      return res.status(403).json({error: 'No tienes permiso para emitir recibos de este viaje'});
     }
-    const result = await receiptService.sendIndividualReceipt(expenseId)
+    const result = await receiptService.sendIndividualReceipt(expenseId);
     if (result.error) {
-      return res.status(result.status || 500).json({error: result.error})
+      return res.status(result.status || 500).json({error: result.error});
     }
-    return res.json(result)
+    return res.json(result);
   }
   catch (error) {
-    console.log('Error generando recibo individual:', error.message)
-    return res.status(500).json({error: error.message || 'Error al generar el recibo'})
+    console.log('Error generando recibo individual:', error.message);
+    return res.status(500).json({error: error.message || 'Error al generar el recibo'});
   }
 };
 
 // Registra un nuevo gasto
 const registerExpense = async (req, res) => {
   try {
-    const expenseData = parseFormData(req.body.datos)
+    const expenseData = parseFormData(req.body.datos);
     if (!expenseData) {
-      return res.status(400).json({error: 'Los datos enviados no son válidos'})
+      return res.status(400).json({error: 'Los datos enviados no son válidos'});
     }
-    const result = await expenseService.createExpense(expenseData, req.file, req.user.id_usuario)
+    const result = await expenseService.createExpense(expenseData, req.file, req.user.id_usuario);
     if (result.error) {
-      return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion})
+      return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion});
     }
-    return res.json({message: 'Gasto registrado correctamente', gasto: result.expense})
+    return res.json({message: 'Gasto registrado correctamente', gasto: result.expense});
   }
   catch (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
 };
 
 // Actualiza un gasto existente
 const updateExpense = async (req, res) => {
   try {
-    const expenseData = parseFormData(req.body.datos)
+    const expenseData = parseFormData(req.body.datos);
     if (!expenseData) {
-      return res.status(400).json({error: 'Los datos enviados no son válidos'})
+      return res.status(400).json({error: 'Los datos enviados no son válidos'});
     }
-    const {expenseId} = req.params
-    const result = await expenseService.updateExpense(expenseId, expenseData, req.file, req.user.id_usuario)
+    const {expenseId} = req.params;
+    const result = await expenseService.updateExpense(expenseId, expenseData, req.file, req.user.id_usuario);
     if (result.error) {
-      return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion})
+      return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion});
     }
-    return res.json({message: 'Gasto actualizado correctamente'})
+    return res.json({message: 'Gasto actualizado correctamente'});
   }
   catch (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
 };
 
 // Elimina un gasto existente
 const deleteExpense = async (req, res) => {
   try {
-    const {expenseId} = req.params
-    const result = await expenseService.deleteExpense(expenseId, req.user.id_usuario)
+    const {expenseId} = req.params;
+    const result = await expenseService.deleteExpense(expenseId, req.user.id_usuario);
     if (result.error) {
-      return res.status(result.status || 500).json({error: result.error})
+      return res.status(result.status || 500).json({error: result.error});
     }
-    return res.json({message: 'Gasto eliminado correctamente'})
+    return res.json({message: 'Gasto eliminado correctamente'});
   }
   catch (error) {
-    return res.status(500).json({error: error.message || 'Error al eliminar el gasto'})
+    return res.status(500).json({error: error.message || 'Error al eliminar el gasto'});
   }
 };
 

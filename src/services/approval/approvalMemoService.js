@@ -1,33 +1,33 @@
-const pdfService = require('../shared/pdfService')
-const {escapeDeep} = require('../../utils/htmlEscape')
+const pdfService = require('../shared/pdfService');
+const {escapeDeep} = require('../../utils/htmlEscape');
 
 // Formatea una fecha ISO a formato dia/mes/anio
 const formatDate = (isoString) => {
-  const [year, month, day] = isoString.split('-')
-  return new Date(year, month - 1, day).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric'})
+  const [year, month, day] = isoString.split('-');
+  return new Date(year, month - 1, day).toLocaleDateString('es-ES', {day: '2-digit', month: '2-digit', year: 'numeric'});
 };
 
 // Genera el HTML del memorandum de aprobacion de un viaje
 const generateMemoHtml = (rawTrip, rawApprover, tripCode) => {
   // Datos escritos por usuarios: se escapan antes de armar el documento
-  const trip = escapeDeep(rawTrip)
-  const approver = escapeDeep(rawApprover)
-  const employee = trip.Usuario
-  const today = new Date().toLocaleDateString('es-ES', {day: 'numeric', month: 'long', year: 'numeric'})
-  const period = `${formatDate(trip.fecha_inicio)} al ${formatDate(trip.fecha_fin)}`
-  const transport = (trip.transporte || '').toLowerCase()
-  const isAirTravel = transport.includes('aéreo') || transport.includes('aereo')
-  const isCompanyVehicle = transport.includes('vehículo de empresa') || transport.includes('vehiculo de empresa')
-  let ticketsText = 'Asimismo, se autoriza la compra de pasajes terrestres correspondientes al trayecto indicado.'
+  const trip = escapeDeep(rawTrip);
+  const approver = escapeDeep(rawApprover);
+  const employee = trip.Usuario;
+  const today = new Date().toLocaleDateString('es-ES', {day: 'numeric', month: 'long', year: 'numeric'});
+  const period = `${formatDate(trip.fecha_inicio)} al ${formatDate(trip.fecha_fin)}`;
+  const transport = (trip.transporte || '').toLowerCase();
+  const isAirTravel = transport.includes('aéreo') || transport.includes('aereo');
+  const isCompanyVehicle = transport.includes('vehículo de empresa') || transport.includes('vehiculo de empresa');
+  let ticketsText = 'Asimismo, se autoriza la compra de pasajes terrestres correspondientes al trayecto indicado.';
   if (isAirTravel) {
-    ticketsText = 'Asimismo, se autoriza la compra de pasajes aéreos correspondientes al trayecto indicado.'
+    ticketsText = 'Asimismo, se autoriza la compra de pasajes aéreos correspondientes al trayecto indicado.';
   }
   else if (isCompanyVehicle) {
-    ticketsText = 'Asimismo, se autoriza el uso de vehículo de empresa para el trayecto indicado.'
+    ticketsText = 'Asimismo, se autoriza el uso de vehículo de empresa para el trayecto indicado.';
   }
-  let originText = ''
+  let originText = '';
   if (trip.origen) {
-    originText = ` partiendo desde ${trip.origen}`
+    originText = ` partiendo desde ${trip.origen}`;
   }
   return `<!DOCTYPE html>
 <html>
@@ -72,13 +72,13 @@ const generateMemoHtml = (rawTrip, rawApprover, tripCode) => {
     <div class="firma-cargo">APROBADOR — MAXAM FANEXA</div>`}
   </div>
 </body>
-</html>`
+</html>`;
 };
 
 // Genera el PDF del memorandum a partir de su HTML
 const generateMemoPdf = async (html) => {
-  const options = {format: 'A4', margin: {top: '10mm', bottom: '10mm', left: '10mm', right: '10mm'}}
-  return await pdfService.generatePdf(html, options)
+  const options = {format: 'A4', margin: {top: '10mm', bottom: '10mm', left: '10mm', right: '10mm'}};
+  return await pdfService.generatePdf(html, options);
 };
 
 module.exports = {generateMemoHtml, generateMemoPdf};

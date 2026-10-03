@@ -1,59 +1,59 @@
-const supabase = require('../../config/supabase')
-const pdfService = require('../shared/pdfService')
-const tripCodeUtil = require('../../utils/tripCode')
-const {escapeDeep} = require('../../utils/htmlEscape')
+const supabase = require('../../config/supabase');
+const pdfService = require('../shared/pdfService');
+const tripCodeUtil = require('../../utils/tripCode');
+const {escapeDeep} = require('../../utils/htmlEscape');
 
-const vatRate = 0.13
+const vatRate = 0.13;
 
 // Blanquea el placeholder que usa la IA cuando no logra extraer un dato
-const cleanValue = (value) => (value === 'No Especificado' ? '' : (value || ''))
+const cleanValue = (value) => (value === 'No Especificado' ? '' : (value || ''));
 
 const symbologyRows = [
   ['F', 'Compra Bien/Servicio c/factura'],
   ['C', 'Compra de Bien sin factura'],
   ['A', 'Servicio, Alquiler sin factura'],
   ['R', 'Docto. sin IVA, sin Retencion'],
-]
+];
 
 // Escapa caracteres especiales de HTML para prevenir inyeccion
 // Los datos se escapan al entrar a la plantilla (escapeDeep); aqui solo se normaliza el vacio
-const escapeHtml = (text) => text || ''
+const escapeHtml = (text) => text || '';
 
 // Extrae la cuenta contable de Oracle a partir del nombre de la categoria
 const extractOracleAccount = (categoryName) => {
   if (!categoryName) {
-    return ''
+    return '';
   }
-  const match = categoryName.match(/^(\d{6})\s+(.+)$/)
+  const match = categoryName.match(/^(\d{6})\s+(.+)$/);
   if (!match) {
-    return categoryName
+    return categoryName;
   }
-  return `${match[1]} ${match[2]}`
-}
+  return `${match[1]} ${match[2]}`;
+};
 
 // Traduce el tipo interno del gasto al codigo de simbologia de Oracle
 const toOracleExpenseType = (internalType) => {
   if (internalType === 'S') {
-    return 'A'
+    return 'A';
   }
-  return internalType
-}
+  return internalType;
+};
 
 // Calcula el desglose fiscal de un gasto
 const getExpenseTaxValues = (expense) => {
-  const isInternational = !!expense.es_gasto_internacional
-  const amount = parseFloat(expense.monto_total) || 0
-  const hasInvoice = !!expense.Factura
+  const isInternational = !!expense.es_gasto_internacional;
+  const amount = parseFloat(expense.monto_total) || 0;
+  const hasInvoice = !!expense.Factura;
   if (isInternational) {
-    return {vat: 0, rcIva: 0, iue: 0, it: 0, cost: amount}
+    return {vat: 0, rcIva: 0, iue: 0, it: 0, cost: amount};
   }
   if (expense.tiene_alcohol) {
-    return {vat: 0, rcIva: 0, iue: 0, it: 0, cost: amount}
+    return {vat: 0, rcIva: 0, iue: 0, it: 0, cost: amount};
   }
   if (hasInvoice) {
-    const partial = parseFloat(expense.Factura?.monto_parcial || 0)
-    const vat = parseFloat((partial * vatRate).toFixed(2))
-    return {vat, rcIva: 0, iue: 0, it: 0, cost: amount}
+    const partial = parseFloat(expense.Factura?.monto_parcial || 0);
+    const vat = parseFloat((partial * vatRate).toFixed(2));
+    return {vat, rcIva: 0, iue: 0, it: 0, cost: amount};
   }
   return {
     vat: 0,
@@ -61,123 +61,123 @@ const getExpenseTaxValues = (expense) => {
     iue: parseFloat(expense.retencion_iue || 0),
     it: parseFloat(expense.retencion_it || 0),
     cost: parseFloat(expense.importe_costo || amount),
-  }
-}
+  };
+};
 
 // Arma la descripcion visible de un gasto segun tenga factura o subitems
 const getExpenseDescription = (expense) => {
-  const hasInvoice = !!expense.Factura
+  const hasInvoice = !!expense.Factura;
   if (hasInvoice) {
     const products = (expense.Factura?.Detalle_Factura || [])
       .map((detail) => `${cleanValue(detail.nombre_producto)}${detail.cantidad ? ` x${detail.cantidad}` : ''}`)
-      .join(', ')
-    return escapeHtml((products || expense.descripcion || `Factura N° ${cleanValue(expense.Factura?.numero_factura)}`).toUpperCase())
+      .join(', ');
+    return escapeHtml((products || expense.descripcion || `Factura N° ${cleanValue(expense.Factura?.numero_factura)}`).toUpperCase());
   }
-  const subitems = expense.Gasto_Subitem || []
+  const subitems = expense.Gasto_Subitem || [];
   if (subitems.length > 0) {
-    return escapeHtml(subitems.map((subitem) => `${subitem.descripcion}: ${parseFloat(subitem.monto).toFixed(2)}`).join(', ').toUpperCase())
+    return escapeHtml(subitems.map((subitem) => `${subitem.descripcion}: ${parseFloat(subitem.monto).toFixed(2)}`).join(', ').toUpperCase());
   }
-  return escapeHtml((expense.descripcion || expense.Categoria_Gasto?.nombre || '').toUpperCase())
-}
+  return escapeHtml((expense.descripcion || expense.Categoria_Gasto?.nombre || '').toUpperCase());
+};
 
 // Arma el texto de los tramos de cambio de moneda de un gasto internacional
 const buildTramosText = (expense) => {
-  const installments = expense.Gasto_Tramo_Moneda || []
+  const installments = expense.Gasto_Tramo_Moneda || [];
   if (installments.length === 0) {
-    return ''
+    return '';
   }
-  return escapeHtml(installments.map((installment) => `${parseFloat(installment.monto_origen).toFixed(2)} ${installment.moneda} → ${parseFloat(installment.monto_usd).toFixed(2)} USD`).join(' | '))
-}
+  return escapeHtml(installments.map((installment) => `${parseFloat(installment.monto_origen).toFixed(2)} ${installment.moneda} → ${parseFloat(installment.monto_usd).toFixed(2)} USD`).join(' | '));
+};
 
 // Formatea una fecha a dia/mes/anio
 const formatDate = (dateInput) => {
   if (!dateInput) {
-    return ''
+    return '';
   }
   // Las fechas YYYY-MM-DD se formatean tal cual: new Date() las toma como UTC y en
   // Bolivia (UTC-4) mostraria el dia anterior
-  const dateOnly = String(dateInput).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  const dateOnly = String(dateInput).match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (dateOnly) {
-    return `${dateOnly[3]}/${dateOnly[2]}/${dateOnly[1]}`
+    return `${dateOnly[3]}/${dateOnly[2]}/${dateOnly[1]}`;
   }
-  const date = new Date(dateInput)
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  return `${day}/${month}/${year}`
-}
+  const date = new Date(dateInput);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
 
 // Genera el HTML de la planilla de rendicion de cuentas
 // Cada reenvio a revision guarda de nuevo las justificaciones; en el documento solo va
 // la mas reciente de cada dia (y la de hoteles al final), igual que en la pantalla.
 // Recibe los comentarios ordenados del mas reciente al mas antiguo.
 const latestJustificationPerDay = (comments) => {
-  const byDay = new Map()
+  const byDay = new Map();
   comments.forEach((comment) => {
-    const key = comment.fecha_justificada || 'HOTEL'
+    const key = comment.fecha_justificada || 'HOTEL';
     if (!byDay.has(key)) {
-      byDay.set(key, comment)
+      byDay.set(key, comment);
     }
-  })
+  });
   return [...byDay.values()].sort((first, second) => {
     if (!first.fecha_justificada) {
-      return 1
+      return 1;
     }
     if (!second.fecha_justificada) {
-      return -1
+      return -1;
     }
-    return String(first.fecha_justificada).localeCompare(String(second.fecha_justificada))
-  })
-}
+    return String(first.fecha_justificada).localeCompare(String(second.fecha_justificada));
+  });
+};
 
 const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   // Datos escritos por usuarios: se escapan antes de armar el documento
-  const trip = escapeDeep(rawTrip)
-  const expenses = escapeDeep(rawExpenses)
-  const dayJustifications = escapeDeep(rawJustifications)
-  const employee = trip.Usuario
-  const responsable = `${employee?.nombre || ''} ${employee?.apellido_paterno || ''}`.trim().toUpperCase()
-  const cargo = employee?.Cargo?.nombre?.toUpperCase() || ''
-  const costCenter = employee?.Seccion?.nombre || ''
+  const trip = escapeDeep(rawTrip);
+  const expenses = escapeDeep(rawExpenses);
+  const dayJustifications = escapeDeep(rawJustifications);
+  const employee = trip.Usuario;
+  const responsable = `${employee?.nombre || ''} ${employee?.apellido_paterno || ''}`.trim().toUpperCase();
+  const cargo = employee?.Cargo?.nombre?.toUpperCase() || '';
+  const costCenter = employee?.Seccion?.nombre || '';
   // En viajes nacionales no hay tramos de cambio ni montos en USD
-  const isInternationalTrip = trip.tipo === 'Internacional'
+  const isInternationalTrip = trip.tipo === 'Internacional';
 
-  let totalImporteFactura = 0
-  let totalImporteBs = 0
-  let totalImporteUsd = 0
-  let totalVat = 0
-  let totalRcIva = 0
-  let totalIue = 0
-  let totalIt = 0
-  let totalCostBs = 0
-  let totalCostUsd = 0
+  let totalImporteFactura = 0;
+  let totalImporteBs = 0;
+  let totalImporteUsd = 0;
+  let totalVat = 0;
+  let totalRcIva = 0;
+  let totalIue = 0;
+  let totalIt = 0;
+  let totalCostBs = 0;
+  let totalCostUsd = 0;
 
   const rows = expenses.map((expense, index) => {
-    const amount = parseFloat(expense.monto_total) || 0
-    const isInternational = isInternationalTrip && !!expense.es_gasto_internacional
-    const hasInvoice = !!expense.Factura
-    const {vat, rcIva, iue, it, cost} = getExpenseTaxValues(expense)
-    const oracleValue = escapeHtml(extractOracleAccount(expense.Categoria_Gasto?.nombre))
-    const oracleType = toOracleExpenseType(expense.tipo)
-    const detailText = getExpenseDescription(expense)
-    const tramosText = buildTramosText(expense)
-    const currency = isInternational ? 'USD' : 'Bs'
+    const amount = parseFloat(expense.monto_total) || 0;
+    const isInternational = isInternationalTrip && !!expense.es_gasto_internacional;
+    const hasInvoice = !!expense.Factura;
+    const {vat, rcIva, iue, it, cost} = getExpenseTaxValues(expense);
+    const oracleValue = escapeHtml(extractOracleAccount(expense.Categoria_Gasto?.nombre));
+    const oracleType = toOracleExpenseType(expense.tipo);
+    const detailText = getExpenseDescription(expense);
+    const tramosText = buildTramosText(expense);
+    const currency = isInternational ? 'USD' : 'Bs';
     if (isInternational) {
-      totalImporteUsd += amount
-      totalCostUsd += cost
+      totalImporteUsd += amount;
+      totalCostUsd += cost;
     }
     else {
-      totalImporteBs += amount
-      totalCostBs += cost
+      totalImporteBs += amount;
+      totalCostBs += cost;
     }
     if (hasInvoice) {
-      totalImporteFactura += amount
+      totalImporteFactura += amount;
     }
-    totalVat += vat
-    totalRcIva += rcIva
-    totalIue += iue
-    totalIt += it
-    const rowClass = isInternational ? 'fila-internacional' : 'fila-nacional'
+    totalVat += vat;
+    totalRcIva += rcIva;
+    totalIue += iue;
+    totalIt += it;
+    const rowClass = isInternational ? 'fila-internacional' : 'fila-nacional';
     return `
     <tr class="${rowClass}">
       <td class="col-n">${index + 1}</td>
@@ -195,19 +195,19 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
       <td class="col-num">${iue.toFixed(2)}</td>
       <td class="col-num">${it.toFixed(2)}</td>
       <td class="col-num">${cost.toFixed(2)}</td>
-    </tr>`
-  }).join('')
+    </tr>`;
+  }).join('');
 
-  const assignedAmount = parseFloat(trip.monto_asignado) || 0
-  const assignedAmountUsd = parseFloat(trip.monto_asignado_usd || 0)
-  const remaining = assignedAmount - totalImporteBs
-  const remainingUsd = assignedAmountUsd - totalImporteUsd
+  const assignedAmount = parseFloat(trip.monto_asignado) || 0;
+  const assignedAmountUsd = parseFloat(trip.monto_asignado_usd || 0);
+  const remaining = assignedAmount - totalImporteBs;
+  const remainingUsd = assignedAmountUsd - totalImporteUsd;
   const balanceRows = [
     ['Fondo Recibido', assignedAmount, assignedAmountUsd],
     ['Saldo en mi poder', remaining, remainingUsd],
     ['Importe a Devolver', remaining > 0 ? remaining : 0, remainingUsd > 0 ? remainingUsd : 0],
     ['Importe a Reembolsar', remaining < 0 ? Math.abs(remaining) : 0, remainingUsd < 0 ? Math.abs(remainingUsd) : 0],
-  ]
+  ];
 
   return `<!DOCTYPE html>
 <html>
@@ -327,8 +327,8 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
           ${dayJustifications.length === 0
             ? '<tr><td colspan="2" style="text-align:center">Sin excesos que justificar</td></tr>'
             : dayJustifications.map((item) => {
-              const label = item.fecha_justificada ? formatDate(item.fecha_justificada) : 'Hoteles'
-              return `<tr><td class="justificaciones-fecha"><strong>${label}</strong></td><td>${escapeHtml(item.descripcion)}</td></tr>`
+              const label = item.fecha_justificada ? formatDate(item.fecha_justificada) : 'Hoteles';
+              return `<tr><td class="justificaciones-fecha"><strong>${label}</strong></td><td>${escapeHtml(item.descripcion)}</td></tr>`;
             }).join('')}
         </tbody>
       </table>
@@ -342,8 +342,8 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
     </div>
   </div>
 </body>
-</html>`
-}
+</html>`;
+};
 
 // Genera el PDF de la planilla de rendicion de cuentas de un viaje aprobado
 const generateStatementPdf = async (tripId) => {
@@ -351,39 +351,39 @@ const generateStatementPdf = async (tripId) => {
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, Seccion(nombre), Cargo(nombre))')
     .eq('id_viaje', tripId)
-    .single()
+    .single();
   if (tripError) {
-    return {error: tripError.message, status: 500}
+    return {error: tripError.message, status: 500};
   }
   if (!trip) {
-    return {error: 'Viaje no encontrado', status: 404}
+    return {error: 'Viaje no encontrado', status: 404};
   }
   if (trip.estado !== 'APROBADO_FINAL') {
-    return {error: 'La planilla en PDF solo está disponible cuando el viaje está aprobado en su totalidad', status: 400}
+    return {error: 'La planilla en PDF solo está disponible cuando el viaje está aprobado en su totalidad', status: 400};
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
     .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
     .eq('id_viaje', tripId)
-    .order('fecha_gasto', {ascending: true})
+    .order('fecha_gasto', {ascending: true});
   if (expensesError) {
-    return {error: expensesError.message, status: 500}
+    return {error: expensesError.message, status: 500};
   }
   const {data: comments} = await supabase
     .from('Comentario')
     .select('descripcion, fecha_justificada, tipo')
     .eq('id_viaje', tripId)
     .eq('tipo', 'JUSTIFICACION')
-    .order('fecha', {ascending: false})
-  const dayJustifications = latestJustificationPerDay(comments || [])
-  const html = generateStatementHtml(trip, expenses || [], dayJustifications)
-  const pdfBuffer = await pdfService.generatePdf(html)
+    .order('fecha', {ascending: false});
+  const dayJustifications = latestJustificationPerDay(comments || []);
+  const html = generateStatementHtml(trip, expenses || [], dayJustifications);
+  const pdfBuffer = await pdfService.generatePdf(html);
   // Nombre de archivo solo con letras, numeros, guiones y guion bajo (sin tildes ni comillas),
   // porque la cabecera de descarga no admite otros caracteres
   const safeReason = (trip.motivo || 'viaje')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'viaje'
-  return {buffer: pdfBuffer, fileName: `Rendicion_${tripId}_${safeReason}.pdf`}
-}
+    .replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'viaje';
+  return {buffer: pdfBuffer, fileName: `Rendicion_${tripId}_${safeReason}.pdf`};
+};
 
-module.exports = {generateStatementPdf}
+module.exports = {generateStatementPdf};

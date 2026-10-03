@@ -2,29 +2,29 @@
 // etiquetas: evita que un texto escrito por el usuario altere o falsifique el documento
 const escapeHtml = (value) => {
   if (value === null || value === undefined) {
-    return ''
+    return '';
   }
   return String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
+    .replace(/'/g, '&#39;');
+};
 
 // Devuelve una copia con todos los textos escapados (objetos y listas anidados); numeros,
 // booleanos y null se conservan. Se usa al entrar a una plantilla con datos de la base.
 const escapeDeep = (value) => {
   if (typeof value === 'string') {
-    return escapeHtml(value)
+    return escapeHtml(value);
   }
   if (Array.isArray(value)) {
-    return value.map(escapeDeep)
+    return value.map(escapeDeep);
   }
   if (value && typeof value === 'object' && !(value instanceof Date) && !Buffer.isBuffer(value)) {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, escapeDeep(item)]))
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, escapeDeep(item)]));
   }
-  return value
-}
+  return value;
+};
 
-module.exports = {escapeHtml, escapeDeep}
+module.exports = {escapeHtml, escapeDeep};

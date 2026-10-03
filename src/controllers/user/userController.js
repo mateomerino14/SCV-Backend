@@ -1,144 +1,144 @@
-const supabase = require('../../config/supabase')
-const bcrypt = require('bcrypt')
-const crypto = require('crypto')
-const userService = require('../../services/user/userService')
-const emailService = require('../../services/shared/emailService')
-const auditLogService = require('../../services/shared/auditLogService')
-const tokenService = require('../../services/user/tokenService')
-const {escapeHtml} = require('../../utils/htmlEscape')
-const saltRounds = 10
+const supabase = require('../../config/supabase');
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const userService = require('../../services/user/userService');
+const emailService = require('../../services/shared/emailService');
+const auditLogService = require('../../services/shared/auditLogService');
+const tokenService = require('../../services/user/tokenService');
+const {escapeHtml} = require('../../utils/htmlEscape');
+const saltRounds = 10;
 
 // Genera una contrasenia temporal legible, sin caracteres ambiguos (0/O, 1/l/I)
 const generateTemporaryPassword = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
-  let password = ''
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let password = '';
   for (let i = 0; i < 10; i++) {
-    password += chars[crypto.randomInt(0, chars.length)]
+    password += chars[crypto.randomInt(0, chars.length)];
   }
-  return password
+  return password;
 };
 
 // Obtiene el perfil del usuario autenticado
 // Columnas que se devuelven al administrar usuarios (nunca el hash de la contrasena ni
 // datos internos de sesion)
-const userPublicColumns = 'id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, id_rol, id_cargo, id_seccion, id_jefe_directo, carnet_identidad, foto_perfil'
+const userPublicColumns = 'id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, id_rol, id_cargo, id_seccion, id_jefe_directo, carnet_identidad, foto_perfil';
 
 // Campos que el administrador puede enviar al crear o editar un usuario
-const editableUserFields = ['nombre', 'apellido_paterno', 'apellido_materno', 'email_corporativo', 'telefono', 'id_cargo', 'id_rol', 'id_jefe_directo', 'id_seccion', 'carnet_identidad', 'activo']
+const editableUserFields = ['nombre', 'apellido_paterno', 'apellido_materno', 'email_corporativo', 'telefono', 'id_cargo', 'id_rol', 'id_jefe_directo', 'id_seccion', 'carnet_identidad', 'activo'];
 
 const pickEditableFields = (body, extraFields = []) => {
-  const allowed = [...editableUserFields, ...extraFields]
-  return Object.fromEntries(Object.entries(body || {}).filter(([key]) => allowed.includes(key)))
-}
+  const allowed = [...editableUserFields, ...extraFields];
+  return Object.fromEntries(Object.entries(body || {}).filter(([key]) => allowed.includes(key)));
+};
 
 const getMe = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
     .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, carnet_identidad, id_rol, foto_perfil, id_seccion, Seccion(nombre), id_jefe_directo, Jefe:id_jefe_directo(nombre, apellido_paterno), Cargo(nombre, monto_diario, monto_diario_usd), Rol(nombre)')
     .eq('id_usuario', req.user.id_usuario)
-    .single()
+    .single();
   if (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
-    return res.json(data)
+    return res.json(data);
   }
 };
 
 // Actualiza los datos basicos del usuario autenticado
 const updateMe = async (req, res) => {
-  const userId = req.user.id_usuario
-  const {telefono, email_corporativo, foto_perfil} = req.body
-  const fieldsToUpdate = {}
+  const userId = req.user.id_usuario;
+  const {telefono, email_corporativo, foto_perfil} = req.body;
+  const fieldsToUpdate = {};
   if (telefono !== undefined) {
-    fieldsToUpdate.telefono = telefono?.trim() || null
+    fieldsToUpdate.telefono = telefono?.trim() || null;
   }
   if (email_corporativo !== undefined) {
-    const email = String(email_corporativo || '').trim().toLowerCase()
+    const email = String(email_corporativo || '').trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 100) {
-      return res.status(400).json({error: 'El correo corporativo no es válido'})
+      return res.status(400).json({error: 'El correo corporativo no es válido'});
     }
-    const {data: emailOwner} = await supabase.from('Usuario').select('id_usuario').eq('email_corporativo', email).neq('id_usuario', userId).maybeSingle()
+    const {data: emailOwner} = await supabase.from('Usuario').select('id_usuario').eq('email_corporativo', email).neq('id_usuario', userId).maybeSingle();
     if (emailOwner) {
-      return res.status(400).json({error: 'Ese correo ya está registrado por otro usuario'})
+      return res.status(400).json({error: 'Ese correo ya está registrado por otro usuario'});
     }
-    fieldsToUpdate.email_corporativo = email
+    fieldsToUpdate.email_corporativo = email;
   }
   // La foto se sube por /me/photo; aqui solo se permite quitarla (no poner una URL cualquiera)
   if (foto_perfil === null || foto_perfil === '') {
-    fieldsToUpdate.foto_perfil = null
+    fieldsToUpdate.foto_perfil = null;
   }
   const {data, error} = await supabase
     .from('Usuario')
     .update(fieldsToUpdate)
     .eq('id_usuario', userId)
     .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)')
-    .single()
+    .single();
   if (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
-    return res.json(data)
+    return res.json(data);
   }
 };
 
 // Actualiza la foto de perfil del usuario autenticado
 const updateMyPhoto = async (req, res) => {
-  const userId = req.user.id_usuario
+  const userId = req.user.id_usuario;
   if (!req.file) {
-    return res.status(400).json({error: 'No se recibió ninguna imagen'})
+    return res.status(400).json({error: 'No se recibió ninguna imagen'});
   }
-  const fileExtension = req.file.originalname.split('.').pop()
-  const fileName = `perfiles/${userId}_${Date.now()}.${fileExtension}`
+  const fileExtension = req.file.originalname.split('.').pop();
+  const fileName = `perfiles/${userId}_${Date.now()}.${fileExtension}`;
   const {error: storageError} = await supabase.storage
     .from('facturas')
-    .upload(fileName, req.file.buffer, {contentType: req.file.mimetype})
+    .upload(fileName, req.file.buffer, {contentType: req.file.mimetype});
   if (storageError) {
-    return res.status(500).json({error: storageError.message})
+    return res.status(500).json({error: storageError.message});
   }
-  const {data: urlData} = supabase.storage.from('facturas').getPublicUrl(fileName)
+  const {data: urlData} = supabase.storage.from('facturas').getPublicUrl(fileName);
   const {data, error} = await supabase
     .from('Usuario')
     .update({foto_perfil: urlData.publicUrl})
     .eq('id_usuario', userId)
     .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)')
-    .single()
+    .single();
   if (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
-    return res.json(data)
+    return res.json(data);
   }
 };
 
 // Cambia la contrasenia del usuario autenticado. Si tiene una contrasena temporal (recien
 // creado o recuperada con codigo) no se le pide la actual, porque no la eligio el o la olvido.
 const changeMyPassword = async (req, res) => {
-  const userId = req.user.id_usuario
-  const {contrasenia_actual, contrasenia_nueva} = req.body
+  const userId = req.user.id_usuario;
+  const {contrasenia_actual, contrasenia_nueva} = req.body;
   if (!contrasenia_nueva) {
-    return res.status(400).json({error: 'Todos los campos son requeridos'})
+    return res.status(400).json({error: 'Todos los campos son requeridos'});
   }
   if (contrasenia_nueva.length < 8) {
-    return res.status(400).json({error: 'La nueva contraseña debe tener al menos 8 caracteres'})
+    return res.status(400).json({error: 'La nueva contraseña debe tener al menos 8 caracteres'});
   }
   const {data: user, error: userError} = await supabase
-    .from('Usuario').select('contrasenia, debe_cambiar_contrasenia').eq('id_usuario', userId).single()
+    .from('Usuario').select('contrasenia, debe_cambiar_contrasenia').eq('id_usuario', userId).single();
   if (userError || !user) {
-    return res.status(404).json({error: 'Usuario no encontrado'})
+    return res.status(404).json({error: 'Usuario no encontrado'});
   }
   if (!user.debe_cambiar_contrasenia) {
     if (!contrasenia_actual) {
-      return res.status(400).json({error: 'Todos los campos son requeridos'})
+      return res.status(400).json({error: 'Todos los campos son requeridos'});
     }
     if (!bcrypt.compareSync(contrasenia_actual, user.contrasenia)) {
-      return res.status(400).json({error: 'La contraseña actual es incorrecta'})
+      return res.status(400).json({error: 'La contraseña actual es incorrecta'});
     }
   }
   if (bcrypt.compareSync(contrasenia_nueva, user.contrasenia)) {
-    return res.status(400).json({error: 'La nueva contraseña no puede ser igual a la actual'})
+    return res.status(400).json({error: 'La nueva contraseña no puede ser igual a la actual'});
   }
-  const newPasswordHash = bcrypt.hashSync(contrasenia_nueva, saltRounds)
+  const newPasswordHash = bcrypt.hashSync(contrasenia_nueva, saltRounds);
   const {data: updatedUser, error: updateError} = await supabase
     .from('Usuario')
     .update({
@@ -151,130 +151,130 @@ const changeMyPassword = async (req, res) => {
     })
     .eq('id_usuario', userId)
     .select('id_usuario, email_corporativo, id_rol')
-    .single()
+    .single();
   if (updateError) {
-    return res.status(500).json({error: updateError.message})
+    return res.status(500).json({error: updateError.message});
   }
-  await auditLogService.logAudit(userId, 'CAMBIO_CLAVE')
+  await auditLogService.logAudit(userId, 'CAMBIO_CLAVE');
   // Este dispositivo sigue conectado con una sesion nueva, emitida despues del cambio
-  res.cookie('refreshToken', tokenService.generateRefreshToken(updatedUser), tokenService.cookieOptions)
-  return res.json({message: 'Contraseña actualizada correctamente', token: tokenService.generateAccessToken(updatedUser, null)})
+  res.cookie('refreshToken', tokenService.generateRefreshToken(updatedUser), tokenService.cookieOptions);
+  return res.json({message: 'Contraseña actualizada correctamente', token: tokenService.generateAccessToken(updatedUser, null)});
 };
 
 // Lista todos los usuarios
 const getAllUsers = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_cargo, id_seccion, Seccion(nombre), carnet_identidad')
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_cargo, id_seccion, Seccion(nombre), carnet_identidad');
   if (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
-    return res.json(data)
+    return res.json(data);
   }
 };
 
 // Actualiza un usuario existente, validando roles y cargos unicos
 const updateUser = async (req, res) => {
-  const userId = req.params.id
+  const userId = req.params.id;
   const {data: currentUser} = await supabase
     .from('Usuario')
     .select('id_rol, id_cargo, activo')
     .eq('id_usuario', userId)
-    .single()
-  const payload = pickEditableFields(req.body, ['contrasenia'])
+    .single();
+  const payload = pickEditableFields(req.body, ['contrasenia']);
   if (payload.id_jefe_directo !== undefined && parseInt(payload.id_jefe_directo) === parseInt(userId)) {
-    return res.status(400).json({error: 'Un usuario no puede ser su propio jefe directo'})
+    return res.status(400).json({error: 'Un usuario no puede ser su propio jefe directo'});
   }
   if (payload.telefono !== undefined) {
-    payload.telefono = payload.telefono?.trim() || null
+    payload.telefono = payload.telefono?.trim() || null;
   }
   if (payload.carnet_identidad !== undefined) {
-    payload.carnet_identidad = payload.carnet_identidad?.trim() || null
+    payload.carnet_identidad = payload.carnet_identidad?.trim() || null;
   }
   if (payload.contrasenia) {
     // Una contrasena puesta por el administrador es temporal: el usuario debe cambiarla al entrar
-    payload.contrasenia = bcrypt.hashSync(payload.contrasenia, saltRounds)
-    payload.debe_cambiar_contrasenia = true
-    payload.motivo_cambio_contrasenia = 'TEMPORAL'
+    payload.contrasenia = bcrypt.hashSync(payload.contrasenia, saltRounds);
+    payload.debe_cambiar_contrasenia = true;
+    payload.motivo_cambio_contrasenia = 'TEMPORAL';
   }
-  let newRole = currentUser?.id_rol
+  let newRole = currentUser?.id_rol;
   if (payload.id_rol !== undefined) {
-    newRole = payload.id_rol
+    newRole = payload.id_rol;
   }
-  let newPosition = currentUser?.id_cargo
+  let newPosition = currentUser?.id_cargo;
   if (payload.id_cargo !== undefined) {
-    newPosition = payload.id_cargo
+    newPosition = payload.id_cargo;
   }
-  let willBeActive = currentUser?.activo
+  let willBeActive = currentUser?.activo;
   if (payload.activo !== undefined) {
-    willBeActive = payload.activo
+    willBeActive = payload.activo;
   }
   if (willBeActive) {
-    const roleError = await userService.validateUniqueRole(newRole, userId)
+    const roleError = await userService.validateUniqueRole(newRole, userId);
     if (roleError) {
-      return res.status(400).json({error: roleError})
+      return res.status(400).json({error: roleError});
     }
-    const positionError = await userService.validateUniquePosition(newPosition, userId)
+    const positionError = await userService.validateUniquePosition(newPosition, userId);
     if (positionError) {
-      return res.status(400).json({error: positionError})
+      return res.status(400).json({error: positionError});
     }
   }
-  const roleChanged = currentUser && payload.id_rol && parseInt(payload.id_rol) !== currentUser.id_rol
-  const wasSuspended = currentUser && payload.activo === false && currentUser.activo === true
+  const roleChanged = currentUser && payload.id_rol && parseInt(payload.id_rol) !== currentUser.id_rol;
+  const wasSuspended = currentUser && payload.activo === false && currentUser.activo === true;
   if (roleChanged || wasSuspended) {
-    payload.refresh_token_invalido_desde = new Date().toISOString()
-    await userService.releaseAssignedTrips(userId)
+    payload.refresh_token_invalido_desde = new Date().toISOString();
+    await userService.releaseAssignedTrips(userId);
   }
   const {data, error} = await supabase
-    .from('Usuario').update(payload).eq('id_usuario', userId).select(userPublicColumns)
+    .from('Usuario').update(payload).eq('id_usuario', userId).select(userPublicColumns);
   if (error) {
     if (error.code === '23505') {
-      return res.status(400).json({error: 'Ya existe un usuario con ese correo corporativo'})
+      return res.status(400).json({error: 'Ya existe un usuario con ese correo corporativo'});
     }
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
     if (payload.contrasenia) {
-      await auditLogService.logAudit(parseInt(userId), 'CAMBIO_CLAVE')
+      await auditLogService.logAudit(parseInt(userId), 'CAMBIO_CLAVE');
     }
-    return res.json(data)
+    return res.json(data);
   }
 };
 
 // Crea un nuevo usuario, validando rol y cargo unicos
 const createUser = async (req, res) => {
-  const body = pickEditableFields(req.body)
-  const temporaryPassword = generateTemporaryPassword()
+  const body = pickEditableFields(req.body);
+  const temporaryPassword = generateTemporaryPassword();
   if (body.telefono !== undefined) {
-    body.telefono = body.telefono?.trim() || null
+    body.telefono = body.telefono?.trim() || null;
   }
   if (body.carnet_identidad !== undefined) {
-    body.carnet_identidad = body.carnet_identidad?.trim() || null
+    body.carnet_identidad = body.carnet_identidad?.trim() || null;
   }
-  body.contrasenia = bcrypt.hashSync(temporaryPassword, saltRounds)
+  body.contrasenia = bcrypt.hashSync(temporaryPassword, saltRounds);
   // La contrasena temporal enviada por correo se debe cambiar en el primer ingreso
-  body.debe_cambiar_contrasenia = true
-  body.motivo_cambio_contrasenia = 'TEMPORAL'
-  const roleError = await userService.validateUniqueRole(body.id_rol, null)
+  body.debe_cambiar_contrasenia = true;
+  body.motivo_cambio_contrasenia = 'TEMPORAL';
+  const roleError = await userService.validateUniqueRole(body.id_rol, null);
   if (roleError) {
-    return res.status(400).json({error: roleError})
+    return res.status(400).json({error: roleError});
   }
-  const positionError = await userService.validateUniquePosition(body.id_cargo, null)
+  const positionError = await userService.validateUniquePosition(body.id_cargo, null);
   if (positionError) {
-    return res.status(400).json({error: positionError})
+    return res.status(400).json({error: positionError});
   }
-  const {data, error} = await supabase.from('Usuario').insert(body).select(userPublicColumns)
+  const {data, error} = await supabase.from('Usuario').insert(body).select(userPublicColumns);
   if (error) {
     if (error.code === '23505') {
-      return res.status(400).json({error: 'Ya existe un usuario con ese correo corporativo'})
+      return res.status(400).json({error: 'Ya existe un usuario con ese correo corporativo'});
     }
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
-    const newUser = data[0]
+    const newUser = data[0];
     try {
-      const loginUrl = process.env.FRONTEND_URL || 'https://scv-frontend.vercel.app'
+      const loginUrl = process.env.FRONTEND_URL || 'https://scv-frontend.vercel.app';
       const emailBody = `
         ${emailService.emailParagraph(`Hola <strong>${escapeHtml(newUser.nombre)}</strong>,`)}
         ${emailService.emailParagraph('Se creó tu cuenta en el Sistema de Control de Viáticos. Estas son tus credenciales de acceso:')}
@@ -282,35 +282,35 @@ const createUser = async (req, res) => {
         ${emailService.emailHighlightBox('Contraseña temporal', temporaryPassword)}
         ${emailService.emailNote('Es una contraseña temporal: al ingresar por primera vez, el sistema te pedirá crear una propia.')}
         ${emailService.emailButton('Ingresar al sistema', loginUrl)}
-      `
-      const emailHtml = emailService.buildEmailLayout('Bienvenido al sistema', emailBody)
-      await emailService.sendEmail([{email: newUser.email_corporativo, name: `${newUser.nombre} ${newUser.apellido_paterno}`}], 'Tu cuenta fue creada', emailHtml)
+      `;
+      const emailHtml = emailService.buildEmailLayout('Bienvenido al sistema', emailBody);
+      await emailService.sendEmail([{email: newUser.email_corporativo, name: `${newUser.nombre} ${newUser.apellido_paterno}`}], 'Tu cuenta fue creada', emailHtml);
     }
     catch (emailError) {
-      console.warn('Error al enviar correo de bienvenida:', emailError.message)
+      console.warn('Error al enviar correo de bienvenida:', emailError.message);
     }
-    return res.json(data)
+    return res.json(data);
   }
 };
 
 // Elimina un usuario existente
 const deleteUser = async (req, res) => {
   const {data, error} = await supabase
-    .from('Usuario').delete().eq('id_usuario', req.params.id).select(userPublicColumns)
+    .from('Usuario').delete().eq('id_usuario', req.params.id).select(userPublicColumns);
   if (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
-    return res.json(data)
+    return res.json(data);
   }
 };
 
 // Verifica si un correo corporativo ya esta registrado
 const checkEmail = async (req, res) => {
-  const {email_corporativo} = req.body
+  const {email_corporativo} = req.body;
   const {data, error} = await supabase
-    .from('Usuario').select('id_usuario').eq('email_corporativo', email_corporativo).single()
-  return res.json({exists: !!data && !error})
+    .from('Usuario').select('id_usuario').eq('email_corporativo', email_corporativo).single();
+  return res.json({exists: !!data && !error});
 };
 
 // Lista todos los empleados con datos basicos
@@ -318,12 +318,12 @@ const getEmployees = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
     .select('id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion')
-    .order('nombre', {ascending: true})
+    .order('nombre', {ascending: true});
   if (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
-    return res.json(data || [])
+    return res.json(data || []);
   }
 };
 
@@ -332,43 +332,43 @@ const getAllUsersDetailed = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
     .select('id_usuario, nombre, apellido_paterno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_seccion, Seccion(nombre), carnet_identidad, id_jefe_directo, Jefe:id_jefe_directo(id_usuario, nombre, apellido_paterno), Cargo(id_cargo, nombre), Rol(nombre)')
-    .order('nombre', {ascending: true})
+    .order('nombre', {ascending: true});
   if (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
-    return res.json(data || [])
+    return res.json(data || []);
   }
 };
 
 // Activa un usuario, validando rol y cargo unicos
 const activateUser = async (req, res) => {
-  const userId = req.params.id
+  const userId = req.params.id;
   const {data: user} = await supabase
-    .from('Usuario').select('id_rol, id_cargo').eq('id_usuario', userId).single()
+    .from('Usuario').select('id_rol, id_cargo').eq('id_usuario', userId).single();
   if (user) {
-    const roleError = await userService.validateUniqueRole(user.id_rol, userId)
+    const roleError = await userService.validateUniqueRole(user.id_rol, userId);
     if (roleError) {
-      return res.status(400).json({error: roleError})
+      return res.status(400).json({error: roleError});
     }
-    const positionError = await userService.validateUniquePosition(user.id_cargo, userId)
+    const positionError = await userService.validateUniquePosition(user.id_cargo, userId);
     if (positionError) {
-      return res.status(400).json({error: positionError})
+      return res.status(400).json({error: positionError});
     }
   }
   const {data, error} = await supabase
-    .from('Usuario').update({activo: true}).eq('id_usuario', req.params.id).select(userPublicColumns)
+    .from('Usuario').update({activo: true}).eq('id_usuario', req.params.id).select(userPublicColumns);
   if (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
-    return res.json(data)
+    return res.json(data);
   }
 };
 
 // Suspende un usuario y libera sus viajes asignados
 const suspendUser = async (req, res) => {
-  await userService.releaseAssignedTrips(req.params.id)
+  await userService.releaseAssignedTrips(req.params.id);
   const {data, error} = await supabase
     .from('Usuario')
     .update({
@@ -376,12 +376,12 @@ const suspendUser = async (req, res) => {
       refresh_token_invalido_desde: new Date().toISOString(),
     })
     .eq('id_usuario', req.params.id)
-    .select(userPublicColumns)
+    .select(userPublicColumns);
   if (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
-    return res.json(data)
+    return res.json(data);
   }
 };
 
@@ -391,12 +391,12 @@ const getMyPosition = async (req, res) => {
     .from('Usuario')
     .select('Cargo(nombre)')
     .eq('id_usuario', req.user.id_usuario)
-    .single()
+    .single();
   if (error) {
-    return res.status(500).json({error: error.message})
+    return res.status(500).json({error: error.message});
   }
   else {
-    return res.json({cargo: data?.Cargo?.nombre || null})
+    return res.json({cargo: data?.Cargo?.nombre || null});
   }
 };
 

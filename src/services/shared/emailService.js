@@ -1,8 +1,8 @@
-const SibApiV3Sdk = require('sib-api-v3-sdk')
-const axios = require('axios')
-const {escapeHtml} = require('../../utils/htmlEscape')
-const defaultClient = SibApiV3Sdk.ApiClient.instance
-defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY
+const SibApiV3Sdk = require('sib-api-v3-sdk');
+const axios = require('axios');
+const {escapeHtml} = require('../../utils/htmlEscape');
+const defaultClient = SibApiV3Sdk.ApiClient.instance;
+defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
 
 // Valida que un correo exista y pueda recibir mensajes
 const validateEmailExists = async (email) => {
@@ -12,24 +12,24 @@ const validateEmailExists = async (email) => {
         api_key: process.env.ABSTRACT_EMAIL_API_KEY,
         email,
       },
-    })
-    const {email_deliverability: emailDeliverability} = response.data
+    });
+    const {email_deliverability: emailDeliverability} = response.data;
     if (!emailDeliverability?.is_format_valid) {
-      return {valid: false, reason: 'Formato de correo inválido'}
+      return {valid: false, reason: 'Formato de correo inválido'};
     }
     else if (!emailDeliverability?.is_mx_valid) {
-      return {valid: false, reason: 'El dominio del correo no existe'}
+      return {valid: false, reason: 'El dominio del correo no existe'};
     }
     else if (emailDeliverability?.status === 'undeliverable') {
-      return {valid: false, reason: 'El correo no existe o no puede recibir mensajes'}
+      return {valid: false, reason: 'El correo no existe o no puede recibir mensajes'};
     }
     else {
-      return {valid: true}
+      return {valid: true};
     }
   }
   catch (error) {
-    console.warn('Email validation error:', error.message)
-    return {valid: true}
+    console.warn('Email validation error:', error.message);
+    return {valid: true};
   }
 };
 
@@ -44,9 +44,9 @@ const BRAND = {
   softRed: '#fde9e9',
   border: '#DEE2F0',
   footer: '#E9EBF2',
-}
+};
 
-const fontFamily = "Inter, 'Segoe UI', Arial, sans-serif"
+const fontFamily = "Inter, 'Segoe UI', Arial, sans-serif";
 
 // Genera el layout HTML compartido para todos los correos del sistema.
 // Usa tablas y estilos en linea porque es lo que respetan los clientes de correo.
@@ -86,17 +86,17 @@ const buildEmailLayout = (title, bodyContent) => {
       </tr>
     </table>
   </div>
-  `
+  `;
 };
 
 // Parrafo con el estilo de texto de los correos
 const emailParagraph = (content) => {
-  return `<p style="margin: 0 0 14px 0; color: ${BRAND.text}; font-size: 14px; line-height: 1.6;">${content}</p>`
+  return `<p style="margin: 0 0 14px 0; color: ${BRAND.text}; font-size: 14px; line-height: 1.6;">${content}</p>`;
 };
 
 // Nota secundaria en gris, para aclaraciones al final del correo
 const emailNote = (content) => {
-  return `<p style="margin: 14px 0 0 0; color: ${BRAND.labels}; font-size: 13px; line-height: 1.5;">${content}</p>`
+  return `<p style="margin: 14px 0 0 0; color: ${BRAND.labels}; font-size: 13px; line-height: 1.5;">${content}</p>`;
 };
 
 // Caja de datos con pares etiqueta / valor (los valores son texto plano y se escapan)
@@ -104,14 +104,14 @@ const emailInfoBox = (rows) => {
   const items = rows
     .filter((row) => row.value !== undefined && row.value !== null && row.value !== '')
     .map((row, index, list) => {
-      const marginBottom = index < list.length - 1 ? '12px' : '0'
+      const marginBottom = index < list.length - 1 ? '12px' : '0';
       return `
         <p style="margin: 0 0 3px 0; color: ${BRAND.labels}; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">${row.label}</p>
         <p style="margin: 0 0 ${marginBottom} 0; color: ${BRAND.text}; font-size: 14px;">${escapeHtml(row.value)}</p>
-      `
+      `;
     })
-    .join('')
-  return `<div style="background-color: ${BRAND.backgroundHeader}; border-radius: 10px; padding: 16px 18px; margin: 4px 0 16px 0;">${items}</div>`
+    .join('');
+  return `<div style="background-color: ${BRAND.backgroundHeader}; border-radius: 10px; padding: 16px 18px; margin: 4px 0 16px 0;">${items}</div>`;
 };
 
 // Caja destacada en rojo institucional, para el dato principal del correo (valor en texto plano)
@@ -121,13 +121,13 @@ const emailHighlightBox = (label, value) => {
       <p style="margin: 0 0 4px 0; color: ${BRAND.primary}; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">${label}</p>
       <p style="margin: 0; color: ${BRAND.title}; font-size: 17px; font-weight: bold;">${escapeHtml(value)}</p>
     </div>
-  `
+  `;
 };
 
 // Boton para ingresar al sistema (solo si FRONTEND_URL esta configurado)
 const emailButton = (text = 'Ingresar al sistema', url = process.env.FRONTEND_URL) => {
   if (!url) {
-    return ''
+    return '';
   }
   return `
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 8px 0 4px 0;">
@@ -137,12 +137,12 @@ const emailButton = (text = 'Ingresar al sistema', url = process.env.FRONTEND_UR
         </td>
       </tr>
     </table>
-  `
+  `;
 };
 
 // Envia un correo con el codigo de verificacion
 const sendVerificationCode = async (toEmail, userName, code) => {
-  const api = new SibApiV3Sdk.TransactionalEmailsApi()
+  const api = new SibApiV3Sdk.TransactionalEmailsApi();
   const body = `
     ${emailParagraph(`Hola <strong>${escapeHtml(userName)}</strong>,`)}
     ${emailParagraph('Usa este código para continuar con la recuperación de tu cuenta:')}
@@ -150,53 +150,53 @@ const sendVerificationCode = async (toEmail, userName, code) => {
       ${code}
     </div>
     ${emailNote('Este código expira en 5 minutos. Si no solicitaste este código, ignora este mensaje.')}
-  `
+  `;
   await api.sendTransacEmail({
     sender: {name: 'Sistema de Viáticos', email: 'mateomerino988@gmail.com'},
     to: [{email: toEmail}],
     subject: 'Código de verificación',
     htmlContent: buildEmailLayout('Código de verificación', body),
-  })
+  });
 };
 
 // Envia un correo generico, con adjuntos opcionales
 const sendEmail = async (to, subject, htmlContent, attachments = [], senderName = 'Sistema de Viáticos') => {
   if (!to || to.length === 0) {
-    return
+    return;
   }
-  const api = new SibApiV3Sdk.TransactionalEmailsApi()
+  const api = new SibApiV3Sdk.TransactionalEmailsApi();
   const payload = {
     sender: {name: senderName, email: 'mateomerino988@gmail.com'},
     to,
     subject,
     htmlContent,
-  }
+  };
   if (attachments.length > 0) {
-    payload.attachment = attachments
+    payload.attachment = attachments;
   }
-  await api.sendTransacEmail(payload)
+  await api.sendTransacEmail(payload);
 };
 
 // Notifica a un empleado que su viaje o rendicion fue rechazado, sin detallar las observaciones
 const sendRejectionNotice = async (employee) => {
   if (!employee?.email_corporativo) {
-    return
+    return;
   }
   try {
     const body = `
       ${emailParagraph(`Hola <strong>${escapeHtml(employee.nombre)}</strong>,`)}
       ${emailParagraph('Tu solicitud fue rechazada. Ingresa al sistema para revisar las observaciones y corregirla.')}
       ${emailButton()}
-    `
-    const html = buildEmailLayout('Solicitud rechazada', body)
+    `;
+    const html = buildEmailLayout('Solicitud rechazada', body);
     await sendEmail(
       [{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}],
       'Tu solicitud fue rechazada',
       html
-    )
+    );
   }
   catch (error) {
-    console.warn('Error enviando correo de rechazo:', error.message)
+    console.warn('Error enviando correo de rechazo:', error.message);
   }
 };
 

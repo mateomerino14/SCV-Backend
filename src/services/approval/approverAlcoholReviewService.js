@@ -1,15 +1,15 @@
-const supabase = require('../../config/supabase')
-const expenseSummaryService = require('./expenseSummaryService')
-const tripCommentService = require('../trip/tripCommentService')
-const emailService = require('../shared/emailService')
-const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService')
-const reviewLogService = require('./reviewLogService')
+const supabase = require('../../config/supabase');
+const expenseSummaryService = require('./expenseSummaryService');
+const tripCommentService = require('../trip/tripCommentService');
+const emailService = require('../shared/emailService');
+const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService');
+const reviewLogService = require('./reviewLogService');
 
 // Agrega el resumen de gastos a una lista de viajes
 const attachSummaryToTrips = (trips) => {
   return trips.map((trip) => {
-    const summary = expenseSummaryService.calculateExpenseSummary(trip.Gasto, trip)
-    const {alerts, reviewStatus} = expenseSummaryService.buildReviewAlerts(summary, trip)
+    const summary = expenseSummaryService.calculateExpenseSummary(trip.Gasto, trip);
+    const {alerts, reviewStatus} = expenseSummaryService.buildReviewAlerts(summary, trip);
     return {
       ...trip,
       gastoAcumulado: summary.accumulatedExpense,
@@ -23,9 +23,9 @@ const attachSummaryToTrips = (trips) => {
       excedeTotalUsd: summary.totalExceedsUsd,
       alertas: alerts,
       estadoRevision: reviewStatus,
-    }
-  })
-}
+    };
+  });
+};
 
 // Lista los viajes pendientes de revision adicional del aprobador por contener alcohol
 const getPendingAlcoholReviews = async (approverId, filters) => {
@@ -34,119 +34,119 @@ const getPendingAlcoholReviews = async (approverId, filters) => {
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'EN_REVISION_APROBADOR')
     .is('id_aprobador_asignado', null)
-    .neq('id_usuario', approverId)
+    .neq('id_usuario', approverId);
   if (filters.fecha_inicio) {
-    query = query.gte('fecha_inicio', filters.fecha_inicio)
+    query = query.gte('fecha_inicio', filters.fecha_inicio);
   }
   if (filters.fecha_fin) {
-    query = query.lte('fecha_fin', filters.fecha_fin)
+    query = query.lte('fecha_fin', filters.fecha_fin);
   }
   if (filters.id_empleado) {
-    query = query.eq('id_usuario', filters.id_empleado)
+    query = query.eq('id_usuario', filters.id_empleado);
   }
-  const {data, error} = await query.order('fecha_inicio', {ascending: false})
+  const {data, error} = await query.order('fecha_inicio', {ascending: false});
   if (error) {
-    return {error: error.message}
+    return {error: error.message};
   }
   const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
     data || [], approverId, 'APROBADOR', (trip) => trip.id_supervisor_asignado
-  )
-  return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(trips, filters.id_seccion))}
-}
+  );
+  return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(trips, filters.id_seccion))};
+};
 
 // Lista los viajes de revision adicional asignados al aprobador
 const getMyAlcoholReviews = async (approverId, filters) => {
-  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))'
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))';
   // El aprobador es unico: toda revision por alcohol pendiente le corresponde
-  await hierarchyAssignmentService.claimStageTrips(approverId, 'id_aprobador_asignado', ['EN_REVISION_APROBADOR'])
+  await hierarchyAssignmentService.claimStageTrips(approverId, 'id_aprobador_asignado', ['EN_REVISION_APROBADOR']);
   let query = supabase
     .from('Viaje')
     .select(selectFields)
     .eq('id_aprobador_asignado', approverId)
     .in('estado', ['EN_REVISION_APROBADOR', 'APROBADO_SUPERVISOR', 'APROBADO_FINAL', 'RECHAZADO'])
-    .eq('tiene_alcohol', true)
+    .eq('tiene_alcohol', true);
   if (filters.fecha_inicio) {
-    query = query.gte('fecha_inicio', filters.fecha_inicio)
+    query = query.gte('fecha_inicio', filters.fecha_inicio);
   }
   if (filters.fecha_fin) {
-    query = query.lte('fecha_fin', filters.fecha_fin)
+    query = query.lte('fecha_fin', filters.fecha_fin);
   }
   if (filters.id_empleado) {
-    query = query.eq('id_usuario', filters.id_empleado)
+    query = query.eq('id_usuario', filters.id_empleado);
   }
-  const {data, error} = await query.order('fecha_inicio', {ascending: false})
+  const {data, error} = await query.order('fecha_inicio', {ascending: false});
   if (error) {
-    return {error: error.message}
+    return {error: error.message};
   }
   else {
     // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
     const merged = await reviewLogService.mergeReviewedTrips({
       userId: approverId, stage: reviewLogService.reviewStages.alcoholReview, select: selectFields, filters,
       trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),
-    })
+    });
     if (merged.error) {
-      return {error: merged.error}
+      return {error: merged.error};
     }
-    return {trips: attachSummaryToTrips(merged.trips)}
+    return {trips: attachSummaryToTrips(merged.trips)};
   }
-}
+};
 
 // Toma un viaje para revision adicional por alcohol
 const takeAlcoholReview = async (tripId, approverId) => {
-  const {data: trip} = await supabase.from('Viaje').select('estado, id_usuario, id_aprobador_asignado').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('estado, id_usuario, id_aprobador_asignado').eq('id_viaje', tripId).single();
   if (!trip) {
-    return {error: 'Viaje no encontrado', status: 404}
+    return {error: 'Viaje no encontrado', status: 404};
   }
   if (trip.estado !== 'EN_REVISION_APROBADOR') {
-    return {error: 'Este viaje no está en revisión adicional del aprobador', status: 400}
+    return {error: 'Este viaje no está en revisión adicional del aprobador', status: 400};
   }
   if (trip.id_usuario === approverId) {
-    return {error: 'No puedes revisar tu propio viaje', status: 403}
+    return {error: 'No puedes revisar tu propio viaje', status: 403};
   }
   // Si ya lo tiene asignado (por ejemplo, por jefatura directa) tomarlo no es un error
   if (trip.id_aprobador_asignado === approverId) {
-    return {message: 'Ya tienes este viaje asignado'}
+    return {message: 'Ya tienes este viaje asignado'};
   }
   if (trip.id_aprobador_asignado) {
-    return {error: 'Este viaje ya fue tomado por otro aprobador', status: 409}
+    return {error: 'Este viaje ya fue tomado por otro aprobador', status: 409};
   }
-  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_aprobador_asignado: approverId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').is('id_aprobador_asignado', null).select('id_viaje')
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_aprobador_asignado: approverId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').is('id_aprobador_asignado', null).select('id_viaje');
   if (error) {
-    return {error: error.message, status: 500}
+    return {error: error.message, status: 500};
   }
   else {
     // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
-      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
-    return {message: 'Viaje tomado correctamente'}
+    return {message: 'Viaje tomado correctamente'};
   }
-}
+};
 
 // Devuelve un viaje de revision adicional por alcohol
 const returnAlcoholReview = async (tripId, approverId) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_aprobador_asignado, estado').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('id_aprobador_asignado, estado').eq('id_viaje', tripId).single();
   if (!trip) {
-    return {error: 'Viaje no encontrado', status: 404}
+    return {error: 'Viaje no encontrado', status: 404};
   }
   if (trip.id_aprobador_asignado !== approverId) {
-    return {error: 'No puedes devolver un viaje que no tomaste', status: 403}
+    return {error: 'No puedes devolver un viaje que no tomaste', status: 403};
   }
   if (trip.estado !== 'EN_REVISION_APROBADOR') {
-    return {error: 'No puedes devolver un viaje ya procesado', status: 400}
+    return {error: 'No puedes devolver un viaje ya procesado', status: 400};
   }
-  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_aprobador_asignado: null}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').eq('id_aprobador_asignado', approverId).select('id_viaje')
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({id_aprobador_asignado: null}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').eq('id_aprobador_asignado', approverId).select('id_viaje');
   if (error) {
-    return {error: error.message, status: 500}
+    return {error: error.message, status: 500};
   }
   else {
     // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
-      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
-    return {message: 'Viaje devuelto correctamente'}
+    return {message: 'Viaje devuelto correctamente'};
   }
-}
+};
 
 // Obtiene el detalle de un viaje en revision adicional por alcohol
 const getAlcoholReviewDetail = async (tripId, approverId) => {
@@ -154,25 +154,25 @@ const getAlcoholReviewDetail = async (tripId, approverId) => {
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd))')
     .eq('id_viaje', tripId)
-    .single()
+    .single();
   if (tripError) {
-    return {error: tripError.message, status: 500}
+    return {error: tripError.message, status: 500};
   }
   if (!trip) {
-    return {error: 'Viaje no encontrado', status: 404}
+    return {error: 'Viaje no encontrado', status: 404};
   }
   if (trip.id_aprobador_asignado && trip.id_aprobador_asignado !== approverId) {
-    const {data: approver} = await supabase.from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', trip.id_aprobador_asignado).single()
-    return {error: `Este viaje está siendo revisado por ${approver?.nombre} ${approver?.apellido_paterno}`, status: 403}
+    const {data: approver} = await supabase.from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', trip.id_aprobador_asignado).single();
+    return {error: `Este viaje está siendo revisado por ${approver?.nombre} ${approver?.apellido_paterno}`, status: 403};
   }
   const {data: expenses} = await supabase
     .from('Gasto')
     .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
-    .eq('id_viaje', tripId)
+    .eq('id_viaje', tripId);
   const {data: comments} = await supabase
-    .from('Comentario').select('*').eq('id_viaje', tripId).order('fecha', {ascending: false})
-  const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip)
-  const {alerts} = expenseSummaryService.buildReviewAlerts(summary, trip)
+    .from('Comentario').select('*').eq('id_viaje', tripId).order('fecha', {ascending: false});
+  const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip);
+  const {alerts} = expenseSummaryService.buildReviewAlerts(summary, trip);
   return {
     trip,
     expenses: expenses || [],
@@ -187,55 +187,55 @@ const getAlcoholReviewDetail = async (tripId, approverId) => {
     totalExceeds: summary.totalExceeds,
     totalExceedsUsd: summary.totalExceedsUsd,
     alerts,
-  }
-}
+  };
+};
 
 // Aprueba la revision adicional del aprobador, continuando el flujo hacia el revisor final
 // Con selfStageSkip se aprueba automaticamente la rendicion del propio aprobador (ver selfReviewSkipService)
 const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} = {}) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_aprobador_asignado, estado').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_aprobador_asignado, estado').eq('id_viaje', tripId).single();
   if (!trip) {
-    return {error: 'Viaje no encontrado', status: 404}
+    return {error: 'Viaje no encontrado', status: 404};
   }
   if (trip.id_usuario === approverId && !selfStageSkip) {
-    return {error: 'No puedes aprobar tu propio viaje', status: 403}
+    return {error: 'No puedes aprobar tu propio viaje', status: 403};
   }
   if (trip.estado !== 'EN_REVISION_APROBADOR') {
-    return {error: 'Este viaje no está en revisión adicional del aprobador', status: 400}
+    return {error: 'Este viaje no está en revisión adicional del aprobador', status: 400};
   }
   if (trip.id_aprobador_asignado !== approverId && !selfStageSkip) {
-    return {error: 'No tienes permiso para aprobar este viaje', status: 403}
+    return {error: 'No tienes permiso para aprobar este viaje', status: 403};
   }
-  const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'APROBADO_SUPERVISOR', id_aprobador_asignado: approverId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').select('id_viaje')
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'APROBADO_SUPERVISOR', id_aprobador_asignado: approverId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').select('id_viaje');
   if (error) {
-    return {error: error.message, status: 500}
+    return {error: error.message, status: 500};
   }
   else {
     // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
-      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
-    await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.alcoholReview, 'APROBADO', {automatic: selfStageSkip})
-    await hierarchyAssignmentService.assignNextReviewer(tripId, approverId, 'REVISOR', 'id_revisor_asignado')
-    await require('./selfReviewSkipService').advanceSelfReviewStages(tripId)
-    return {message: 'Revisión adicional aprobada, la rendición pasa al revisor final'}
+    await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.alcoholReview, 'APROBADO', {automatic: selfStageSkip});
+    await hierarchyAssignmentService.assignNextReviewer(tripId, approverId, 'REVISOR', 'id_revisor_asignado');
+    await require('./selfReviewSkipService').advanceSelfReviewStages(tripId);
+    return {message: 'Revisión adicional aprobada, la rendición pasa al revisor final'};
   }
-}
+};
 
 // Rechaza la revision adicional del aprobador
 const rejectAlcoholReview = async (tripId, approverId) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_aprobador_asignado, estado, ciclo_revision, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo)').eq('id_viaje', tripId).single()
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_aprobador_asignado, estado, ciclo_revision, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo)').eq('id_viaje', tripId).single();
   if (!trip) {
-    return {error: 'Viaje no encontrado', status: 404}
+    return {error: 'Viaje no encontrado', status: 404};
   }
   if (trip.id_usuario === approverId) {
-    return {error: 'No puedes rechazar tu propio viaje', status: 403}
+    return {error: 'No puedes rechazar tu propio viaje', status: 403};
   }
   if (trip.estado !== 'EN_REVISION_APROBADOR') {
-    return {error: 'Este viaje no está en revisión adicional del aprobador', status: 400}
+    return {error: 'Este viaje no está en revisión adicional del aprobador', status: 400};
   }
   if (trip.id_aprobador_asignado !== approverId) {
-    return {error: 'No tienes permiso para rechazar este viaje', status: 403}
+    return {error: 'No tienes permiso para rechazar este viaje', status: 403};
   }
   const {data: existingComments} = await supabase
     .from('Comentario')
@@ -244,24 +244,24 @@ const rejectAlcoholReview = async (tripId, approverId) => {
     .eq('id_usuario', approverId)
     .eq('tipo', 'OBSERVACION')
     .eq('ciclo_revision', trip.ciclo_revision || 1)
-    .not('id_gasto', 'is', null)
+    .not('id_gasto', 'is', null);
   if (!existingComments || existingComments.length === 0) {
-    return {error: 'Debes agregar al menos una observación a algún gasto antes de rechazar', status: 400}
+    return {error: 'Debes agregar al menos una observación a algún gasto antes de rechazar', status: 400};
   }
-  const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'RECHAZADO'}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').select('id_viaje')
+  const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'RECHAZADO'}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').select('id_viaje');
   if (error) {
-    return {error: error.message, status: 500}
+    return {error: error.message, status: 500};
   }
   else {
     // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
-      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409}
+      return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
-    await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.alcoholReview, 'RECHAZADO')
-    await emailService.sendRejectionNotice(trip.Usuario)
-    return {message: 'Viaje rechazado correctamente'}
+    await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.alcoholReview, 'RECHAZADO');
+    await emailService.sendRejectionNotice(trip.Usuario);
+    return {message: 'Viaje rechazado correctamente'};
   }
-}
+};
 
 module.exports = {
   getPendingAlcoholReviews,
@@ -274,4 +274,4 @@ module.exports = {
   addComment: tripCommentService.addTripComment,
   editComment: tripCommentService.editTripComment,
   deleteComment: tripCommentService.deleteTripComment,
-}
+};

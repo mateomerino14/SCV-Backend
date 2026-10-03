@@ -1,6 +1,6 @@
-const supabase = require('../../config/supabase')
-const textNormalizer = require('../../utils/textNormalizer')
-const geminiService = require('./geminiService')
+const supabase = require('../../config/supabase');
+const textNormalizer = require('../../utils/textNormalizer');
+const geminiService = require('./geminiService');
 
 const alcoholKeywords = [
   'cerveza', 'cervezas', 'beer',
@@ -51,7 +51,7 @@ const alcoholKeywords = [
   'shot',
   'bebida alcoholica', 'bebida alcohólica',
   'bebidas alcoholicas', 'bebidas alcohólicas',
-]
+];
 
 const innocuousWords = [
   'agua', 'jugo', 'refresco', 'gaseosa', 'cola', 'fanta', 'sprite',
@@ -64,97 +64,97 @@ const innocuousWords = [
   'papeleria', 'papelería', 'utiles', 'útiles',
   'medicamento', 'farmacia',
   'combustible', 'gasolina', 'diesel',
-]
+];
 
 // Verifica si el nombre del producto contiene alguna palabra clave de alcohol
 const containsAlcoholKeyword = (productName) => {
-  const normalizedName = textNormalizer.normalizeText(productName)
-  return alcoholKeywords.some((keyword) => normalizedName.includes(textNormalizer.normalizeText(keyword)))
-}
+  const normalizedName = textNormalizer.normalizeText(productName);
+  return alcoholKeywords.some((keyword) => normalizedName.includes(textNormalizer.normalizeText(keyword)));
+};
 
 // Verifica si el nombre del producto es claramente inocuo
 const isInnocuousProduct = (productName) => {
-  const normalizedName = textNormalizer.normalizeText(productName)
-  return innocuousWords.some((keyword) => normalizedName.includes(textNormalizer.normalizeText(keyword)))
-}
+  const normalizedName = textNormalizer.normalizeText(productName);
+  return innocuousWords.some((keyword) => normalizedName.includes(textNormalizer.normalizeText(keyword)));
+};
 
 // Analiza una lista de detalles de factura y determina si hay alcohol
 const analyzeAlcohol = async (details) => {
   if (!details || details.length === 0) {
-    return false
+    return false;
   }
   for (const item of details) {
     if (containsAlcoholKeyword(item.nombre_producto)) {
-      return true
+      return true;
     }
   }
   const ambiguousProducts = details
     .map((item) => item.nombre_producto)
-    .filter((productName) => !isInnocuousProduct(productName))
+    .filter((productName) => !isInnocuousProduct(productName));
   if (ambiguousProducts.length === 0) {
-    return false
+    return false;
   }
   try {
-    const productList = ambiguousProducts.join(', ')
-    const prompt = `Analiza esta lista de productos y responde SOLO con "true" si alguno es una bebida alcohólica (incluyendo cualquier tipo de cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago, o cualquier bebida con contenido alcohólico de cualquier región o país). Responde SOLO "true" o "false", sin explicación. Lista: ${productList}`
-    const response = (await geminiService.generateText(prompt, {taskName: 'deteccion de alcohol', maxAttempts: 2})).toLowerCase()
-    return response === 'true'
+    const productList = ambiguousProducts.join(', ');
+    const prompt = `Analiza esta lista de productos y responde SOLO con "true" si alguno es una bebida alcohólica (incluyendo cualquier tipo de cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago, o cualquier bebida con contenido alcohólico de cualquier región o país). Responde SOLO "true" o "false", sin explicación. Lista: ${productList}`;
+    const response = (await geminiService.generateText(prompt, {taskName: 'deteccion de alcohol', maxAttempts: 2})).toLowerCase();
+    return response === 'true';
   }
   catch (error) {
-    console.warn('Deteccion de alcohol por IA no disponible, se usan palabras de riesgo:', error.message)
-    const riskWords = ['trago', 'copa', 'bebida', 'brebaje', 'fermentado', 'destilado', 'macerado']
-    return details.some((item) => riskWords.some((word) => textNormalizer.normalizeText(item.nombre_producto).includes(word)))
+    console.warn('Deteccion de alcohol por IA no disponible, se usan palabras de riesgo:', error.message);
+    const riskWords = ['trago', 'copa', 'bebida', 'brebaje', 'fermentado', 'destilado', 'macerado'];
+    return details.some((item) => riskWords.some((word) => textNormalizer.normalizeText(item.nombre_producto).includes(word)));
   }
-}
+};
 
 // Analiza un texto libre (descripcion de gasto) y determina si menciona alcohol
 const analyzeAlcoholText = async (text) => {
   if (!text || !text.trim()) {
-    return false
+    return false;
   }
   if (containsAlcoholKeyword(text)) {
-    return true
+    return true;
   }
   if (isInnocuousProduct(text)) {
-    return false
+    return false;
   }
   try {
-    const prompt = `Analiza este texto y responde SOLO con "true" si menciona o hace referencia a bebidas alcohólicas (cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago, o cualquier bebida con contenido alcohólico de cualquier región o país). Responde SOLO "true" o "false", sin explicación. Texto: ${text}`
-    const response = (await geminiService.generateText(prompt, {taskName: 'deteccion de alcohol en texto', maxAttempts: 2})).toLowerCase()
-    return response === 'true'
+    const prompt = `Analiza este texto y responde SOLO con "true" si menciona o hace referencia a bebidas alcohólicas (cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago, o cualquier bebida con contenido alcohólico de cualquier región o país). Responde SOLO "true" o "false", sin explicación. Texto: ${text}`;
+    const response = (await geminiService.generateText(prompt, {taskName: 'deteccion de alcohol en texto', maxAttempts: 2})).toLowerCase();
+    return response === 'true';
   }
   catch (error) {
-    console.warn('Deteccion de alcohol en texto por IA no disponible, se usan palabras de riesgo:', error.message)
-    const riskWords = ['trago', 'copa', 'bebida', 'brebaje', 'fermentado', 'destilado', 'macerado']
-    return riskWords.some((word) => textNormalizer.normalizeText(text).includes(word))
+    console.warn('Deteccion de alcohol en texto por IA no disponible, se usan palabras de riesgo:', error.message);
+    const riskWords = ['trago', 'copa', 'bebida', 'brebaje', 'fermentado', 'destilado', 'macerado'];
+    return riskWords.some((word) => textNormalizer.normalizeText(text).includes(word));
   }
-}
+};
 
 // Recalcula y actualiza el indicador de alcohol de un gasto puntual a partir del detalle de su factura
 const updateAlcoholInExpenseFromDetails = async (expenseId, details) => {
   try {
-    const result = await analyzeAlcohol(details)
-    await supabase.from('Gasto').update({tiene_alcohol: result}).eq('id_gasto', expenseId)
-    return result
+    const result = await analyzeAlcohol(details);
+    await supabase.from('Gasto').update({tiene_alcohol: result}).eq('id_gasto', expenseId);
+    return result;
   }
   catch (error) {
-    console.warn('Error en updateAlcoholInExpenseFromDetails:', error.message)
-    return false
+    console.warn('Error en updateAlcoholInExpenseFromDetails:', error.message);
+    return false;
   }
-}
+};
 
 // Recalcula y actualiza el indicador de alcohol de un gasto puntual a partir de su descripcion libre
 const updateAlcoholInExpenseFromText = async (expenseId, text) => {
   try {
-    const result = await analyzeAlcoholText(text)
-    await supabase.from('Gasto').update({tiene_alcohol: result}).eq('id_gasto', expenseId)
-    return result
+    const result = await analyzeAlcoholText(text);
+    await supabase.from('Gasto').update({tiene_alcohol: result}).eq('id_gasto', expenseId);
+    return result;
   }
   catch (error) {
-    console.warn('Error en updateAlcoholInExpenseFromText:', error.message)
-    return false
+    console.warn('Error en updateAlcoholInExpenseFromText:', error.message);
+    return false;
   }
-}
+};
 
 // Recalcula y actualiza el indicador de alcohol de un viaje. Cada gasto ya guarda su
 // propio tiene_alcohol al registrarse o editarse (facturas por su detalle de productos,
@@ -165,16 +165,16 @@ const updateAlcoholInTrip = async (tripId) => {
     const {data: expenses} = await supabase
       .from('Gasto')
       .select('tiene_alcohol')
-      .eq('id_viaje', tripId)
-    const result = (expenses || []).some((expense) => expense.tiene_alcohol === true)
-    await supabase.from('Viaje').update({tiene_alcohol: result}).eq('id_viaje', tripId)
-    return result
+      .eq('id_viaje', tripId);
+    const result = (expenses || []).some((expense) => expense.tiene_alcohol === true);
+    await supabase.from('Viaje').update({tiene_alcohol: result}).eq('id_viaje', tripId);
+    return result;
   }
   catch (error) {
-    console.warn('Error en updateAlcoholInTrip:', error.message)
-    return false
+    console.warn('Error en updateAlcoholInTrip:', error.message);
+    return false;
   }
-}
+};
 
 // Lista de palabras inapropiadas que se bloquean sin necesidad de IA
 const hardcodedBadWords = [
@@ -182,13 +182,13 @@ const hardcodedBadWords = [
   'idiota', 'estúpido', 'estupido', 'pendejo', 'culero', 'chingada',
   'verga', 'maricón', 'maricon', 'cabrón', 'cabron', 'bastardo',
   'hijo de puta', 'hdp', 'conchetumare', 'weon', 'weón', 'huevon', 'huevón',
-]
+];
 
 // Verifica si el texto contiene alguna palabra de la lista negra
 const containsHardcodedBadWord = (text) => {
-  const lower = text.toLowerCase()
-  return hardcodedBadWords.some((word) => lower.includes(word))
-}
+  const lower = text.toLowerCase();
+  return hardcodedBadWords.some((word) => lower.includes(word));
+};
 
 // Usa Gemini para detectar si un texto contiene lenguaje inapropiado o agresivo
 const detectWithGemini = async (text) => {
@@ -198,34 +198,34 @@ Tu tarea es determinar si el siguiente texto contiene lenguaje inapropiado, ofen
 Texto a evaluar: "${text}"
 
 Responde ÚNICAMENTE con un JSON sin texto adicional ni backticks:
-{"inapropiado": true/false, "motivo": "explicación breve solo si es inapropiado, sino null"}`
+{"inapropiado": true/false, "motivo": "explicación breve solo si es inapropiado, sino null"}`;
 
-  const responseText = await geminiService.generateText(prompt, {taskName: 'moderacion de comentario', maxAttempts: 2})
-  const cleanJson = responseText.replace(/```json|```/g, '').trim()
-  const parsed = JSON.parse(cleanJson)
-  return parsed.inapropiado === true
-}
+  const responseText = await geminiService.generateText(prompt, {taskName: 'moderacion de comentario', maxAttempts: 2});
+  const cleanJson = responseText.replace(/```json|```/g, '').trim();
+  const parsed = JSON.parse(cleanJson);
+  return parsed.inapropiado === true;
+};
 
 // Valida si un texto es apropiado para usarse en observaciones del sistema
 const validateText = async (text) => {
   if (!text || text.trim().length === 0) {
-    return {valid: true}
+    return {valid: true};
   }
   if (containsHardcodedBadWord(text)) {
-    return {valid: false, error: 'El comentario contiene palabras inapropiadas'}
+    return {valid: false, error: 'El comentario contiene palabras inapropiadas'};
   }
   try {
-    const isInappropriate = await detectWithGemini(text)
+    const isInappropriate = await detectWithGemini(text);
     if (isInappropriate) {
-      return {valid: false, error: 'El comentario contiene palabras inapropiadas'}
+      return {valid: false, error: 'El comentario contiene palabras inapropiadas'};
     }
-    return {valid: true}
+    return {valid: true};
   }
   catch (error) {
-    console.warn('Error en detección con Gemini:', error.message)
-    return {valid: true}
+    console.warn('Error en detección con Gemini:', error.message);
+    return {valid: true};
   }
-}
+};
 
 module.exports = {
   analyzeAlcohol,

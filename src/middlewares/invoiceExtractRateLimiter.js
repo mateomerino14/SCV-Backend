@@ -1,4 +1,4 @@
-const {rateLimit, ipKeyGenerator} = require('express-rate-limit')
+const {rateLimit, ipKeyGenerator} = require('express-rate-limit');
 
 // Limita las extracciones de facturas con IA por usuario, ya que cada llamada tiene costo
 const invoiceExtractRateLimiter = rateLimit({
@@ -8,6 +8,6 @@ const invoiceExtractRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => (req.user?.id_usuario ? String(req.user.id_usuario) : ipKeyGenerator(req.ip)),
-})
+});
 
 module.exports = invoiceExtractRateLimiter;

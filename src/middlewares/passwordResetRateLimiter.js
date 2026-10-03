@@ -1,6 +1,6 @@
-const rateLimit = require('express-rate-limit')
+const rateLimit = require('express-rate-limit');
 
-const limitMessage = {error: 'Demasiados intentos. Espera 15 minutos antes de volver a intentar.'}
+const limitMessage = {error: 'Demasiados intentos. Espera 15 minutos antes de volver a intentar.'};
 
 // Envio de codigos de recuperacion: cuenta todos los pedidos, porque cada uno manda un correo
 const sendCodeRateLimiter = rateLimit({
@@ -9,7 +9,7 @@ const sendCodeRateLimiter = rateLimit({
   message: limitMessage,
   standardHeaders: true,
   legacyHeaders: false,
-})
+});
 
 // Verificacion de codigos: solo cuentan los intentos fallidos (ademas, cada codigo se anula
 // tras 5 intentos incorrectos)
@@ -20,6 +20,6 @@ const verifyCodeRateLimiter = rateLimit({
   message: limitMessage,
   standardHeaders: true,
   legacyHeaders: false,
-})
+});
 
 module.exports = {sendCodeRateLimiter, verifyCodeRateLimiter};
