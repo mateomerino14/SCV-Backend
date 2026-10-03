@@ -63,27 +63,28 @@ chore: Actualiza esquema de base de datos a timestamptz
 
 ```javascript
 // Correcto
-const userData = {}
-const travelHistory = []
-const createExpense = () => {}
+const userData = {};
+const travelHistory = [];
+const createExpense = () => {};
 
 // Incorrecto
-const datosUsuario = {}
-const historialViajes = []
-const crearGasto = () => {}
+const datosUsuario = {};
+const historialViajes = [];
+const crearGasto = () => {};
 ```
 
 ### Comentarios
 
 - **Frontend**: no se incluyen comentarios explicativos por función. El nombre de la función y su contenido deben ser suficientes.
-- **Backend**: cada función lleva un comentario de una línea que describe su propósito.
+- **Backend**: cada función lleva un comentario de una línea que describe su propósito. Dentro de las funciones solo se dejan avisos importantes, también de una línea.
+- **Base de datos**: comentarios breves en los scripts SQL: un encabezado por sección y una línea donde haga falta.
 
 ```javascript
 // Obtiene la fecha calendario actual en Bolivia
 const getBoliviaToday = () => {
-  const now = new Date()
-  const boliviaTime = new Date(now.getTime() + boliviaOffsetHours * 60 * 60 * 1000)
-  return boliviaTime.toISOString().split('T')[0]
+  const now = new Date();
+  const boliviaTime = new Date(now.getTime() + boliviaOffsetHours * 60 * 60 * 1000);
+  return boliviaTime.toISOString().split('T')[0];
 };
 ```
 
@@ -98,27 +99,27 @@ const getBoliviaToday = () => {
 ```javascript
 // Correcto
 if (result.error) {
-  return res.status(result.status).json({error: result.error})
+  return res.status(result.status).json({error: result.error});
 }
 else {
-  return res.json({message: result.message})
+  return res.json({message: result.message});
 }
 
 // Incorrecto
 return result.error
   ? res.status(result.status).json({error: result.error})
-  : res.json({message: result.message})
+  : res.json({message: result.message});
 ```
 
 **`else` y `catch` en línea nueva**, posterior al cierre de la llave.
 
 ```javascript
 try {
-  const data = await getData()
-  return data
+  const data = await getData();
+  return data;
 }
 catch (error) {
-  return {error: error.message}
+  return {error: error.message};
 }
 ```
 
@@ -126,10 +127,10 @@ catch (error) {
 
 ```javascript
 // Correcto
-const payload = {data: value, status: 200}
+const payload = {data: value, status: 200};
 
 // Incorrecto
-const payload = { data: value, status: 200 }
+const payload = { data: value, status: 200 };
 ```
 
 **Usar `const` por defecto**; `let` únicamente cuando el valor deba reasignarse.
@@ -137,8 +138,8 @@ const payload = { data: value, status: 200 }
 **Evitar valores mágicos**; declararlos como constantes con nombre.
 
 ```javascript
-const toleranceDays = 4
-const boliviaOffsetHours = -4
+const toleranceDays = 4;
+const boliviaOffsetHours = -4;
 ```
 
 ---
@@ -184,6 +185,8 @@ Ningún componente de presentación importa un servicio.
 | Molécula | Composición de átomos que resuelve una unidad funcional |
 | Organismo | Bloque autónomo y complejo de la interfaz |
 
+Los componentes de `components/ui/`, los átomos y las moléculas reutilizables se documentan con una historia de Storybook (`<Componente>.stories.jsx`) junto al archivo del componente.
+
 Si un componente crece hasta necesitar más de un estado propio o más de una llamada a un hook de negocio, probablemente deba dividirse.
 
 ### Estilos
@@ -223,10 +226,10 @@ Las rutas con parámetros se construyen mediante las funciones de `constants/rou
 
 ```javascript
 // Correcto
-navigate(supervisorExpenseDetailPath(expenseId))
+navigate(supervisorExpenseDetailPath(expenseId));
 
 // Incorrecto
-navigate(`/dashboard/supervisor/gasto/${expenseId}`)
+navigate(`/dashboard/supervisor/gasto/${expenseId}`);
 ```
 
 ### Manejo de errores
@@ -278,26 +281,26 @@ Un controlador siempre recibe `(req, res)`. Un servicio recibe parámetros expl�
 ```javascript
 // Controlador
 const getExpenseDetail = async (req, res) => {
-  const {expenseId} = req.params
-  const result = await expenseService.getExpenseDetail(expenseId)
+  const {expenseId} = req.params;
+  const result = await expenseService.getExpenseDetail(expenseId);
   if (result.error) {
-    return res.status(result.status).json({error: result.error})
+    return res.status(result.status).json({error: result.error});
   }
   else {
-    return res.json(result.expense)
+    return res.json(result.expense);
   }
 };
 
 // Servicio
 const getExpenseDetail = async (expenseId) => {
-  const {data, error} = await supabase.from('Gasto').select('*').eq('id_gasto', expenseId).single()
+  const {data, error} = await supabase.from('Gasto').select('*').eq('id_gasto', expenseId).single();
   if (error) {
-    return {error: error.message, status: 500}
+    return {error: error.message, status: 500};
   }
   if (!data) {
-    return {error: 'Gasto no encontrado', status: 404}
+    return {error: 'Gasto no encontrado', status: 404};
   }
-  return {expense: data}
+  return {expense: data};
 };
 ```
 
@@ -309,10 +312,10 @@ Las tareas que no deben interrumpir el flujo principal —notificaciones por cor
 
 ```javascript
 try {
-  await emailService.sendEmail(to, subject, html)
+  await emailService.sendEmail(to, subject, html);
 }
 catch (error) {
-  console.warn('Error notificando al empleado:', error.message)
+  console.warn('Error notificando al empleado:', error.message);
 }
 ```
 
@@ -324,7 +327,7 @@ La restricción de acceso se declara en la ruta, no dentro del controlador.
 router.post('/expense-review/:tripId/take',
   authMiddleware,
   roleMiddleware(['SUPERVISOR']),
-  reviewController.takeExpenseReview)
+  reviewController.takeExpenseReview);
 ```
 
 ### Fechas y zonas horarias
@@ -338,13 +341,13 @@ Bolivia está en UTC−4. Usar `toISOString()` sobre una fecha local desplaza el
 ```javascript
 // Correcto
 const getBoliviaToday = () => {
-  const now = new Date()
-  const boliviaTime = new Date(now.getTime() + boliviaOffsetHours * 60 * 60 * 1000)
-  return boliviaTime.toISOString().split('T')[0]
+  const now = new Date();
+  const boliviaTime = new Date(now.getTime() + boliviaOffsetHours * 60 * 60 * 1000);
+  return boliviaTime.toISOString().split('T')[0];
 };
 
 // Incorrecto
-const today = new Date().toISOString().split('T')[0]
+const today = new Date().toISOString().split('T')[0];
 ```
 
 ### Validación
