@@ -1,80 +1,114 @@
-const supabase = require('../../config/supabase')
-const numberToWords = require('../../utils/numberToWords')
-const emailService = require('../shared/emailService')
-const pdfService = require('../shared/pdfService')
+const supabase = require('../../config/supabase');
+const numberToWords = require('../../utils/numberToWords');
+const emailService = require('../shared/emailService');
+const pdfService = require('../shared/pdfService');
+const {buildTripCode} = require('../../utils/tripCode');
+const {escapeDeep, escapeHtml: escapeText} = require('../../utils/htmlEscape');
 
-// Escapa caracteres especiales de HTML para prevenir inyeccion
-const escapeHtml = (text) => {
-  return (text || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-};
+// Los datos se escapan al entrar a cada plantilla (escapeDeep); aqui solo se normaliza el vacio
+const escapeHtml = (text) => text || '';
 
 // Formatea una fecha ISO a formato dia/mes/anio
 const formatShortDate = (isoString) => {
-  const [year, month, day] = isoString.split('-')
-  return `${day}/${month}/${year}`
+  const [year, month, day] = String(isoString || '').split('T')[0].split('-');
+  return `${day}/${month}/${year}`;
 };
 
-// Obtiene el siguiente numero correlativo de recibo, formateado a 6 digitos
-const getNextReceiptNumber = async () => {
-  const {data: correlativeData, error} = await supabase.rpc('incrementar_correlativo_recibo')
-  if (error) {
-    return {error: 'Error al generar el número de recibo'}
+// Completa el numero de recibo con ceros a la izquierda
+const formatReceiptNumber = (number) => String(number).padStart(6, '0');
+
+// Busca el recibo ya emitido (individual por gasto, o agrupado por viaje/tipo/moneda)
+const findIssuedReceipt = async ({tripId, expenseId, type, isInternational}) => {
+  let query = supabase.from('Recibo').select('numero');
+  if (expenseId) {
+    query = query.eq('id_gasto', expenseId);
   }
   else {
-    return {receiptNumber: String(correlativeData).padStart(6, '0')}
+    query = query.eq('id_viaje', tripId).is('id_gasto', null).eq('tipo', type).eq('es_gasto_internacional', isInternational);
   }
+  const {data} = await query.maybeSingle();
+  return data;
+};
+
+// Devuelve el numero del recibo, reutilizando el ya emitido o tomando el siguiente
+const getReceiptNumber = async ({tripId, expenseId = null, type, isInternational}) => {
+  const existing = await findIssuedReceipt({tripId, expenseId, type, isInternational});
+  if (existing) {
+    return {receiptNumber: formatReceiptNumber(existing.numero), reissued: true};
+  }
+  const {data: correlativeData, error} = await supabase.rpc('incrementar_correlativo_recibo');
+  if (error) {
+    return {error: 'Error al generar el número de recibo'};
+  }
+  const {error: insertError} = await supabase.from('Recibo').insert({
+    numero: correlativeData,
+    id_viaje: tripId,
+    id_gasto: expenseId,
+    tipo: type,
+    es_gasto_internacional: isInternational,
+  });
+  if (insertError) {
+    // Dos envios simultaneos del mismo recibo: gana el primero y se usa su numero
+    const concurrent = await findIssuedReceipt({tripId, expenseId, type, isInternational});
+    if (concurrent) {
+      return {receiptNumber: formatReceiptNumber(concurrent.numero), reissued: true};
+    }
+    return {error: 'Error al registrar el número de recibo'};
+  }
+  return {receiptNumber: formatReceiptNumber(correlativeData), reissued: false};
 };
 
 // Genera el HTML de un recibo agrupado por tipo de gasto
-const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isInternational, tripId, motivo, supervisor) => {
-  const today = new Date()
-  const day = today.getDate()
-  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-  const month = monthNames[today.getMonth()]
-  const year = today.getFullYear()
-  const currency = isInternational ? 'USD' : 'Bs'
-  const currencyWords = isInternational ? 'DÓLARES AMERICANOS' : 'BOLIVIANOS'
-  const isService = type === 'S'
-  const retentionLabel = isService ? 'RETENCIÓN RC-IVA 13%' : 'RETENCIÓN IUE 5%'
-  const typeTitle = isService ? 'RECIBO PAGO DE SERVICIOS' : 'RECIBO DE COMPRAS'
-  const totalAmount = expenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0)
-  let totalRetention = 0
+const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, type, isInternational, tripCode, rawMotivo, rawSupervisor) => {
+  const expenses = escapeDeep(rawExpenses);
+  const employee = escapeDeep(rawEmployee);
+  const motivo = escapeDeep(rawMotivo);
+  const supervisor = escapeDeep(rawSupervisor);
+  const today = new Date();
+  const day = today.getDate();
+  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const month = monthNames[today.getMonth()];
+  const year = today.getFullYear();
+  const currency = isInternational ? 'USD' : 'Bs';
+  const currencyWords = isInternational ? 'DÓLARES AMERICANOS' : 'BOLIVIANOS';
+  const isService = type === 'S';
+  const retentionLabel = isService ? 'RETENCIÓN RC-IVA 13%' : 'RETENCIÓN IUE 5%';
+  const typeTitle = isService ? 'RECIBO PAGO DE SERVICIOS' : 'RECIBO DE COMPRAS';
+  const totalAmount = expenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
+  let totalRetention = 0;
   if (!isInternational) {
     if (isService) {
-      totalRetention = expenses.reduce((sum, expense) => sum + parseFloat(expense.retencion_rc_iva || 0), 0)
+      totalRetention = expenses.reduce((sum, expense) => sum + parseFloat(expense.retencion_rc_iva || 0), 0);
     }
     else {
-      totalRetention = expenses.reduce((sum, expense) => sum + parseFloat(expense.retencion_iue || 0), 0)
+      totalRetention = expenses.reduce((sum, expense) => sum + parseFloat(expense.retencion_iue || 0), 0);
     }
   }
-  let totalIt = 0
+  let totalIt = 0;
   if (!isInternational) {
-    totalIt = expenses.reduce((sum, expense) => sum + parseFloat(expense.retencion_it || 0), 0)
+    totalIt = expenses.reduce((sum, expense) => sum + parseFloat(expense.retencion_it || 0), 0);
   }
-  const totalToPay = expenses.reduce((sum, expense) => sum + parseFloat(expense.importe_costo || expense.monto_total || 0), 0)
-  const costCenter = `${employee?.numero_dependencia || ''} / ${employee?.numero_seccion || ''}`.trim()
-  const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords)
+  const totalToPay = expenses.reduce((sum, expense) => sum + parseFloat(expense.importe_costo || expense.monto_total || 0), 0);
+  const costCenter = employee?.Seccion?.nombre || '';
+  const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords);
   const expenseRows = expenses.map((expense, index) => {
-    const subItems = expense.Gasto_Subitem || []
-    const exchangeSegments = expense.Gasto_Tramo_Moneda || []
-    let description = ''
+    const subItems = expense.Gasto_Subitem || [];
+    const exchangeSegments = expense.Gasto_Tramo_Moneda || [];
+    let description = '';
     if (subItems.length > 0) {
-      description = escapeHtml(subItems.map((item) => `${item.descripcion}: ${parseFloat(item.monto).toFixed(2)}`).join('\n'))
+      description = escapeHtml(subItems.map((item) => `${item.descripcion}: ${parseFloat(item.monto).toFixed(2)}`).join('\n'));
     }
     else {
-      description = escapeHtml(expense.descripcion || expense.Categoria_Gasto?.nombre || '')
+      description = escapeHtml(expense.descripcion || expense.Categoria_Gasto?.nombre || '');
     }
-    let segmentsText = '—'
+    let segmentsText = '—';
     if (exchangeSegments.length > 0) {
-      segmentsText = escapeHtml(exchangeSegments.map((segment) => `${parseFloat(segment.monto_origen).toFixed(2)} ${segment.moneda} → ${parseFloat(segment.monto_usd).toFixed(2)} USD`).join('\n'))
+      segmentsText = escapeHtml(exchangeSegments.map((segment) => `${parseFloat(segment.monto_origen).toFixed(2)} ${segment.moneda} → ${parseFloat(segment.monto_usd).toFixed(2)} USD`).join('\n'));
     }
-    const dateStr = formatShortDate(expense.fecha_gasto)
-    let segmentsColumn = ''
+    const dateStr = formatShortDate(expense.fecha_gasto);
+    let segmentsColumn = '';
     if (isInternational) {
-      segmentsColumn = `<td class="col-tramos">${segmentsText}</td>`
+      segmentsColumn = `<td class="col-tramos">${segmentsText}</td>`;
     }
     return `
     <tr>
@@ -83,13 +117,13 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
       <td class="col-desc">${description}</td>
       ${segmentsColumn}
       <td class="col-importe">${parseFloat(expense.monto_total || 0).toFixed(2)}</td>
-    </tr>`
-  }).join('')
-  const minRows = Math.max(0, 12 - expenses.length)
+    </tr>`;
+  }).join('');
+  const minRows = Math.max(0, 12 - expenses.length);
   const emptyRows = Array.from({length: minRows}).map((_, index) => {
-    let segmentsColumn = ''
+    let segmentsColumn = '';
     if (isInternational) {
-      segmentsColumn = '<td class="col-tramos"></td>'
+      segmentsColumn = '<td class="col-tramos"></td>';
     }
     return `
     <tr>
@@ -98,22 +132,22 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
       <td class="col-desc"></td>
       ${segmentsColumn}
       <td class="col-importe"></td>
-    </tr>`
-  }).join('')
-  let retentionRow = ''
+    </tr>`;
+  }).join('');
+  let retentionRow = '';
   if (!isInternational) {
     retentionRow = `<div class="totales-fila"><span>${retentionLabel}</span><span>${totalRetention.toFixed(2)}</span></div>
-        <div class="totales-fila"><span>RETENCIÓN IT 3%</span><span>${totalIt.toFixed(2)}</span></div>`
+        <div class="totales-fila"><span>RETENCIÓN IT 3%</span><span>${totalIt.toFixed(2)}</span></div>`;
   }
-  let segmentsHeader = ''
+  let segmentsHeader = '';
   if (isInternational) {
-    segmentsHeader = '<th class="col-tramos">TRAMOS DE CAMBIO</th>'
+    segmentsHeader = '<th class="col-tramos">TRAMOS DE CAMBIO</th>';
   }
-  let descWidth = '52'
-  let segmentsWidth = '0'
+  let descWidth = '52';
+  let segmentsWidth = '0';
   if (isInternational) {
-    descWidth = '38'
-    segmentsWidth = '20'
+    descWidth = '38';
+    segmentsWidth = '20';
   }
   return `<!DOCTYPE html>
 <html>
@@ -122,7 +156,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   @page { size: landscape; margin: 0; }
-  body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; background: #fff; }
+  body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .marco { border: 1.5px solid #000; padding: 16px 24px; width: 100%; min-height: 100vh; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
   .logo { font-size: 14pt; font-weight: bold; letter-spacing: 1px; width: 20%; }
@@ -151,7 +185,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
   .son-texto { flex: 1; border-bottom: 1px solid #000; padding-bottom: 2px; margin-right: 12px; }
   .pie { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
   .pie-izq { width: 45%; text-align: center; }
-  .pie-izq .linea-firma { border-top: 1px solid #000; margin-top: 40px; padding-top: 4px; font-size: 9.5pt; }
+  .pie-izq .linea-firma { margin-top: 40px; font-size: 13pt; font-weight: bold; }
   .pie-der { width: 45%; font-size: 10pt; }
   .pie-der p { margin-bottom: 18px; border-bottom: 1px solid #000; padding-bottom: 2px; }
 </style>
@@ -167,7 +201,7 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
       Lugar: Cochabamba &nbsp;&nbsp; de ${day} &nbsp;&nbsp; de ${month} &nbsp;&nbsp; de ${year}
     </div>
     <div class="viaje-linea">
-      <span>Nº de Viaje: ${tripId}</span>
+      <span>Nº de Viaje: ${tripCode}</span>
       <span>Concepto: ${escapeHtml(motivo || '')}</span>
       <span>Monto: ${totalAmount.toFixed(2)} ${currency}</span>
     </div>
@@ -213,44 +247,48 @@ const generateGroupedReceiptHtml = (expenses, employee, receiptNumber, type, isI
     </div>
   </div>
 </body>
-</html>`
+</html>`;
 };
 
 // Genera el HTML de un recibo individual por un solo gasto
-const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId, motivo, supervisor) => {
-  const today = new Date()
-  const day = today.getDate()
-  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-  const month = monthNames[today.getMonth()]
-  const year = today.getFullYear()
-  const isInternational = !!expense.es_gasto_internacional
-  const currency = isInternational ? 'USD' : 'Bs'
-  const currencyWords = isInternational ? 'DÓLARES AMERICANOS' : 'BOLIVIANOS'
-  const isService = expense.tipo === 'S'
-  const retentionLabel = isService ? 'RETENCIÓN RC-IVA 13%' : 'RETENCIÓN IUE 5%'
-  const typeTitle = isService ? 'RECIBO PAGO DE SERVICIOS' : 'RECIBO DE COMPRAS'
-  const subItems = expense.Gasto_Subitem || []
-  const exchangeSegments = expense.Gasto_Tramo_Moneda || []
-  const hasSubItems = subItems.length > 0
-  const hasSegments = isInternational && exchangeSegments.length > 0
-  const totalAmount = parseFloat(expense.monto_total || 0)
-  let totalRetention = 0
+const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, tripCode, rawMotivo, rawSupervisor) => {
+  const expense = escapeDeep(rawExpense);
+  const employee = escapeDeep(rawEmployee);
+  const motivo = escapeDeep(rawMotivo);
+  const supervisor = escapeDeep(rawSupervisor);
+  const today = new Date();
+  const day = today.getDate();
+  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const month = monthNames[today.getMonth()];
+  const year = today.getFullYear();
+  const isInternational = !!expense.es_gasto_internacional;
+  const currency = isInternational ? 'USD' : 'Bs';
+  const currencyWords = isInternational ? 'DÓLARES AMERICANOS' : 'BOLIVIANOS';
+  const isService = expense.tipo === 'S';
+  const retentionLabel = isService ? 'RETENCIÓN RC-IVA 13%' : 'RETENCIÓN IUE 5%';
+  const typeTitle = isService ? 'RECIBO PAGO DE SERVICIOS' : 'RECIBO DE COMPRAS';
+  const subItems = expense.Gasto_Subitem || [];
+  const exchangeSegments = expense.Gasto_Tramo_Moneda || [];
+  const hasSubItems = subItems.length > 0;
+  const hasSegments = isInternational && exchangeSegments.length > 0;
+  const totalAmount = parseFloat(expense.monto_total || 0);
+  let totalRetention = 0;
   if (!isInternational) {
     if (isService) {
-      totalRetention = parseFloat(expense.retencion_rc_iva || 0)
+      totalRetention = parseFloat(expense.retencion_rc_iva || 0);
     }
     else {
-      totalRetention = parseFloat(expense.retencion_iue || 0)
+      totalRetention = parseFloat(expense.retencion_iue || 0);
     }
   }
-  let totalIt = 0
+  let totalIt = 0;
   if (!isInternational) {
-    totalIt = parseFloat(expense.retencion_it || 0)
+    totalIt = parseFloat(expense.retencion_it || 0);
   }
-  const totalToPay = parseFloat(expense.importe_costo || expense.monto_total || 0)
-  const costCenter = `${employee?.numero_dependencia || ''} / ${employee?.numero_seccion || ''}`.trim()
-  const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords)
-  let expenseRows = ''
+  const totalToPay = parseFloat(expense.importe_costo || expense.monto_total || 0);
+  const costCenter = employee?.Seccion?.nombre || '';
+  const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords);
+  let expenseRows = '';
   if (hasSubItems) {
     expenseRows = subItems.map((item, index) => `
     <tr>
@@ -258,7 +296,7 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId,
       <td class="col-fecha">${formatShortDate(expense.fecha_gasto)}</td>
       <td class="col-desc">${escapeHtml(item.descripcion)}</td>
       <td class="col-importe">${parseFloat(item.monto).toFixed(2)}</td>
-    </tr>`).join('')
+    </tr>`).join('');
   }
   else {
     expenseRows = `
@@ -267,32 +305,32 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId,
       <td class="col-fecha">${formatShortDate(expense.fecha_gasto)}</td>
       <td class="col-desc">${escapeHtml(expense.descripcion || expense.Categoria_Gasto?.nombre || '')}</td>
       <td class="col-importe">${totalAmount.toFixed(2)}</td>
-    </tr>`
+    </tr>`;
   }
-  let rowCount = 1
+  let rowCount = 1;
   if (hasSubItems) {
-    rowCount = subItems.length
+    rowCount = subItems.length;
   }
-  const minRows = Math.max(0, 10 - rowCount)
+  const minRows = Math.max(0, 10 - rowCount);
   const emptyRows = Array.from({length: minRows}).map((_, index) => `
     <tr>
       <td class="col-n">${rowCount + index + 1}</td>
       <td class="col-fecha"></td>
       <td class="col-desc"></td>
       <td class="col-importe"></td>
-    </tr>`).join('')
-  let retentionRow = ''
+    </tr>`).join('');
+  let retentionRow = '';
   if (!isInternational) {
     retentionRow = `<div class="totales-fila"><span>${retentionLabel}</span><span>${totalRetention.toFixed(2)}</span></div>
-        <div class="totales-fila"><span>RETENCIÓN IT 3%</span><span>${totalIt.toFixed(2)}</span></div>`
+        <div class="totales-fila"><span>RETENCIÓN IT 3%</span><span>${totalIt.toFixed(2)}</span></div>`;
   }
-  let segmentsHtml = ''
+  let segmentsHtml = '';
   if (hasSegments) {
     segmentsHtml = `
     <div class="tramos-box">
       <p class="tramos-titulo">TRAMOS DE CAMBIO</p>
       ${exchangeSegments.map((segment) => `<p class="tramos-linea">${parseFloat(segment.monto_origen).toFixed(2)} ${segment.moneda} → ${parseFloat(segment.monto_usd).toFixed(2)} USD (T/C: ${parseFloat(segment.tipo_cambio).toFixed(4)})</p>`).join('')}
-    </div>`
+    </div>`;
   }
   return `<!DOCTYPE html>
 <html>
@@ -301,7 +339,7 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId,
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   @page { size: landscape; margin: 0; }
-  body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; background: #fff; }
+  body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .marco { border: 1.5px solid #000; padding: 16px 24px; width: 100%; min-height: 100vh; }
   .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
   .logo { font-size: 14pt; font-weight: bold; letter-spacing: 1px; width: 20%; }
@@ -332,7 +370,7 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId,
   .son-texto { flex: 1; border-bottom: 1px solid #000; padding-bottom: 2px; margin-right: 12px; }
   .pie { display: flex; justify-content: space-between; margin-top: 40px; page-break-inside: avoid; }
   .pie-izq { width: 45%; text-align: center; }
-  .pie-izq .linea-firma { border-top: 1px solid #000; margin-top: 40px; padding-top: 4px; font-size: 9.5pt; }
+  .pie-izq .linea-firma { margin-top: 40px; font-size: 13pt; font-weight: bold; }
   .pie-der { width: 45%; font-size: 10pt; }
   .pie-der p { margin-bottom: 18px; border-bottom: 1px solid #000; padding-bottom: 2px; }
 </style>
@@ -348,7 +386,7 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId,
       Lugar: Cochabamba &nbsp;&nbsp; de ${day} &nbsp;&nbsp; de ${month} &nbsp;&nbsp; de ${year}
     </div>
     <div class="viaje-linea">
-      <span>Nº de Viaje: ${tripId}</span>
+      <span>Nº de Viaje: ${tripCode}</span>
       <span>Concepto: ${escapeHtml(motivo || '')}</span>
       <span>Monto: ${totalAmount.toFixed(2)} ${currency}</span>
     </div>
@@ -394,37 +432,37 @@ const generateIndividualReceiptHtml = (expense, employee, receiptNumber, tripId,
     </div>
   </div>
 </body>
-</html>`
+</html>`;
 };
 
 // Genera y envia un recibo agrupado por viaje y tipo de gasto
 const sendGroupedReceipt = async (tripId, type, isInternational) => {
   if (!['C', 'S'].includes(type)) {
-    return {error: 'El tipo debe ser Compra (C) o Servicio (S)', status: 400}
+    return {error: 'El tipo debe ser Compra (C) o Servicio (S)', status: 400};
   }
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad)')
+    .select('motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad)')
     .eq('id_viaje', tripId)
-    .single()
+    .single();
   if (tripError) {
-    return {error: tripError.message, status: 500}
+    return {error: tripError.message, status: 500};
   }
   if (!trip) {
-    return {error: 'Viaje no encontrado', status: 404}
+    return {error: 'Viaje no encontrado', status: 404};
   }
   if (trip.estado !== 'APROBADO_FINAL') {
-    return {error: 'El recibo solo puede emitirse cuando el viaje está aprobado en su totalidad', status: 400}
+    return {error: 'El recibo solo puede emitirse cuando el viaje está aprobado en su totalidad', status: 400};
   }
-  const employee = trip.Usuario
-  let supervisor = null
+  const employee = trip.Usuario;
+  let supervisor = null;
   if (trip.id_supervisor_asignado) {
     const {data: supervisorData} = await supabase
-      .from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', trip.id_supervisor_asignado).single()
-    supervisor = supervisorData
+      .from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', trip.id_supervisor_asignado).single();
+    supervisor = supervisorData;
   }
   if (!employee?.email_corporativo) {
-    return {error: 'El empleado no tiene un correo corporativo registrado', status: 400}
+    return {error: 'El empleado no tiene un correo corporativo registrado', status: 400};
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
@@ -432,112 +470,116 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
     .eq('id_viaje', tripId)
     .eq('tipo', type)
     .eq('es_gasto_internacional', isInternational)
-    .order('fecha_gasto', {ascending: true})
+    .order('fecha_gasto', {ascending: true});
   if (expensesError) {
-    return {error: expensesError.message, status: 500}
+    return {error: expensesError.message, status: 500};
   }
   if (!expenses || expenses.length === 0) {
-    let internationalLabel = ''
+    let internationalLabel = '';
     if (isInternational) {
-      internationalLabel = 'internacionales '
+      internationalLabel = 'internacionales ';
     }
-    let typeLabel = 'Compra'
+    let typeLabel = 'Compra';
     if (type === 'S') {
-      typeLabel = 'Servicio'
+      typeLabel = 'Servicio';
     }
-    return {error: `No hay gastos ${internationalLabel}de tipo ${typeLabel} sin factura registrados en este viaje`, status: 400}
+    return {error: `No hay gastos ${internationalLabel}de tipo ${typeLabel} sin factura registrados en este viaje`, status: 400};
   }
-  const {receiptNumber, error: numberError} = await getNextReceiptNumber()
+  const {receiptNumber, reissued, error: numberError} = await getReceiptNumber({tripId, type, isInternational});
   if (numberError) {
-    return {error: numberError, status: 500}
+    return {error: numberError, status: 500};
   }
-  const html = generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, tripId, trip.motivo, supervisor)
-  const pdfBuffer = await pdfService.generatePdf(html)
-  const pdfBase64 = pdfBuffer.toString('base64')
-  let typeName = 'Compras'
+  const html = generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, buildTripCode(trip), trip.motivo, supervisor);
+  const pdfBuffer = await pdfService.generatePdf(html);
+  const pdfBase64 = pdfBuffer.toString('base64');
+  let typeName = 'Compras';
   if (type === 'S') {
-    typeName = 'Servicios'
+    typeName = 'Servicios';
   }
-  let internationalSuffix = ''
+  let internationalSuffix = '';
   if (isInternational) {
-    internationalSuffix = '_Internacional'
+    internationalSuffix = '_Internacional';
   }
-  const attachments = [{content: pdfBase64, name: `Recibo_${typeName}${internationalSuffix}_${receiptNumber}.pdf`}]
-  let emailTitle = 'Recibo de Compras'
+  const attachments = [{content: pdfBase64, name: `Recibo_${typeName}${internationalSuffix}_${receiptNumber}.pdf`}];
+  let emailTitle = 'Recibo de Compras';
   if (type === 'S') {
-    emailTitle = 'Recibo de Pago de Servicios'
+    emailTitle = 'Recibo de Pago de Servicios';
   }
-  let internationalEmailSuffix = ''
+  let internationalEmailSuffix = '';
   if (isInternational) {
-    internationalEmailSuffix = ' Internacional'
+    internationalEmailSuffix = ' Internacional';
   }
   const emailHtml = emailService.buildEmailLayout(`${emailTitle}${internationalEmailSuffix}`, `
-    <p>Se adjunta el recibo consolidado de ${typeName.toLowerCase()} Nº ${receiptNumber}, con ${expenses.length} gasto(s) registrado(s).</p>
-  `)
+    ${emailService.emailParagraph(`Hola <strong>${escapeText(employee.nombre)}</strong>,`)}
+    ${emailService.emailParagraph(`Se adjunta el recibo consolidado de ${typeName.toLowerCase()}, con ${expenses.length} gasto(s) registrado(s).`)}
+    ${emailService.emailHighlightBox('Recibo', `Nº ${receiptNumber}`)}
+  `);
   await emailService.sendEmail(
     [{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}],
     `${emailTitle}${internationalEmailSuffix} — Nº ${receiptNumber}`,
     emailHtml,
     attachments
-  )
-  return {message: 'Recibo generado y enviado correctamente', expenseCount: expenses.length}
+  );
+  return {message: reissued ? 'Recibo reenviado correctamente' : 'Recibo generado y enviado correctamente', expenseCount: expenses.length, numeroRecibo: receiptNumber, reenvio: reissued};
 };
 
 // Genera y envia un recibo individual por un solo gasto
 const sendIndividualReceipt = async (expenseId) => {
   const {data: expense, error: expenseError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, numero_dependencia, numero_seccion, carnet_identidad))')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, estado, fecha_inicio, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad))')
     .eq('id_gasto', expenseId)
-    .single()
+    .single();
   if (expenseError) {
-    return {error: expenseError.message, status: 500}
+    return {error: expenseError.message, status: 500};
   }
   if (!expense) {
-    return {error: 'Gasto no encontrado', status: 404}
+    return {error: 'Gasto no encontrado', status: 404};
   }
   if (!['C', 'S'].includes(expense.tipo)) {
-    return {error: 'Solo se puede generar recibo para gastos de tipo Compra o Servicio sin factura', status: 400}
+    return {error: 'Solo se puede generar recibo para gastos de tipo Compra o Servicio sin factura', status: 400};
   }
   if (expense.Viaje?.estado !== 'APROBADO_FINAL') {
-    return {error: 'El recibo solo puede emitirse cuando el viaje está aprobado en su totalidad', status: 400}
+    return {error: 'El recibo solo puede emitirse cuando el viaje está aprobado en su totalidad', status: 400};
   }
-  const employee = expense.Viaje?.Usuario
+  const employee = expense.Viaje?.Usuario;
   if (!employee?.email_corporativo) {
-    return {error: 'El empleado no tiene un correo corporativo registrado', status: 400}
+    return {error: 'El empleado no tiene un correo corporativo registrado', status: 400};
   }
-  let supervisor = null
+  let supervisor = null;
   if (expense.Viaje?.id_supervisor_asignado) {
     const {data: supervisorData} = await supabase
-      .from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', expense.Viaje.id_supervisor_asignado).single()
-    supervisor = supervisorData
+      .from('Usuario').select('nombre, apellido_paterno').eq('id_usuario', expense.Viaje.id_supervisor_asignado).single();
+    supervisor = supervisorData;
   }
-  const {receiptNumber, error: numberError} = await getNextReceiptNumber()
+  const {receiptNumber, reissued, error: numberError} = await getReceiptNumber({tripId: expense.id_viaje, expenseId: expense.id_gasto, type: expense.tipo, isInternational: !!expense.es_gasto_internacional});
   if (numberError) {
-    return {error: numberError, status: 500}
+    return {error: numberError, status: 500};
   }
-  const html = generateIndividualReceiptHtml(expense, employee, receiptNumber, expense.Viaje?.id_viaje, expense.Viaje?.motivo, supervisor)
-  const pdfBuffer = await pdfService.generatePdf(html)
-  const pdfBase64 = pdfBuffer.toString('base64')
-  let typeName = 'Compra'
+  const html = generateIndividualReceiptHtml(expense, employee, receiptNumber, buildTripCode(expense.Viaje || {}), expense.Viaje?.motivo, supervisor);
+  const pdfBuffer = await pdfService.generatePdf(html);
+  const pdfBase64 = pdfBuffer.toString('base64');
+  let typeName = 'Compra';
   if (expense.tipo === 'S') {
-    typeName = 'Servicio'
+    typeName = 'Servicio';
   }
-  const attachments = [{content: pdfBase64, name: `Recibo_${typeName}_${receiptNumber}.pdf`}]
-  let emailTitle = 'Recibo de Compra'
+  const attachments = [{content: pdfBase64, name: `Recibo_${typeName}_${receiptNumber}.pdf`}];
+  let emailTitle = 'Recibo de Compra';
   if (expense.tipo === 'S') {
-    emailTitle = 'Recibo de Pago de Servicio'
+    emailTitle = 'Recibo de Pago de Servicio';
   }
   const emailHtml = emailService.buildEmailLayout(emailTitle, `
-    <p>Se adjunta el recibo Nº ${receiptNumber} correspondiente al gasto registrado.</p>
-  `)
+    ${emailService.emailParagraph(`Hola <strong>${escapeText(employee.nombre)}</strong>,`)}
+    ${emailService.emailParagraph('Se adjunta el recibo correspondiente al gasto registrado.')}
+    ${emailService.emailHighlightBox('Recibo', `Nº ${receiptNumber}`)}
+  `);
   await emailService.sendEmail(
     [{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}],
     `${emailTitle} — Nº ${receiptNumber}`,
     emailHtml,
     attachments
-  )
-  return {message: 'Recibo generado y enviado correctamente'}
+  );
+  return {message: reissued ? 'Recibo reenviado correctamente' : 'Recibo generado y enviado correctamente', numeroRecibo: receiptNumber, reenvio: reissued};
 };
 
 module.exports = {sendGroupedReceipt, sendIndividualReceipt};

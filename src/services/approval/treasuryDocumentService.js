@@ -1,13 +1,17 @@
-const pdfService = require('../shared/pdfService')
+const pdfService = require('../shared/pdfService');
+const {escapeDeep} = require('../../utils/htmlEscape');
 
 // Genera el HTML de confirmacion de fondo asignado
-const generateFundConfirmationHtml = (trip, treasurer, tripCode) => {
-  const employee = trip.Usuario
-  const today = new Date().toLocaleDateString('es-ES', {day: 'numeric', month: 'long', year: 'numeric'})
-  const isInternational = trip.tipo === 'Internacional'
-  let internationalRow = ''
+const generateFundConfirmationHtml = (rawTrip, rawTreasurer, tripCode) => {
+  // Datos escritos por usuarios: se escapan antes de armar el documento
+  const trip = escapeDeep(rawTrip);
+  const treasurer = escapeDeep(rawTreasurer);
+  const employee = trip.Usuario;
+  const today = new Date().toLocaleDateString('es-ES', {day: 'numeric', month: 'long', year: 'numeric'});
+  const isInternational = trip.tipo === 'Internacional';
+  let internationalRow = '';
   if (isInternational) {
-    internationalRow = `<div class="montos-fila"><span>Fondo Internacional (USD)</span><span><strong>USD ${parseFloat(trip.monto_asignado_usd || 0).toFixed(2)}</strong></span></div>`
+    internationalRow = `<div class="montos-fila"><span>Fondo Internacional (USD)</span><span><strong>USD ${parseFloat(trip.monto_asignado_usd || 0).toFixed(2)}</strong></span></div>`;
   }
   return `<!DOCTYPE html>
 <html>
@@ -24,24 +28,29 @@ const generateFundConfirmationHtml = (trip, treasurer, tripCode) => {
   .firma-area { margin-top: 40px; text-align: center; }
   .firma-nombre { font-size: 11pt; font-weight: bold; }
   .firma-cargo { font-size: 10pt; text-transform: uppercase; }
+  .firma-nota { font-size: 9pt; color: #475569; margin-top: 4px; }
 </style>
 </head>
 <body>
   <div class="logo-area">MAXAM FANEXA</div>
   <div class="titulo">CONFIRMACIÓN DE FONDO ASIGNADO</div>
   <p class="cuerpo">Estimado(a) ${employee?.nombre} ${employee?.apellido_paterno},</p>
-  <p class="cuerpo">Le confirmamos que el fondo correspondiente al viaje ${tripCode} (${trip.motivo}) ha sido aprobado por Tesorería con fecha ${today}. Ya puede proceder a registrar sus gastos.</p>
+  <p class="cuerpo">Le confirmamos que el fondo correspondiente al viaje ${tripCode} (${trip.motivo}) ha sido aprobado ${treasurer?.aprobacionAutomatica ? 'automáticamente' : 'por Tesorería'} con fecha ${today}. Ya puede proceder a registrar sus gastos.</p>
   <div class="montos-box">
     <div class="montos-fila"><span>Fondo Nacional (Bs)</span><span><strong>Bs. ${parseFloat(trip.monto_asignado).toFixed(2)}</strong></span></div>
     ${internationalRow}
   </div>
   <p class="cuerpo">Cualquier consulta adicional puede dirigirla a Tesorería.</p>
   <div class="firma-area">
-    <div class="firma-nombre">${treasurer?.nombre} ${treasurer?.apellido_paterno}</div>
-    <div class="firma-cargo">TESORERÍA — MAXAM FANEXA</div>
+    ${treasurer?.aprobacionAutomatica
+      ? `<div class="firma-nombre">Aprobación automática</div>
+    <div class="firma-cargo">Sistema de Control de Viáticos — MAXAM FANEXA</div>
+    <div class="firma-nota">El titular del viaje es el tesorero; el fondo se aprobó automáticamente con el monto solicitado en el viaje.</div>`
+      : `<div class="firma-nombre">${treasurer?.nombre} ${treasurer?.apellido_paterno}</div>
+    <div class="firma-cargo">TESORERÍA — MAXAM FANEXA</div>`}
   </div>
 </body>
-</html>`
+</html>`;
 };
 
 module.exports = {generateFundConfirmationHtml, generatePdf: pdfService.generatePdf};

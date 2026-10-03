@@ -2,8 +2,7 @@
 -- Funciones usadas por el backend via supabase.rpc()
 -- ============================================================
 
--- Incrementa y devuelve el correlativo usado para numerar recibos y memos.
--- El search_path fijo evita el warning "Function Search Path Mutable".
+-- Incrementa y devuelve el correlativo de recibos (search_path fijo por seguridad)
 create or replace function incrementar_correlativo_recibo()
 returns integer
 language plpgsql

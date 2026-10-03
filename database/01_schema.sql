@@ -9,9 +9,15 @@ create table if not exists "Rol" (
 
 create table if not exists "Cargo" (
   id_cargo serial primary key,
-  nombre varchar(50) not null unique,
+  nombre varchar(100) not null unique,
   monto_diario decimal(10, 2) not null,
   monto_diario_usd numeric(10, 2) default 0,
+  activo boolean not null default true
+);
+
+create table if not exists "Seccion" (
+  id_seccion serial primary key,
+  nombre varchar(100) not null unique,
   activo boolean not null default true
 );
 
@@ -29,7 +35,7 @@ create table if not exists "Impuesto" (
 
 create table if not exists "Proveedor" (
   id_proveedor serial primary key,
-  nombre varchar(50) not null,
+  nombre varchar(150) not null,
   tipo_doc_fiscal varchar(3) check (tipo_doc_fiscal in ('NIT', 'CI')),
   numero_doc_fiscal varchar(50)
 );
@@ -48,11 +54,16 @@ create table if not exists "Usuario" (
   activo boolean not null default true,
   contrasenia text not null,
   foto_perfil text,
-  numero_dependencia varchar(50),
-  numero_seccion varchar(50),
-  carnet_identidad varchar(20),
+  id_jefe_directo integer references "Usuario"(id_usuario),
+  id_seccion integer references "Seccion"(id_seccion),
+  carnet_identidad varchar(15),
   ultima_cambio_contrasenia timestamptz default now(),
   refresh_token_invalido_desde timestamptz,
+  -- true mientras tenga una contrasena temporal (recien creado, puesta por el administrador
+  -- o recuperada con codigo): debe cambiarla antes de usar el sistema
+  debe_cambiar_contrasenia boolean not null default false,
+  -- TEMPORAL (cuenta nueva o clave puesta por el administrador) o RECUPERACION (entro con codigo)
+  motivo_cambio_contrasenia varchar(15) check (motivo_cambio_contrasenia in ('TEMPORAL', 'RECUPERACION')),
   id_cargo integer not null references "Cargo"(id_cargo),
   id_rol integer not null references "Rol"(id_rol)
 );
@@ -88,18 +99,26 @@ create table if not exists "Viaje" (
   placa_vehiculo varchar(20),
   monto_asignado decimal(10, 2) not null,
   monto_asignado_usd numeric(10, 2) default 0,
-  estado varchar(25) not null default 'BORRADOR' check (estado in (
+  estado varchar(25) not null default 'BORRADOR' constraint viaje_estado_check check (estado in (
     'BORRADOR', 'EN_REVISION_VIAJE', 'APROBADO_VIAJE', 'EN_REVISION_TESORERO', 'EN_CURSO',
     'EN_REVISION', 'EN_REVISION_APROBADOR', 'APROBADO_SUPERVISOR', 'APROBADO_FINAL', 'RECHAZADO'
   )),
   fue_iniciado boolean default false,
   ciclo_revision integer not null default 1,
   tiene_alcohol boolean,
-  id_usuario integer not null references "Usuario"(id_usuario),
-  id_supervisor_asignado integer references "Usuario"(id_usuario),
-  id_aprobador_asignado integer references "Usuario"(id_usuario),
-  id_revisor_asignado integer references "Usuario"(id_usuario),
-  id_tesorero_asignado integer references "Usuario"(id_usuario)
+  id_usuario integer not null,
+  id_supervisor_asignado integer,
+  id_aprobador_asignado integer,
+  id_revisor_asignado integer,
+  id_tesorero_asignado integer,
+  -- Viaje tiene cinco claves foraneas hacia Usuario; el backend desambigua los
+  -- embeds de PostgREST por nombre (Usuario!viaje_id_usuario_foreign), asi que
+  -- estos nombres NO deben cambiarse.
+  constraint viaje_id_usuario_foreign foreign key (id_usuario) references "Usuario"(id_usuario),
+  constraint viaje_id_supervisor_asignado_foreign foreign key (id_supervisor_asignado) references "Usuario"(id_usuario),
+  constraint viaje_id_aprobador_asignado_foreign foreign key (id_aprobador_asignado) references "Usuario"(id_usuario),
+  constraint viaje_id_revisor_asignado_foreign foreign key (id_revisor_asignado) references "Usuario"(id_usuario),
+  constraint viaje_id_tesorero_asignado_foreign foreign key (id_tesorero_asignado) references "Usuario"(id_usuario)
 );
 
 create table if not exists "Solicitud_Autorizacion_Plazo" (
@@ -126,7 +145,7 @@ create table if not exists "Gasto" (
   tipo char(1) not null check (tipo in ('F', 'R', 'C', 'S')),
   modificado boolean not null default false,
   es_gasto_internacional boolean default false,
-  moneda varchar(10) default 'USD',
+  moneda varchar(10) default 'BOB',
   tipo_cambio numeric(10, 4) default 1,
   monto_moneda_origen numeric(10, 2) default 0,
   base_imponible numeric(10, 2) default 0,
@@ -178,7 +197,7 @@ create table if not exists "Factura" (
 
 create table if not exists "Detalle_Factura" (
   id_detalle serial primary key,
-  nombre_producto varchar(50) not null,
+  nombre_producto varchar(255) not null,
   cantidad numeric(10, 2) not null,
   precio decimal(10, 2) not null,
   id_factura integer not null references "Factura"(id_factura)
@@ -203,7 +222,8 @@ create table if not exists "Comentario" (
   fecha_justificada date,
   id_usuario integer not null references "Usuario"(id_usuario),
   id_viaje integer not null references "Viaje"(id_viaje),
-  id_gasto integer references "Gasto"(id_gasto) on delete cascade
+  -- Si se elimina el gasto, la observacion se conserva (queda como observacion general)
+  id_gasto integer references "Gasto"(id_gasto) on delete set null
 );
 
 -- ------------------------------------------------------------
@@ -219,6 +239,38 @@ insert into "Correlativo_Recibo" (numero)
 select 0
 where not exists (select 1 from "Correlativo_Recibo" where id = 1);
 
+-- Numero de cada recibo emitido (por gasto o agrupado por viaje), para conservarlo al reenviar
+create table if not exists "Recibo" (
+  id_recibo serial primary key,
+  numero integer not null unique,
+  id_viaje integer not null references "Viaje"(id_viaje) on delete cascade,
+  id_gasto integer references "Gasto"(id_gasto) on delete cascade,
+  tipo char(1) not null check (tipo in ('C', 'S')),
+  es_gasto_internacional boolean not null default false,
+  fecha_emision timestamptz not null default now()
+);
+
+create unique index if not exists recibo_individual_unique on "Recibo"(id_gasto) where id_gasto is not null;
+create unique index if not exists recibo_agrupado_unique on "Recibo"(id_viaje, tipo, es_gasto_internacional) where id_gasto is null;
+
+-- ------------------------------------------------------------
+-- Historial de revision
+-- ------------------------------------------------------------
+
+-- Cada aprobacion o rechazo de un viaje por etapa; automatica cuando el revisor era el viajero
+create table if not exists "Revision_Viaje" (
+  id_revision serial primary key,
+  id_viaje integer not null references "Viaje"(id_viaje) on delete cascade,
+  id_usuario integer not null references "Usuario"(id_usuario),
+  etapa varchar(20) not null check (etapa in ('REVISION_VIAJE', 'APROBACION_VIAJE', 'ASIGNACION_FONDOS', 'REVISION_GASTOS', 'REVISION_ALCOHOL', 'REVISION_FINAL')),
+  accion varchar(10) not null check (accion in ('APROBADO', 'RECHAZADO')),
+  automatica boolean not null default false,
+  fecha timestamptz not null default now()
+);
+
+create index if not exists idx_revision_viaje_usuario_etapa on "Revision_Viaje"(id_usuario, etapa);
+create index if not exists idx_revision_viaje_id_viaje on "Revision_Viaje"(id_viaje);
+
 -- ------------------------------------------------------------
 -- Indices para optimizacion de consultas
 -- ------------------------------------------------------------
@@ -226,6 +278,8 @@ where not exists (select 1 from "Correlativo_Recibo" where id = 1);
 -- Usuarios y seguridad
 create index if not exists idx_auditoria_id_usuario on "Auditoria"(id_usuario);
 create index if not exists idx_codigo_verificacion_id_usuario on "Codigo_Verificacion"(id_usuario);
+create index if not exists idx_usuario_jefe_directo on "Usuario"(id_jefe_directo);
+create index if not exists idx_usuario_seccion on "Usuario"(id_seccion);
 
 -- Viajes: filtrado por propietario, estado y asignacion
 create index if not exists idx_viaje_id_usuario on "Viaje"(id_usuario);
@@ -271,3 +325,17 @@ create table if not exists "Solicitud_Reemplazo" (
 create index if not exists idx_reemplazo_id_viaje on "Solicitud_Reemplazo"(id_viaje);
 create index if not exists idx_reemplazo_id_sustituto on "Solicitud_Reemplazo"(id_sustituto);
 create index if not exists idx_reemplazo_estado on "Solicitud_Reemplazo"(estado);
+
+-- ------------------------------------------------------------
+-- Configuracion del resumen de pendientes (una sola fila)
+-- ------------------------------------------------------------
+-- Dias (0 domingo a 6 sabado) y horas (HH:MM, hora Bolivia) del resumen de pendientes
+
+create table if not exists "Configuracion_Recordatorio" (
+  id smallint primary key default 1 check (id = 1),
+  activo boolean not null default true,
+  dias smallint[] not null default '{1,2,3,4,5}',
+  horas text[] not null default '{08:00,12:00,16:00}',
+  fecha_actualizacion timestamptz not null default now(),
+  id_usuario_actualizacion integer references "Usuario"(id_usuario) on delete set null
+);

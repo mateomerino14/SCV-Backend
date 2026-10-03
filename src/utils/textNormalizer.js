@@ -5,7 +5,7 @@ const normalizeText = (text) => {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9\s]/g, ' ')
-    .trim()
+    .trim();
 };
 
 module.exports = {normalizeText};
