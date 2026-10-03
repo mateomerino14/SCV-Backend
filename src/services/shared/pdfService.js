@@ -7,9 +7,7 @@ const defaultOptions = {
   preferCSSPageSize: true,
 };
 
-// Genera un PDF a partir de un contenido HTML; por defecto usa A4 apaisado.
-// El HTML se carga tal cual (sin plantillas: un texto con llaves no rompe el documento),
-// con JavaScript desactivado, y el navegador se cierra siempre, aunque algo falle.
+// Genera un PDF desde HTML (A4 apaisado por defecto) y siempre cierra el navegador
 const generatePdf = async (html, options = defaultOptions) => {
   const browser = await puppeteer.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox'],

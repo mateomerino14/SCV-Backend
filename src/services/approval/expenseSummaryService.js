@@ -4,9 +4,7 @@ const isHotelExpense = (expense) => {
   return categoryName.toUpperCase().includes('HOTEL');
 };
 
-// Calcula el resumen de gastos de un viaje: los hoteles se controlan contra el
-// total del viaje, el resto de gastos se controla dia por dia contra la cuota
-// diaria del cargo del empleado (monto_diario / monto_diario_usd)
+// Resume los gastos: hoteles contra el total del viaje y el resto por dia contra la cuota del cargo
 const calculateExpenseSummary = (expenses, trip) => {
   const allExpenses = expenses || [];
   const hotelExpenses = allExpenses.filter(isHotelExpense);

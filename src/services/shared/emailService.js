@@ -48,8 +48,7 @@ const BRAND = {
 
 const fontFamily = "Inter, 'Segoe UI', Arial, sans-serif";
 
-// Genera el layout HTML compartido para todos los correos del sistema.
-// Usa tablas y estilos en linea porque es lo que respetan los clientes de correo.
+// Genera el layout HTML de los correos, con tablas y estilos en linea
 const buildEmailLayout = (title, bodyContent) => {
   return `
   <div style="margin: 0; padding: 0; background-color: ${BRAND.backgroundHeader};">

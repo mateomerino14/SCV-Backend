@@ -19,8 +19,7 @@ const detectTaxDocType = (taxId) => {
   }
 };
 
-// Escapa los comodines de ilike (% y _) para que el nombre se compare tal cual, sin
-// distinguir mayusculas: "%" no debe coincidir con cualquier proveedor
+// Escapa los comodines de ilike (% y _) para comparar el nombre tal cual
 const toExactNamePattern = (name) => String(name || '').trim().replace(/[\\%_]/g, (char) => `\\${char}`);
 
 // Busca un proveedor por nombre, o lo crea si no existe

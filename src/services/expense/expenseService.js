@@ -4,8 +4,7 @@ const alcoholDetectionService = require('../shared/alcoholDetectionService');
 const supplierService = require('./supplierService');
 const substitutionService = require('../approval/substitutionService');
 
-// Calcula las retenciones aplicables segun el monto, tipo de gasto y si es internacional
-// Los gastos con alcohol pierden el credito fiscal y las retenciones: se imputan completos como costo
+// Calcula las retenciones; los gastos con alcohol se imputan completos como costo
 const calculateRetentions = (amount, type, isInternational, hasAlcohol) => {
   const amountNum = parseFloat(amount);
   if (hasAlcohol || isInternational || type === 'F' || type === 'R') {
@@ -34,8 +33,7 @@ const calculateAmountFromSubitems = (subItems) => {
   return parseFloat(subItems.reduce((sum, item) => sum + parseFloat(item.monto || 0), 0).toFixed(2));
 };
 
-// En un viaje internacional, el primer y el ultimo dia se controlan en bolivianos
-// y los dias intermedios en dolares; valida que el gasto use la moneda correcta segun la fecha
+// En internacionales el primer y ultimo dia van en bolivianos y los intermedios en dolares
 const validateCurrencyByDay = (trip, expenseDate, isInternational) => {
   if (trip.tipo !== 'Internacional' || !expenseDate) {
     return null;
@@ -54,8 +52,7 @@ const validateCurrencyByDay = (trip, expenseDate, isInternational) => {
   return null;
 };
 
-// Valida tramos de moneda y subgastos antes de escribir nada, para no dejar un gasto a
-// medio guardar si algun dato viene incompleto
+// Valida tramos de moneda y subgastos antes de escribir nada
 const validateExpenseDetails = (expenseData, isInternational) => {
   if (isInternational && Array.isArray(expenseData.tramos)) {
     for (const segment of expenseData.tramos) {
@@ -77,8 +74,7 @@ const validateExpenseDetails = (expenseData, isInternational) => {
   return null;
 };
 
-// Sube el comprobante al almacenamiento y devuelve su URL publica (o un error). Se llama
-// antes de escribir el gasto, para no dejarlo guardado a medias si la subida falla.
+// Sube el comprobante antes de escribir el gasto y devuelve su URL publica
 const uploadReceiptImage = async (file) => {
   const fileExtension = file.originalname.split('.').pop();
   const fileName = `gastos/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExtension}`;
@@ -111,8 +107,7 @@ const createExpense = async (expenseData, file, userId) => {
     return {error: detailsError, status: 400};
   }
   let totalAmount = parseFloat(expenseData.monto_total);
-  // Los tramos de moneda son solo referencia: el monto que vale es el que ingreso el empleado.
-  // Con subgastos, el total es su suma (en Bs o en USD segun el gasto)
+  // Los tramos son referencia: vale el monto ingresado o la suma de subgastos
   if (usesSubItems) {
     const subItemsAmount = calculateAmountFromSubitems(expenseData.subitems);
     if (subItemsAmount !== null) {
@@ -246,8 +241,7 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
     return {error: detailsError, status: 400};
   }
   let totalAmount = parseFloat(expenseData.monto_total);
-  // Los tramos de moneda son solo referencia: el monto que vale es el que ingreso el empleado.
-  // Con subgastos, el total es su suma (en Bs o en USD segun el gasto)
+  // Los tramos son referencia: vale el monto ingresado o la suma de subgastos
   if (usesSubItems) {
     const subItemsAmount = calculateAmountFromSubitems(expenseData.subitems);
     if (subItemsAmount !== null) {

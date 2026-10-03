@@ -70,8 +70,7 @@ test('sin jefe directo pero con alguien de su seccion cae al respaldo por seccio
 });
 
 test('el respaldo por seccion nunca incluye a la propia persona como su destinatario', async () => {
-  // Maria es SUPERVISOR de la seccion Ventas; su jefe Pedro es APROBADOR, no sirve para este rol.
-  // Sin la exclusion, el nivel 2 la devolveria a ella misma como "supervisora de Ventas".
+  // Maria es supervisora de Ventas: sin la exclusion el nivel 2 la devolveria a ella misma
   const scope = await resolveReviewerScope(3, 'SUPERVISOR');
   expect(scope.userIds || []).not.toContain(3);
 });

@@ -1,13 +1,8 @@
 -- ============================================================
 -- LIMPIEZA COMPLETA PARA PRUEBAS
 -- ============================================================
--- Borra TODOS los usuarios, viajes, gastos, facturas, comentarios,
--- solicitudes y auditoria. Reinicia los contadores de ID a 1.
--- NO toca los catalogos (Rol, Cargo, Categoria_Gasto, Impuesto),
--- ya que esos son datos de referencia, no datos de prueba.
---
--- ADVERTENCIA: esto borra todo sin posibilidad de deshacer.
--- Usar solo en un entorno de pruebas, nunca en produccion.
+-- Borra usuarios, viajes, gastos, facturas, solicitudes y auditoria; conserva los catalogos
+-- ADVERTENCIA: no se puede deshacer. Solo en pruebas, nunca en produccion
 -- ============================================================
 
 truncate table
@@ -32,6 +27,6 @@ restart identity cascade;
 
 update "Correlativo_Recibo" set numero = 0;
 
--- La limpieza de usuarios borra en cascada la configuracion de recordatorios: se repone la de fabrica
+-- La limpieza borra en cascada la configuracion de recordatorios: se repone la de fabrica
 insert into "Configuracion_Recordatorio" (id) values (1)
 on conflict (id) do nothing;

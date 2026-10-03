@@ -72,8 +72,7 @@ const createRequest = async (tripId, employeeId, reason) => {
   if (!(await substitutionService.canActOnTrip(tripId, employeeId))) {
     return {error: 'No tienes permiso sobre este viaje', status: 403};
   }
-  // Solo tiene sentido con el viaje en curso y el plazo de registro vencido (sin una
-  // extension vigente): en otro caso el empleado ya puede registrar o no le corresponde
+  // Solo con el viaje en curso y el plazo de registro vencido, sin una extension vigente
   if (trip.estado !== 'EN_CURSO') {
     return {error: 'Solo puedes pedir una extensión de plazo mientras el viaje está en curso', status: 400};
   }
@@ -166,6 +165,7 @@ const getRequestRecipients = (request) => {
   return people.filter((person, index) => people.findIndex((other) => other.id_usuario === person.id_usuario) === index);
 };
 
+// Nombre de quien pidio la extension
 const requesterName = (request) => `${request.Solicitante?.nombre || ''} ${request.Solicitante?.apellido_paterno || ''}`.trim();
 
 // Mensaje para quien intenta atender una solicitud que ya no esta pendiente
@@ -185,8 +185,7 @@ const processedRequestError = async (requestId) => {
   return {error: describeProcessedRequest(data), status: 409};
 };
 
-// Cierra las solicitudes pendientes de esos viajes (por ejemplo, al enviarse el viaje a
-// revision): ya no tienen sentido y no deben quedar en la bandeja del revisor
+// Cierra las solicitudes pendientes de esos viajes, que ya no aplican al enviarse a revision
 const closePendingRequests = async (tripIds) => {
   const ids = (tripIds || []).map((tripId) => parseInt(tripId)).filter((tripId) => !isNaN(tripId));
   if (ids.length === 0) {

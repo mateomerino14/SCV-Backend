@@ -156,10 +156,7 @@ const updateAlcoholInExpenseFromText = async (expenseId, text) => {
   }
 };
 
-// Recalcula y actualiza el indicador de alcohol de un viaje. Cada gasto ya guarda su
-// propio tiene_alcohol al registrarse o editarse (facturas por su detalle de productos,
-// gastos sin factura por su descripcion y subgastos), asi que el viaje tiene alcohol si
-// cualquiera de sus gastos lo tiene. No se vuelve a consultar a la IA.
+// Recalcula el indicador de alcohol del viaje a partir de sus gastos, sin consultar a la IA
 const updateAlcoholInTrip = async (tripId) => {
   try {
     const {data: expenses} = await supabase

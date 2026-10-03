@@ -14,6 +14,7 @@ const formatShortDate = (isoString) => {
   return `${day}/${month}/${year}`;
 };
 
+// Completa el numero de recibo con ceros a la izquierda
 const formatReceiptNumber = (number) => String(number).padStart(6, '0');
 
 // Busca el recibo ya emitido (individual por gasto, o agrupado por viaje/tipo/moneda)
@@ -29,8 +30,7 @@ const findIssuedReceipt = async ({tripId, expenseId, type, isInternational}) => 
   return data;
 };
 
-// Devuelve el numero del recibo: si ya se emitio, reutiliza el mismo numero (un reenvio
-// no genera un recibo nuevo); si no, toma el siguiente correlativo y lo guarda.
+// Devuelve el numero del recibo, reutilizando el ya emitido o tomando el siguiente
 const getReceiptNumber = async ({tripId, expenseId = null, type, isInternational}) => {
   const existing = await findIssuedReceipt({tripId, expenseId, type, isInternational});
   if (existing) {

@@ -1,5 +1,4 @@
-// Escapa un texto para insertarlo en HTML (correos y PDF) sin que se interprete como
-// etiquetas: evita que un texto escrito por el usuario altere o falsifique el documento
+// Escapa un texto para insertarlo en HTML (correos y PDF) sin que se interprete como etiquetas
 const escapeHtml = (value) => {
   if (value === null || value === undefined) {
     return '';
@@ -12,8 +11,7 @@ const escapeHtml = (value) => {
     .replace(/'/g, '&#39;');
 };
 
-// Devuelve una copia con todos los textos escapados (objetos y listas anidados); numeros,
-// booleanos y null se conservan. Se usa al entrar a una plantilla con datos de la base.
+// Devuelve una copia con todos los textos escapados, incluidos objetos y listas anidados
 const escapeDeep = (value) => {
   if (typeof value === 'string') {
     return escapeHtml(value);

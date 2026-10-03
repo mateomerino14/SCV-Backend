@@ -4,19 +4,14 @@ const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const app = express();
 
-// En Render la aplicacion esta detras de un proxy: se confia en el primero para leer la IP
-// real del usuario (X-Forwarded-For). Sin esto, todos compartirian el limite de intentos de
-// ingreso. Solo se activa en Render (o con TRUST_PROXY=true), porque sin un proxy delante
-// cualquiera podria falsear esa cabecera para evadir el limite.
+// Confia en el proxy de Render para leer la IP real en el limite de intentos
 if (process.env.RENDER === 'true' || process.env.TRUST_PROXY === 'true') {
   app.set('trust proxy', 1);
 }
 
 app.use(helmet());
 
-// Dominios del cliente web que pueden llamar a la API. Se configuran en CORS_ORIGINS
-// (separados por coma) para cambiar de dominio sin tocar el codigo; sin la variable se
-// usan los de desarrollo y Vercel
+// Dominios del cliente web permitidos (CORS_ORIGINS, separados por coma)
 const defaultOrigins = [
   'http://localhost:5173',
   'https://scv-frontend.vercel.app',

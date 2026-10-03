@@ -5,8 +5,7 @@ const tokenService = require('../../services/user/tokenService');
 const emailService = require('../../services/shared/emailService');
 const auditLogService = require('../../services/shared/auditLogService');
 
-// Intentos fallidos por codigo de verificacion (en memoria): al llegar al maximo el codigo
-// se anula, para que no se pueda adivinar probando combinaciones
+// Intentos fallidos por codigo de verificacion; al llegar al maximo el codigo se anula
 const maxCodeAttempts = 5;
 const failedCodeAttempts = new Map();
 
@@ -18,8 +17,7 @@ const login = async (req, res) => {
     .select('*')
     .eq('email_corporativo', email_corporativo)
     .single();
-  // Mismo mensaje si el correo no existe o la contrasena no coincide, para no revelar
-  // que cuentas existen; el aviso de suspension solo se da con la contrasena correcta
+  // Mismo mensaje si falla el correo o la contrasena, para no revelar que cuentas existen
   const invalidCredentials = 'Correo o contraseña incorrectos';
   if (error || !data) {
     return res.status(401).json({error: invalidCredentials});
@@ -31,8 +29,7 @@ const login = async (req, res) => {
   if (!data.activo) {
     return res.status(401).json({error: 'Tu cuenta está suspendida'});
   }
-  // refresh_token_invalido_desde no se limpia: los tokens emitidos antes de un cambio de rol
-  // o suspension siguen invalidos; el token nuevo es posterior y funciona normalmente
+  // refresh_token_invalido_desde no se limpia: los tokens anteriores siguen invalidos
   const passwordChangeReason = tokenService.getPasswordChangeReason(data);
   const accessToken = tokenService.generateAccessToken(data, passwordChangeReason);
   const refreshToken = tokenService.generateRefreshToken(data);
@@ -75,8 +72,7 @@ const refresh = async (req, res) => {
   }
 };
 
-// Identifica al usuario que cierra sesion: primero por la cookie de refresco y, si el
-// navegador no la envio, por el token de acceso de la cabecera Authorization
+// Identifica a quien cierra sesion por la cookie de refresco o, si no llega, por el token de acceso
 const getLogoutUserId = (req) => {
   const refreshToken = req.cookies?.refreshToken;
   if (refreshToken) {
@@ -84,13 +80,11 @@ const getLogoutUserId = (req) => {
       return jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET).id_usuario;
     }
     catch (error) {
-      // Cookie vencida o invalida: se intenta con el token de acceso
     }
   }
   const accessToken = req.headers.authorization?.split(' ')[1];
   if (accessToken) {
     try {
-      // Un token de acceso recien vencido sigue identificando a quien cierra la sesion
       return jwt.verify(accessToken, process.env.JWT_SECRET, {ignoreExpiration: true}).id_usuario;
     }
     catch (error) {
@@ -207,8 +201,7 @@ const verifyCode = async (req, res) => {
     .select('*')
     .eq('id_usuario', user.id_usuario)
     .single();
-  // Quien entra con un codigo de recuperacion olvido su contrasena: debe crear una nueva
-  // antes de seguir (la ventana de cambio no le pide la actual)
+  // Con codigo de recuperacion debe crear una contrasena nueva antes de seguir
   await supabase
     .from('Usuario')
     .update({debe_cambiar_contrasenia: true, motivo_cambio_contrasenia: 'RECUPERACION'})

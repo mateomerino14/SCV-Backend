@@ -18,19 +18,19 @@ const generateTemporaryPassword = () => {
   return password;
 };
 
-// Obtiene el perfil del usuario autenticado
-// Columnas que se devuelven al administrar usuarios (nunca el hash de la contrasena ni
-// datos internos de sesion)
+// Columnas que se devuelven al administrar usuarios (sin hash ni datos de sesion)
 const userPublicColumns = 'id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, id_rol, id_cargo, id_seccion, id_jefe_directo, carnet_identidad, foto_perfil';
 
 // Campos que el administrador puede enviar al crear o editar un usuario
 const editableUserFields = ['nombre', 'apellido_paterno', 'apellido_materno', 'email_corporativo', 'telefono', 'id_cargo', 'id_rol', 'id_jefe_directo', 'id_seccion', 'carnet_identidad', 'activo'];
 
+// Deja solo los campos que el administrador puede enviar
 const pickEditableFields = (body, extraFields = []) => {
   const allowed = [...editableUserFields, ...extraFields];
   return Object.fromEntries(Object.entries(body || {}).filter(([key]) => allowed.includes(key)));
 };
 
+// Obtiene el perfil del usuario autenticado
 const getMe = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
@@ -111,8 +111,7 @@ const updateMyPhoto = async (req, res) => {
   }
 };
 
-// Cambia la contrasenia del usuario autenticado. Si tiene una contrasena temporal (recien
-// creado o recuperada con codigo) no se le pide la actual, porque no la eligio el o la olvido.
+// Cambia la contrasena del usuario; con una temporal no se pide la actual
 const changeMyPassword = async (req, res) => {
   const userId = req.user.id_usuario;
   const {contrasenia_actual, contrasenia_nueva} = req.body;
@@ -156,7 +155,6 @@ const changeMyPassword = async (req, res) => {
     return res.status(500).json({error: updateError.message});
   }
   await auditLogService.logAudit(userId, 'CAMBIO_CLAVE');
-  // Este dispositivo sigue conectado con una sesion nueva, emitida despues del cambio
   res.cookie('refreshToken', tokenService.generateRefreshToken(updatedUser), tokenService.cookieOptions);
   return res.json({message: 'Contraseña actualizada correctamente', token: tokenService.generateAccessToken(updatedUser, null)});
 };
@@ -253,7 +251,6 @@ const createUser = async (req, res) => {
     body.carnet_identidad = body.carnet_identidad?.trim() || null;
   }
   body.contrasenia = bcrypt.hashSync(temporaryPassword, saltRounds);
-  // La contrasena temporal enviada por correo se debe cambiar en el primer ingreso
   body.debe_cambiar_contrasenia = true;
   body.motivo_cambio_contrasenia = 'TEMPORAL';
   const roleError = await userService.validateUniqueRole(body.id_rol, null);

@@ -1,26 +1,9 @@
 -- ============================================================
 -- CARGA DE ORGANIZACION DE PRUEBA (jerarquia real)
 -- ============================================================
--- Crea una pequena organizacion de prueba para validar el
--- comportamiento completo de la jerarquia por jefe directo:
---
---   Lucia (REVISOR)
---     `-- Pedro (APROBADOR)
---          `-- Maria (SUPERVISOR, seccion "Ventas")
---               `-- Juan (EMPLEADO, seccion "Ventas")
---               `-- Ana  (EMPLEADO, seccion "Ventas")
---          `-- Jorge (SUPERVISOR, seccion "Logistica")
---               `-- Carlos (EMPLEADO, seccion "Logistica")
---
---   Sofia (EMPLEADO, seccion "Sin Cobertura", SIN jefe directo)
---     -> prueba el respaldo: como nadie de "Sin Cobertura" tiene
---        rol SUPERVISOR, su viaje deberia mostrarse a TODOS los
---        supervisores (nivel 3 del respaldo)
---
---   Admin (ADMINISTRADOR) y Tesoro (cargo de tesoreria), sin
---   participar de la jerarquia de revision.
---
--- La contrasenia de TODOS los usuarios de prueba es: Prueba1234
+-- Lucia (revisor) > Pedro (aprobador) > Maria (Ventas) y Jorge (Logistica), supervisores de sus empleados
+-- Sofia queda sin jefe y sin supervisor en su seccion: su viaje lo ven todos los supervisores
+-- Contrasena de todos los usuarios de prueba: Prueba1234
 -- ============================================================
 
 insert into "Cargo" (nombre, monto_diario, monto_diario_usd, activo) values
@@ -75,7 +58,7 @@ update "Usuario" set id_jefe_directo = (select id_usuario from "Usuario" where e
 update "Usuario" set id_jefe_directo = (select id_usuario from "Usuario" where email_corporativo = 'jorge.supervisor@maxam.com')
   where email_corporativo = 'carlos.empleado@maxam.com';
 
--- Sofia queda deliberadamente sin id_jefe_directo, para probar el respaldo.
+-- Sofia queda sin jefe directo para probar el respaldo
 
 select
   u.nombre || ' ' || u.apellido_paterno as usuario,

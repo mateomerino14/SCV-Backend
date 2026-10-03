@@ -11,8 +11,7 @@ const sendCodeRateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Verificacion de codigos: solo cuentan los intentos fallidos (ademas, cada codigo se anula
-// tras 5 intentos incorrectos)
+// Verificacion de codigos: solo cuentan los intentos fallidos
 const verifyCodeRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,

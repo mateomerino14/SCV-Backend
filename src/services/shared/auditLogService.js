@@ -1,7 +1,6 @@
 const supabase = require('../../config/supabase');
 
-// Registra un evento de auditoria (INGRESO, SALIDA o CAMBIO_CLAVE). Nunca
-// interrumpe el flujo principal: si falla, solo queda un aviso en el log.
+// Registra un evento de auditoria; si falla solo deja un aviso en el log
 const logAudit = async (userId, tipo) => {
   if (!userId) {
     return;

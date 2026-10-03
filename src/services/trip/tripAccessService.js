@@ -7,6 +7,7 @@ const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService
 // Roles unicos o de control que revisan viajes de toda la empresa
 const companyWideRoles = ['ADMINISTRADOR', 'REVISOR', 'APROBADOR'];
 
+// Obtiene el rol y el cargo de quien hace la consulta
 const getRequester = async (userId) => {
   const {data} = await supabase
     .from('Usuario')
@@ -16,6 +17,7 @@ const getRequester = async (userId) => {
   return data;
 };
 
+// Indica si el usuario tiene el cargo de tesorero
 const isTreasurer = (user) =>
   textNormalizer.normalizeText(user?.Cargo?.nombre || '') === textNormalizer.normalizeText(userDirectoryService.treasurerPositionName);
 
@@ -30,15 +32,13 @@ const hasReviewedTrip = async (tripId, userId) => {
   return (data || []).length > 0;
 };
 
-// El empleado dueno del viaje esta dentro del alcance de este supervisor (jefe directo,
-// su seccion o cualquiera si no hay jerarquia), igual que en la lista de pendientes
+// Indica si el dueño del viaje esta dentro del alcance del supervisor
 const isInSupervisorScope = async (trip, supervisorId) => {
   const eligible = await hierarchyAssignmentService.filterTripsByHierarchy([trip], supervisorId, 'SUPERVISOR', (item) => item.id_usuario);
   return eligible.length > 0;
 };
 
-// Un supervisor accede a un viaje si se lo asignaron, si ya lo reviso, o si esta sin
-// asignar y el empleado esta dentro de su alcance
+// Indica si un supervisor puede acceder al viaje (asignado, revisado o en su alcance)
 const canSupervisorAccessTrip = async (trip, supervisorId) => {
   if (trip.id_supervisor_asignado === supervisorId) {
     return true;
@@ -52,9 +52,7 @@ const canSupervisorAccessTrip = async (trip, supervisorId) => {
   return false;
 };
 
-// Puede ver el detalle de un viaje (sus gastos, comprobantes y documentos): el dueño, su
-// reemplazo aprobado, el tesorero, el administrador, el revisor y el aprobador, y el
-// supervisor que corresponda. Un empleado no puede ver viajes ajenos cambiando el id.
+// Indica quien puede ver el detalle de un viaje segun su participacion
 const canViewTrip = async (tripId, userId) => {
   const {data: trip} = await supabase
     .from('Viaje')

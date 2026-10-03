@@ -3,6 +3,7 @@ const supabase = require('../../config/supabase');
 const auditColumns = 'id_auditoria, fecha, tipo, Usuario(id_usuario, nombre, apellido_paterno, email_corporativo)';
 const maxRowsPerRequest = 1000;
 
+// Arma la consulta de auditoria con los filtros recibidos
 const buildAuditQuery = (filters, options) => {
   let query = supabase.from('Auditoria').select(auditColumns, options);
   if (filters.tipo) {
@@ -20,9 +21,7 @@ const buildAuditQuery = (filters, options) => {
   return query.order('fecha', {ascending: false}).order('id_auditoria', {ascending: false});
 };
 
-// Lista los registros de auditoria con filtros opcionales.
-// Con pagina y limite devuelve una pagina {registros, total}; sin ellos devuelve todos
-// los registros filtrados (para exportar a Excel), leyendo de a 1000 filas.
+// Lista los registros de auditoria; con pagina y limite devuelve una pagina, sin ellos todos
 const getAllAudits = async (req, res) => {
   const page = parseInt(req.query.pagina);
   const limit = parseInt(req.query.limite);

@@ -1,15 +1,13 @@
-// Envia ahora el resumen de pendientes, sin esperar a la hora programada.
-//   npm run resumen               envia los correos de verdad
-//   npm run resumen -- --prueba   solo muestra a quien le llegaria y que diria
-// Lo mismo puede hacerse desde la pantalla Recordatorios del administrador.
+// Envia el resumen de pendientes ahora (npm run resumen; con -- --prueba solo lo muestra)
 require('dotenv').config();
 const supabase = require('../src/config/supabase');
 const reminderScheduleService = require('../src/services/shared/reminderScheduleService');
 
 const dryRun = process.argv.includes('--prueba');
 
+// Revisa la conexion y envia (o simula) el resumen, mostrando el resultado por persona
 const run = async () => {
-  // Sin conexion a la base, el resumen no encontraria pendientes y pareceria que no hay nada
+  // Sin conexion a la base el resumen saldria vacio
   const {error} = await supabase.from('Usuario').select('id_usuario', {head: true, count: 'exact'});
   if (error) {
     console.error('No se pudo conectar a la base de datos. Revisa SUPABASE_URL y SUPABASE_KEY en el .env:', error.message || error);

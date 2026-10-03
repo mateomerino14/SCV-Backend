@@ -3,8 +3,7 @@ const commentModerationService = require('../shared/commentModerationService');
 const textNormalizer = require('../../utils/textNormalizer');
 const userDirectoryService = require('../user/userDirectoryService');
 
-// Etapas de revision y el campo que indica quien la tiene asignada. En las etapas de roles
-// unicos (aprobador, revisor) y de tesoreria la ruta ya exige el rol o cargo.
+// Etapas de revision y el campo que indica quien la tiene asignada
 const reviewStageFields = {
   EN_REVISION_VIAJE: {field: 'id_supervisor_asignado', mustBeAssigned: true, role: 'SUPERVISOR'},
   EN_REVISION: {field: 'id_supervisor_asignado', mustBeAssigned: true, role: 'SUPERVISOR'},
@@ -20,8 +19,7 @@ const getCommenter = async (userId) => {
   return data;
 };
 
-// Solo quien revisa la etapa actual puede observar el viaje: nadie comenta un viaje ya
-// decidido ni uno propio, ni uno de una etapa que no le corresponde o asignado a otra persona
+// Indica si el usuario revisa la etapa actual y puede observar el viaje
 const checkCanComment = async (trip, userId) => {
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404};
@@ -111,8 +109,7 @@ const editTripComment = async (tripId, commentId, userId, description) => {
   if (comment.tipo !== 'OBSERVACION') {
     return {error: 'Solo se pueden modificar observaciones', status: 403};
   }
-  // Una observacion ya no se cambia cuando la etapa se decidio o paso a otro ciclo: es el
-  // respaldo de la aprobacion o del rechazo
+  // Una observacion ya no se cambia cuando la etapa se decidio
   const {data: trip} = await supabase.from('Viaje').select(tripColumns).eq('id_viaje', tripId).single();
   const denied = await checkCanComment(trip, userId);
   if (denied) {
@@ -142,8 +139,7 @@ const deleteTripComment = async (tripId, commentId, userId) => {
   if (comment.tipo !== 'OBSERVACION') {
     return {error: 'Solo se pueden modificar observaciones', status: 403};
   }
-  // Una observacion ya no se cambia cuando la etapa se decidio o paso a otro ciclo: es el
-  // respaldo de la aprobacion o del rechazo
+  // Una observacion ya no se cambia cuando la etapa se decidio
   const {data: trip} = await supabase.from('Viaje').select(tripColumns).eq('id_viaje', tripId).single();
   const denied = await checkCanComment(trip, userId);
   if (denied) {

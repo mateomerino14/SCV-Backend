@@ -1,12 +1,9 @@
 -- =====================================================================
 -- Cambios recientes para bases existentes (octubre 2026)
--- Ya incluidos en 01_schema.sql: solo se corre en bases creadas antes.
--- Se puede correr mas de una vez sin problema.
+-- Ya incluidos en 01_schema.sql; solo para bases creadas antes, se puede correr mas de una vez
 -- =====================================================================
 
--- 1) Motivo del cambio de contrasena pendiente: TEMPORAL (cuenta nueva o clave puesta por el
---    administrador) o RECUPERACION (ingreso con codigo de verificacion). Define el texto de la
---    ventana que obliga a cambiarla.
+-- 1) Motivo del cambio de contrasena pendiente: TEMPORAL o RECUPERACION
 alter table "Usuario" add column if not exists motivo_cambio_contrasenia varchar(15)
   check (motivo_cambio_contrasenia in ('TEMPORAL', 'RECUPERACION'));
 update "Usuario" set motivo_cambio_contrasenia = 'TEMPORAL'
@@ -32,7 +29,7 @@ end $$;
 alter table "Gasto" alter column moneda set default 'BOB';
 
 -- 4) Correccion de datos guardados antes de los ultimos arreglos
--- Gastos con factura o recibo guardados antes con costo en 0: el costo es el monto completo.
+-- Gastos con factura o recibo guardados con costo en 0: el costo es el monto completo
 update "Gasto"
 set base_imponible = monto_total, importe_costo = monto_total, monto_moneda_origen = monto_total,
     retencion_rc_iva = 0, retencion_iue = 0, retencion_it = 0

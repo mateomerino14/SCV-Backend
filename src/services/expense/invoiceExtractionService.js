@@ -54,8 +54,7 @@ const normalizeResult = (parsedData) => {
   };
 };
 
-// Extrae los datos de una factura enviando la imagen al modelo de vision
-// (con modelo de respaldo si el principal falla o se queda sin cuota)
+// Extrae los datos de una factura con el modelo de vision (y uno de respaldo si falla)
 const extractInvoiceData = async (file) => {
   const imageBase64 = file.buffer.toString('base64');
   const responseText = await geminiService.generateText([

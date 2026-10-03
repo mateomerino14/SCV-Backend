@@ -1,7 +1,6 @@
 const supabase = require('../../config/supabase');
 
-// Personas con un reemplazo aprobado en el viaje: rinden los gastos en nombre del titular,
-// asi que no pueden ser quienes revisen esa rendicion
+// Reemplazos aprobados del viaje, que no pueden revisar esa rendicion
 const getTripSubstituteIds = async (tripId) => {
   if (!tripId) {
     return [];
@@ -14,11 +13,7 @@ const getTripSubstituteIds = async (tripId) => {
   return (data || []).map((row) => row.id_sustituto);
 };
 
-// Resuelve quien debe ver el paso de revision de una persona dada, segun la jerarquia:
-// 1. su jefe directo, si esta activo y tiene el rol correcto
-// 2. si no, cualquier usuario activo con ese rol que comparta su misma seccion
-// 3. si tampoco, todos los usuarios activos con ese rol
-// excludeIds deja fuera a personas que no pueden revisar (p. ej. el reemplazo del viaje)
+// Resuelve quien revisa a una persona: su jefe directo, su seccion o todos con ese rol
 const resolveReviewerScope = async (personId, roleName, excludeIds = []) => {
   const {data: person} = await supabase
     .from('Usuario')
@@ -51,8 +46,7 @@ const resolveReviewerScope = async (personId, roleName, excludeIds = []) => {
   return {level: 'todos', userIds: null, excludeIds};
 };
 
-// Roles que solo puede tener una persona activa (userService.validateUniqueRole).
-// A ellos no se les aplica la jerarquia: todo lo de su etapa les llega directamente.
+// Roles de una sola persona, a los que no se aplica la jerarquia
 const uniqueRoles = ['REVISOR', 'APROBADOR'];
 
 // Devuelve el id del unico usuario activo con un rol unico, o null si no hay
@@ -66,9 +60,7 @@ const getUniqueRoleHolder = async (roleName) => {
   return data?.[0]?.id_usuario || null;
 };
 
-// Asigna al usuario actual los viajes de su etapa que quedaron sin asignar o asignados
-// a otra persona (por ejemplo un revisor anterior que el administrador reemplazo).
-// Solo se usa con roles unicos, donde todo lo de la etapa le corresponde a una persona.
+// Asigna al usuario los viajes de su etapa sin asignar o de otra persona (roles unicos)
 const claimStageTrips = async (userId, assignedField, states) => {
   await supabase
     .from('Viaje')
@@ -78,9 +70,7 @@ const claimStageTrips = async (userId, assignedField, states) => {
     .or(`${assignedField}.is.null,${assignedField}.neq.${userId}`);
 };
 
-// Asigna automaticamente el siguiente revisor de un viaje cuando la jerarquia resuelve
-// a una persona especifica; si resuelve a una seccion o a todos, deja el viaje sin
-// asignar para que se tome del listado de pendientes
+// Asigna el siguiente revisor si la jerarquia resuelve a una persona; si no, queda sin asignar
 const assignNextReviewer = async (tripId, personId, roleName, assignedField) => {
   if (uniqueRoles.includes(roleName)) {
     const {data: trip} = await supabase.from('Viaje').select('id_usuario').eq('id_viaje', tripId).single();
@@ -103,9 +93,7 @@ const assignNextReviewer = async (tripId, personId, roleName, assignedField) => 
   return scope;
 };
 
-// Filtra una lista de viajes ya obtenida para que solo aparezcan los que le
-// corresponden al solicitante: asignados directamente a el, o sin asignar y dentro
-// de su alcance de seccion o de "todos" segun la jerarquia del dueno de cada viaje
+// Filtra los viajes que le corresponden al solicitante segun la jerarquia
 const filterTripsByHierarchy = async (trips, requesterId, roleName, ownerIdExtractor) => {
   const results = [];
   for (const trip of trips) {

@@ -1,5 +1,4 @@
-// Lee el campo "datos" (JSON) de un formulario multiparte. Devuelve null si falta o no es
-// un JSON valido, para responder 400 en vez de un error interno
+// Lee el campo datos (JSON) de un formulario multiparte; devuelve null si no es valido
 const parseFormData = (rawValue) => {
   if (typeof rawValue !== 'string' || !rawValue.trim()) {
     return null;

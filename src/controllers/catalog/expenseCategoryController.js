@@ -11,8 +11,7 @@ const getAllExpenseCategories = async (req, res) => {
   }
 };
 
-// Crea una nueva categoria de gasto
-// Solo se aceptan los campos de la categoria (no ids ni otras columnas enviadas por el cliente)
+// Crea una nueva categoria de gasto aceptando solo sus campos
 const createExpenseCategory = async (req, res) => {
   const nombre = String(req.body?.nombre || '').trim();
   if (!nombre || nombre.length > 50) {

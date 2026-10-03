@@ -54,7 +54,6 @@ const getMyTrips = async (treasurerId, filters) => {
     return {error: error.message};
   }
   else {
-    // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
     const merged = await reviewLogService.mergeReviewedTrips({
       userId: treasurerId, stage: reviewLogService.reviewStages.fundAssignment, select: selectFields, filters,
       trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),
@@ -116,9 +115,7 @@ const updateAmounts = async (tripId, amounts, treasurerId) => {
   }
 };
 
-// Aprueba el fondo de un viaje y notifica al empleado
-// Con selfStageSkip se aprueba automaticamente el fondo del propio tesorero, con el monto
-// que el mismo solicito en el viaje (ver selfReviewSkipService)
+// Aprueba el fondo de un viaje y notifica; con selfStageSkip se aprueba solo con el monto pedido
 const approveTrip = async (tripId, treasurerId, {selfStageSkip = false} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')

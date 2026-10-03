@@ -118,7 +118,6 @@ const getMyTrips = async (approverId, filters) => {
     return {error: error.message};
   }
   else {
-    // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
     const merged = await reviewLogService.mergeReviewedTrips({
       userId: approverId, stage: reviewLogService.reviewStages.tripApproval, select: selectFields, filters,
       trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),
@@ -148,8 +147,7 @@ const getTripDetail = async (tripId, approverId) => {
   return {trip, comments: comments || []};
 };
 
-// Aprueba un viaje en fase de aprobacion previa
-// Con selfStageSkip se aprueba automaticamente el viaje del propio aprobador (ver selfReviewSkipService)
+// Aprueba un viaje en fase de aprobacion previa; con selfStageSkip se aprueba solo si es suyo
 const approveTrip = async (tripId, approverId, {selfStageSkip = false} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')

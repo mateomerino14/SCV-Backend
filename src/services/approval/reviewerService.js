@@ -83,7 +83,6 @@ const getMyReviews = async (reviewerId, filters) => {
     return {error: error.message};
   }
   else {
-    // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
     const merged = await reviewLogService.mergeReviewedTrips({
       userId: reviewerId, stage: reviewLogService.reviewStages.finalReview, select: selectFields, filters,
       trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),
@@ -178,8 +177,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
   const pdfBuffer = await finalReviewDocumentService.generatePdf(resultHtml);
   const pdfBase64 = pdfBuffer.toString('base64');
   const attachments = [{content: pdfBase64, name: `Resultado_Rendicion_${tripCode.replace('/', '-')}.pdf`}];
-  // Resultado por moneda: en un viaje internacional puede tocar devolver en una moneda y
-  // recibir reembolso en la otra, asi que cada una se informa por separado
+  // Resultado por moneda: puede haber devolucion en una y reembolso en la otra
   const describeBalance = (balance, currency) => {
     if (Math.abs(balance) < 0.005) {
       return 'Sin saldo pendiente';
@@ -207,8 +205,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
   );
 };
 
-// Aprueba definitivamente un viaje
-// Con selfStageSkip se aprueba automaticamente la rendicion del propio revisor (ver selfReviewSkipService)
+// Aprueba definitivamente un viaje; con selfStageSkip se aprueba solo si es del propio revisor
 const approveReview = async (tripId, reviewerId, {selfStageSkip = false} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')

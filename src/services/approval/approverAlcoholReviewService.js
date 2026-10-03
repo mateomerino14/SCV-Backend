@@ -79,7 +79,6 @@ const getMyAlcoholReviews = async (approverId, filters) => {
     return {error: error.message};
   }
   else {
-    // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
     const merged = await reviewLogService.mergeReviewedTrips({
       userId: approverId, stage: reviewLogService.reviewStages.alcoholReview, select: selectFields, filters,
       trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),
@@ -190,8 +189,7 @@ const getAlcoholReviewDetail = async (tripId, approverId) => {
   };
 };
 
-// Aprueba la revision adicional del aprobador, continuando el flujo hacia el revisor final
-// Con selfStageSkip se aprueba automaticamente la rendicion del propio aprobador (ver selfReviewSkipService)
+// Aprueba la revision del aprobador; con selfStageSkip se aprueba sola si el viaje es suyo
 const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} = {}) => {
   const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_aprobador_asignado, estado').eq('id_viaje', tripId).single();
   if (!trip) {

@@ -17,13 +17,10 @@ const getActiveReviewers = async () => {
   }
 };
 
-// Crea una solicitud para que otra persona rinda los gastos de un viaje
-// Roles que no pueden ser reemplazo: el revisor y el aprobador son unicos y revisarian
-// la misma rendicion que registraron; el administrador no participa del flujo de viajes
+// Roles que no pueden ser reemplazo (unicos en el flujo o sin viajes)
 const excludedSubstituteRoles = ['ADMINISTRADOR', 'REVISOR', 'APROBADOR'];
 
-// Personas que pueden rendir en nombre del solicitante: usuarios activos de su misma
-// seccion, sin incluirlo a el ni a los roles excluidos
+// Personas activas de la misma seccion que pueden rendir por el solicitante
 const getCandidates = async (requesterId) => {
   const {data: requester} = await supabase.from('Usuario').select('id_seccion').eq('id_usuario', requesterId).single();
   if (!requester?.id_seccion) {
@@ -43,6 +40,7 @@ const getCandidates = async (requesterId) => {
   return {candidates: data || [], sinSeccion: false};
 };
 
+// Crea una solicitud para que otra persona rinda los gastos de un viaje
 const createRequest = async (tripId, requesterId, substituteId) => {
   if (!substituteId) {
     return {error: 'Debes seleccionar quién rendirá por ti', status: 400};
@@ -171,8 +169,7 @@ const processedRequestError = async (requestId) => {
   return {error: describeProcessedRequest(data), status: 409};
 };
 
-// Cierra las solicitudes pendientes de esos viajes (por ejemplo, al enviarse el viaje a
-// revision): ya no tienen sentido y no deben quedar en la bandeja del revisor
+// Cierra las solicitudes pendientes de esos viajes, que ya no aplican al enviarse a revision
 const closePendingRequests = async (tripIds) => {
   const ids = (tripIds || []).map((tripId) => parseInt(tripId)).filter((tripId) => !isNaN(tripId));
   if (ids.length === 0) {
@@ -416,8 +413,7 @@ const canActOnTrip = async (tripId, userId) => {
   return (approvedSubstitution || []).length > 0;
 };
 
-// Verifica si un usuario puede registrar, editar o eliminar gastos de un viaje:
-// debe ser el titular o su sustituto aprobado, y el viaje debe estar en fase de gastos
+// Verifica que el usuario sea titular o reemplazo aprobado y el viaje este en fase de gastos
 const canRegisterExpenseOnTrip = async (tripId, userId) => {
   const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, fue_iniciado, tipo, fecha_inicio, fecha_fin').eq('id_viaje', tripId).single();
   if (!trip) {

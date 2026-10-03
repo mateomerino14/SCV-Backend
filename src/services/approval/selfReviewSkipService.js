@@ -9,9 +9,7 @@ const getTreasurerId = async () => {
   return treasurers[0]?.id_usuario || null;
 };
 
-// Etapas atendidas por una sola persona (rol o cargo unico). Si el viaje llega a la
-// etapa de su propio dueño, esa etapa se aprueba automaticamente: nadie revisa lo suyo
-// y no hay otra persona que pueda hacerlo.
+// Etapas de una sola persona: si el viaje es suyo, la etapa se aprueba automaticamente
 const stages = {
   APROBADO_VIAJE: {label: 'aprobador', getHolder: () => hierarchyAssignmentService.getUniqueRoleHolder('APROBADOR'), approve: (tripId, userId) => require('./approverService').approveTrip(tripId, userId, {selfStageSkip: true})},
   EN_REVISION_TESORERO: {label: 'tesorero', getHolder: getTreasurerId, approve: (tripId, userId) => require('./treasurerService').approveTrip(tripId, userId, {selfStageSkip: true})},
@@ -19,8 +17,7 @@ const stages = {
   APROBADO_SUPERVISOR: {label: 'revisor', getHolder: () => hierarchyAssignmentService.getUniqueRoleHolder('REVISOR'), approve: (tripId, userId) => require('./reviewerService').approveReview(tripId, userId, {selfStageSkip: true})},
 };
 
-// Avanza el viaje mientras este en una etapa cuyo responsable unico es su propio dueño.
-// Puede encadenar etapas (p. ej. revision por alcohol y luego revision final).
+// Avanza el viaje mientras su etapa la atienda solo su propio dueño
 const advanceSelfReviewStages = async (tripId) => {
   for (let step = 0; step < Object.keys(stages).length; step++) {
     const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado').eq('id_viaje', tripId).single();

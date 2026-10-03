@@ -1,9 +1,7 @@
 -- ============================================================
 -- BORRA TODAS LAS TABLAS EXISTENTES (esquema completo desde cero)
 -- ============================================================
--- ADVERTENCIA: esto borra TODA la base de datos, tablas incluidas,
--- no solo los datos. No se puede deshacer. Usar solo en un entorno
--- de pruebas, nunca en produccion con datos reales.
+-- ADVERTENCIA: borra toda la base, tablas incluidas, sin poder deshacerlo. Solo en pruebas
 -- ============================================================
 
 drop table if exists

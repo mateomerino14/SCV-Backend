@@ -239,9 +239,7 @@ insert into "Correlativo_Recibo" (numero)
 select 0
 where not exists (select 1 from "Correlativo_Recibo" where id = 1);
 
--- Numero asignado a cada recibo emitido, para que al reenviarlo conserve el mismo
--- numero. Individual: un recibo por gasto (id_gasto). Agrupado: uno por viaje, tipo
--- (Compra/Servicio) y moneda (id_gasto nulo).
+-- Numero de cada recibo emitido (por gasto o agrupado por viaje), para conservarlo al reenviar
 create table if not exists "Recibo" (
   id_recibo serial primary key,
   numero integer not null unique,
@@ -259,9 +257,7 @@ create unique index if not exists recibo_agrupado_unique on "Recibo"(id_viaje, t
 -- Historial de revision
 -- ------------------------------------------------------------
 
--- Cada aprobacion o rechazo de un viaje: quien lo hizo, en que etapa y cuando.
--- Alimenta los historiales de revision de supervisor, aprobador, tesorero y revisor.
--- automatica = true cuando la etapa se aprobo sola porque el revisor era el viajero.
+-- Cada aprobacion o rechazo de un viaje por etapa; automatica cuando el revisor era el viajero
 create table if not exists "Revision_Viaje" (
   id_revision serial primary key,
   id_viaje integer not null references "Viaje"(id_viaje) on delete cascade,
@@ -333,8 +329,7 @@ create index if not exists idx_reemplazo_estado on "Solicitud_Reemplazo"(estado)
 -- ------------------------------------------------------------
 -- Configuracion del resumen de pendientes (una sola fila)
 -- ------------------------------------------------------------
--- Dias (0 = domingo ... 6 = sabado) y horas (HH:MM, hora Bolivia) en que se envia
--- el resumen de pendientes. La edita el administrador desde la pantalla Recordatorios.
+-- Dias (0 domingo a 6 sabado) y horas (HH:MM, hora Bolivia) del resumen de pendientes
 
 create table if not exists "Configuracion_Recordatorio" (
   id smallint primary key default 1 check (id = 1),

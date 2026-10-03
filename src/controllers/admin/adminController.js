@@ -1,8 +1,9 @@
 const supabase = require('../../config/supabase');
 
-// Supabase devuelve como maximo 1000 filas por consulta: se lee por paginas para que
-// los totales no se queden cortos cuando haya muchos viajes o usuarios
+// Supabase devuelve como maximo 1000 filas por consulta
 const pageSize = 1000;
+
+// Lee todas las filas de una tabla por paginas
 const fetchAllRows = async (table, columns, idColumn) => {
   const rows = [];
   for (let from = 0; ; from += pageSize) {

@@ -8,8 +8,7 @@ const fallbackModelName = 'gemini-3.5-flash-lite';
 const primaryModel = geminiClient.getGenerativeModel({model: primaryModelName});
 const fallbackModel = geminiClient.getGenerativeModel({model: fallbackModelName});
 
-// Indica si el error es por cuota agotada (429). Reintentar con el mismo modelo no
-// sirve: la cuota no se libera en segundos, asi que se pasa directo al respaldo.
+// Indica si el error es por cuota agotada (429), para pasar directo al respaldo
 const isQuotaError = (error) => {
   const message = error?.message || '';
   return message.includes('429') || message.toLowerCase().includes('quota');
@@ -38,8 +37,7 @@ const generateWithRetries = async (model, modelName, request, maxAttempts, taskN
   throw lastError;
 };
 
-// Genera contenido con el modelo principal y, si falla, con el de respaldo.
-// Devuelve el texto de la respuesta; lanza el error solo si ambos modelos fallan.
+// Genera contenido con el modelo principal y, si falla, con el de respaldo
 const generateText = async (request, {taskName = 'consulta', maxAttempts = 3} = {}) => {
   try {
     return await generateWithRetries(primaryModel, primaryModelName, request, maxAttempts, taskName);

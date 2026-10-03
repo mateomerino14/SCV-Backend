@@ -57,7 +57,6 @@ const getMyTripReviews = async (supervisorId, filters) => {
     return {error: error.message};
   }
   else {
-    // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
     const merged = await reviewLogService.mergeReviewedTrips({
       userId: supervisorId, stage: reviewLogService.reviewStages.tripReview, select: selectFields, filters,
       trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),
@@ -302,7 +301,6 @@ const getMyExpenseReviews = async (supervisorId, filters) => {
     return {error: error.message};
   }
   else {
-    // Suma los viajes que el mismo reviso en esta etapa (historial de revision)
     const merged = await reviewLogService.mergeReviewedTrips({
       userId: supervisorId, stage: reviewLogService.reviewStages.expenseReview, select: selectFields, filters,
       trips: hierarchyAssignmentService.filterBySection(data || [], filters.id_seccion),

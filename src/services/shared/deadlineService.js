@@ -29,10 +29,7 @@ const addDays = (isoDate, days) => {
   return date;
 };
 
-// Valida si una fecha de evento esta dentro del plazo permitido del viaje.
-// El plazo de registro (fin del viaje + tolerancia) solo corre mientras el viaje esta en
-// curso: si un revisor rechazo la rendicion, el empleado puede corregir sus gastos sin pedir
-// autorizacion (la fecha del gasto igual debe estar dentro del periodo del viaje).
+// Valida que la fecha este dentro del plazo; el plazo solo corre con el viaje en curso
 async function validateTripDeadline(tripId, eventDate) {
   const {data: trip} = await supabase
     .from('Viaje')

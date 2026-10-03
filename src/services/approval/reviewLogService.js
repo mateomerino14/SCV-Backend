@@ -11,9 +11,7 @@ const reviewStages = {
   finalReview: 'REVISION_FINAL',
 };
 
-// Deja constancia de quien aprobo o rechazo el viaje en una etapa. Las aprobaciones
-// automaticas (el revisor es el propio viajero) se guardan marcadas y no cuentan en
-// su historial. Un fallo aqui no debe deshacer la aprobacion, solo se registra en el log.
+// Registra quien aprobo o rechazo el viaje en una etapa; un fallo aqui no deshace la accion
 const recordReview = async (tripId, userId, stage, action, {automatic = false} = {}) => {
   const {error} = await supabase.from('Revision_Viaje').insert({
     id_viaje: parseInt(tripId),
@@ -28,6 +26,7 @@ const recordReview = async (tripId, userId, stage, action, {automatic = false} =
   }
 };
 
+// Aplica a la consulta los filtros de fechas y empleado
 const applyTripFilters = (query, filters) => {
   let filtered = query;
   if (filters.fecha_inicio) {
@@ -62,13 +61,7 @@ const getLatestEntryByTrip = async (tripIds) => {
   return latest;
 };
 
-// Suma a la lista de trabajo del usuario los viajes que el mismo reviso en su etapa y
-// marca cada viaje con resultado_revision:
-// - APROBADO: su ultima accion en la etapa fue aprobarlo (queda en su historial siempre).
-// - RECHAZADO: lo rechazo el y el viaje sigue rechazado; cuando el empleado lo corrige
-//   y lo reenvia, deja de mostrarse.
-// - null: pendiente o sin revision propia.
-// Un viaje aprobado antes que hoy revisa otra persona sigue en su historial (asignado_a_mi = false).
+// Suma a la lista los viajes que el usuario reviso, con su resultado (APROBADO, RECHAZADO o null)
 const mergeReviewedTrips = async ({userId, stage, trips, select, filters}) => {
   const {data: entries, error} = await supabase
     .from('Revision_Viaje')
@@ -110,8 +103,7 @@ const mergeReviewedTrips = async ({userId, stage, trips, select, filters}) => {
     }
     else if (own?.accion === 'RECHAZADO' && rejectedCandidates.includes(trip.id_viaje)) {
       const latest = latestByTrip.get(trip.id_viaje);
-      // El rechazo vigente debe ser exactamente su ultimo registro en esta etapa (no un rechazo
-      // suyo en otra etapa, por ejemplo en gastos, cuando este rechazo previo ya se corrigio)
+      // El rechazo vigente debe ser su ultimo registro en esta etapa
       if (latest && latest.id_usuario === userId && latest.accion === 'RECHAZADO' && latest.etapa === stage && latest.fecha === own.fecha) {
         result = 'RECHAZADO';
       }
@@ -119,8 +111,7 @@ const mergeReviewedTrips = async ({userId, stage, trips, select, filters}) => {
     // asignado_a_mi: el viaje esta en su lista de trabajo (no solo en su historial)
     return {...trip, resultado_revision: result, fecha_revision: own?.fecha || null, asignado_a_mi: baseIds.has(trip.id_viaje)};
   });
-  // Los viajes que solo llegaron por el historial y ya no tienen un resultado vigente
-  // (rechazos ya corregidos por el empleado) no se muestran
+  // No se muestran los del historial sin resultado vigente (rechazos ya corregidos)
   const visible = tagged.filter((trip) => baseIds.has(trip.id_viaje) || trip.resultado_revision);
   // Lo revisado mas recientemente primero; lo que aun no reviso, por fecha de inicio
   const sortKey = (trip) => String(trip.fecha_revision || trip.fecha_inicio || '');

@@ -1,8 +1,7 @@
 -- ============================================================
 -- Activacion de Row Level Security en todas las tablas
 -- ============================================================
--- Activa RLS y elimina las politicas permisivas, dejando las tablas
--- en "denegar por defecto". No afecta al backend, que usa service_role.
+-- Deja las tablas en denegar por defecto; el backend usa service_role y no se ve afectado
 
 do $block$
 declare

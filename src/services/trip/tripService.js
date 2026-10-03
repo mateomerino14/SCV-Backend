@@ -148,6 +148,8 @@ const isValidDate = (value) => {
   const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
   return date.getUTCFullYear() === Number(match[1]) && date.getUTCMonth() === Number(match[2]) - 1 && date.getUTCDate() === Number(match[3]);
 };
+
+// Indica si el monto es un numero valido y no negativo
 const isValidAmount = (value) => value !== undefined && value !== null && value !== '' && !isNaN(parseFloat(value)) && parseFloat(value) >= 0;
 
 // Valida los datos de un viaje al crearlo o reeditarlo, con los mismos limites de la base
@@ -195,8 +197,7 @@ const editTrip = async (tripId, userId, tripData) => {
   if (trip.id_usuario !== userId) {
     return {error: 'No tienes permiso para editar este viaje', status: 403};
   }
-  // Solo se reedita el viaje antes de iniciarlo; si se rechazo en la fase de gastos se
-  // corrigen los gastos y se reenvia con "finalizar", sin volver a la aprobacion previa
+  // Solo se reedita antes de iniciarlo; un rechazo en gastos se corrige y se reenvia
   const isEditableRejection = trip.estado === 'RECHAZADO' && !trip.fue_iniciado;
   if (trip.estado !== 'BORRADOR' && !isEditableRejection) {
     return {error: 'Solo puedes editar viajes en borrador o rechazados antes de iniciarse', status: 400};

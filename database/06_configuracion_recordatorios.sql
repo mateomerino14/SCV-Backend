@@ -1,14 +1,12 @@
 -- =====================================================================
 -- Configuracion de recordatorios (octubre 2026)
--- Ya incluido en 01_schema.sql, 03_seed.sql y 04_rls_hardening.sql: solo se corre
--- en bases creadas antes. Se puede correr mas de una vez sin problema.
+-- Ya incluido en 01, 03 y 04; solo para bases creadas antes, se puede correr mas de una vez
 -- =====================================================================
 
 -- ------------------------------------------------------------
 -- Configuracion del resumen de pendientes (una sola fila)
 -- ------------------------------------------------------------
--- Dias (0 = domingo ... 6 = sabado) y horas (HH:MM, hora Bolivia) en que se envia
--- el resumen de pendientes. La edita el administrador desde la pantalla Recordatorios.
+-- Dias (0 domingo a 6 sabado) y horas (HH:MM, hora Bolivia) del resumen de pendientes
 
 create table if not exists "Configuracion_Recordatorio" (
   id smallint primary key default 1 check (id = 1),

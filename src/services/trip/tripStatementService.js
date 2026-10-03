@@ -15,8 +15,7 @@ const symbologyRows = [
   ['R', 'Docto. sin IVA, sin Retencion'],
 ];
 
-// Escapa caracteres especiales de HTML para prevenir inyeccion
-// Los datos se escapan al entrar a la plantilla (escapeDeep); aqui solo se normaliza el vacio
+// Normaliza el texto vacio; los datos ya llegan escapados (escapeDeep)
 const escapeHtml = (text) => text || '';
 
 // Extrae la cuenta contable de Oracle a partir del nombre de la categoria
@@ -94,8 +93,7 @@ const formatDate = (dateInput) => {
   if (!dateInput) {
     return '';
   }
-  // Las fechas YYYY-MM-DD se formatean tal cual: new Date() las toma como UTC y en
-  // Bolivia (UTC-4) mostraria el dia anterior
+  // Las fechas YYYY-MM-DD se formatean tal cual para no correrlas un dia por UTC
   const dateOnly = String(dateInput).match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (dateOnly) {
     return `${dateOnly[3]}/${dateOnly[2]}/${dateOnly[1]}`;
@@ -107,10 +105,7 @@ const formatDate = (dateInput) => {
   return `${day}/${month}/${year}`;
 };
 
-// Genera el HTML de la planilla de rendicion de cuentas
-// Cada reenvio a revision guarda de nuevo las justificaciones; en el documento solo va
-// la mas reciente de cada dia (y la de hoteles al final), igual que en la pantalla.
-// Recibe los comentarios ordenados del mas reciente al mas antiguo.
+// Deja solo la justificacion mas reciente de cada dia (y la de hoteles al final)
 const latestJustificationPerDay = (comments) => {
   const byDay = new Map();
   comments.forEach((comment) => {
@@ -130,6 +125,7 @@ const latestJustificationPerDay = (comments) => {
   });
 };
 
+// Genera el HTML de la planilla de rendicion de cuentas
 const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   // Datos escritos por usuarios: se escapan antes de armar el documento
   const trip = escapeDeep(rawTrip);
@@ -378,8 +374,7 @@ const generateStatementPdf = async (tripId) => {
   const dayJustifications = latestJustificationPerDay(comments || []);
   const html = generateStatementHtml(trip, expenses || [], dayJustifications);
   const pdfBuffer = await pdfService.generatePdf(html);
-  // Nombre de archivo solo con letras, numeros, guiones y guion bajo (sin tildes ni comillas),
-  // porque la cabecera de descarga no admite otros caracteres
+  // Nombre de archivo solo con letras, numeros y guiones, como exige la cabecera de descarga
   const safeReason = (trip.motivo || 'viaje')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'viaje';

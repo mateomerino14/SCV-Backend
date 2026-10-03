@@ -37,9 +37,7 @@ const attachIvaTax = async (invoiceId, ivaAmount) => {
   }
 };
 
-// Sube el archivo de imagen de la factura y lo asocia al gasto
-// Sube la imagen de la factura y devuelve su URL publica (o un error). Se llama antes de
-// escribir, para no dejar una factura sin comprobante si la subida falla.
+// Sube la imagen de la factura antes de escribir y devuelve su URL publica
 const uploadInvoiceImage = async (file) => {
   const fileExtension = file.originalname.split('.').pop();
   const fileName = `facturas/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExtension}`;
@@ -52,8 +50,7 @@ const uploadInvoiceImage = async (file) => {
   return {url: supabase.storage.from('facturas').getPublicUrl(fileName).data.publicUrl};
 };
 
-// Valida los campos requeridos para guardar una factura
-// Cada producto de la factura con nombre, cantidad mayor a cero y precio no negativo
+// Valida que cada producto tenga nombre, cantidad mayor a cero y precio no negativo
 const validateInvoiceLines = (lines) => {
   for (const item of lines) {
     if (!String(item?.nombre_producto || '').trim()) {
@@ -66,6 +63,7 @@ const validateInvoiceLines = (lines) => {
   return null;
 };
 
+// Valida los campos requeridos para guardar una factura
 const validateInvoiceData = (invoiceData) => {
   if (!invoiceData.proveedor) {
     return 'El nombre del proveedor es requerido';

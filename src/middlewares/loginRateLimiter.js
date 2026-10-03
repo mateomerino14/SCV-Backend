@@ -1,7 +1,6 @@
 const rateLimit = require('express-rate-limit');
 
-// Limita los intentos de login fallidos por IP. Los ingresos correctos no cuentan, para
-// que una oficina que sale a internet con una sola IP no se bloquee con el uso normal.
+// Limita los intentos de login fallidos por IP; los ingresos correctos no cuentan
 const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,

@@ -58,8 +58,7 @@ const getSupervisorPendingCounts = async (supervisorId) => {
 // "1 viaje esperando" / "3 viajes esperando"
 const countLine = (count, singular, plural, rest) => `${count} ${count === 1 ? singular : plural} ${rest}`;
 
-// Arma y envia el correo resumen a un grupo de usuarios con un rol. Cada destinatario se
-// agrega al reporte; en modo prueba (dryRun) solo se arma el reporte y no se envia nada
+// Arma y envia el resumen a un grupo; con dryRun solo lo agrega al reporte
 const sendDigestToGroup = async (users, title, bodyLines, report, dryRun) => {
   if (users.length === 0 || bodyLines.length === 0) {
     return;
@@ -104,15 +103,13 @@ const sendDigestToGroup = async (users, title, bodyLines, report, dryRun) => {
   });
 };
 
-// Envia el resumen de pendientes a supervisores, aprobadores, revisores y tesoreros.
-// Devuelve a quien se envio (o se enviaria, con dryRun) y que decia cada correo
+// Envia el resumen de pendientes a cada revisor y devuelve a quien se envio
 const sendDailyDigest = async ({dryRun = false} = {}) => {
   const report = [];
   try {
     const counts = await getPendingCounts();
 
-    // Cada supervisor recibe sus propios pendientes: lo que tiene asignado y lo que esta sin
-    // asignar dentro de su alcance (jefe directo, seccion), igual que en su bandeja
+    // Cada supervisor recibe sus pendientes asignados y los sin asignar de su alcance
     const supervisors = await getActiveUsersByRole('SUPERVISOR');
     for (const supervisor of supervisors) {
       const supervisorCounts = await getSupervisorPendingCounts(supervisor.id_usuario);
