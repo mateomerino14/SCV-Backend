@@ -1,8 +1,7 @@
 -- ============================================================
 -- Activacion de Row Level Security en todas las tablas
 -- ============================================================
--- Activa RLS y elimina las politicas permisivas, dejando las tablas
--- en "denegar por defecto". No afecta al backend, que usa service_role.
+-- Deja las tablas en denegar por defecto; el backend usa service_role y no se ve afectado
 
 do $block$
 declare
@@ -10,9 +9,9 @@ declare
   policy_record record;
   target_tables text[] := array[
     'Auditoria', 'Cargo', 'Categoria_Gasto', 'Codigo_Verificacion', 'Comentario',
-    'Correlativo_Recibo', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
+    'Correlativo_Recibo', 'Recibo', 'Revision_Viaje', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Impuesto', 'Proveedor',
-    'Rol', 'Solicitud_Autorizacion_Plazo', 'Usuario', 'Viaje'
+    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Viaje', 'Configuracion_Recordatorio'
   ];
 begin
   foreach table_name in array target_tables
@@ -34,7 +33,7 @@ from pg_policies
 where schemaname = 'public'
   and tablename in (
     'Auditoria', 'Cargo', 'Categoria_Gasto', 'Codigo_Verificacion', 'Comentario',
-    'Correlativo_Recibo', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
+    'Correlativo_Recibo', 'Recibo', 'Revision_Viaje', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Impuesto', 'Proveedor',
-    'Rol', 'Solicitud_Autorizacion_Plazo', 'Usuario', 'Viaje'
+    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Viaje', 'Configuracion_Recordatorio'
   );
