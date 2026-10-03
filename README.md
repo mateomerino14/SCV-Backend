@@ -306,7 +306,7 @@ database/                     Scripts SQL del esquema (ver su README.md)
 | `/deadline-authorization` | `approval/deadlineAuthorization.js` | Extensiones de plazo |
 | `/substitution` | `approval/substitution.js` | Rendición por terceros |
 | `/role`, `/position`, `/section`, `/expense-category`, `/tax`, `/audit` | `catalog/` | Catálogos e historial de accesos |
-| `/admin` | `admin/admin.js` | Resumen general del administrador y configuración de recordatorios |
+| `/admin` | `admin/admin.js` | Resumen general del administrador (con periodo opcional `fecha_inicio` y `fecha_fin`; los montos por sección cuentan solo viajes con fondos entregados) y configuración de recordatorios |
 
 Las imágenes de comprobantes y los productos de cada factura no tienen rutas propias: se gestionan solo a través de `/expense` y `/invoice`, que verifican dueño, etapa y plazo.
 
