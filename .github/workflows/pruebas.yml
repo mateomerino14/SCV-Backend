@@ -1,0 +1,67 @@
+name: Pruebas
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unitarias:
+    name: Pruebas unitarias
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: http://localhost:3998
+      SUPABASE_KEY: clave-de-prueba
+      JWT_SECRET: secreto-de-prueba
+      JWT_REFRESH_SECRET: secreto-de-refresco-de-prueba
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  api:
+    name: Pruebas de la API
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: scv_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: test
+      SUPABASE_URL: http://localhost:3998
+      SUPABASE_KEY: clave-de-prueba
+      JWT_SECRET: secreto-de-prueba
+      JWT_REFRESH_SECRET: secreto-de-refresco-de-prueba
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Crear la base de prueba
+        run: |
+          for script in 01_schema 02_functions 03_seed 04_rls_hardening testing_02_organizacion_prueba; do
+            psql -h localhost -U postgres -d scv_test -v ON_ERROR_STOP=1 -q -f database/$script.sql
+          done
+      - name: Levantar PostgREST y el proxy de Supabase
+        run: |
+          curl -sSL https://github.com/PostgREST/postgrest/releases/download/v12.2.3/postgrest-v12.2.3-linux-static-x64.tar.xz | tar -xJ
+          printf 'db-uri = "postgres://postgres:test@localhost:5432/scv_test"\ndb-schemas = "public"\ndb-anon-role = "postgres"\nserver-port = 3999\n' > postgrest.conf
+          ./postgrest postgrest.conf > postgrest.log 2>&1 &
+          node tests/support/supabaseProxy.js > proxy.log 2>&1 &
+          sleep 3
+      - run: npm run test:api
