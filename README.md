@@ -43,6 +43,7 @@ FRONTEND_URL=...
 | `CORS_ORIGINS` | Opcional. Dominios del cliente web que pueden usar la API, separados por coma. Sin ella se aceptan `localhost:5173` y los dominios de Vercel del proyecto |
 | `TRUST_PROXY` | Opcional. `true` si el servidor está detrás de un proxy (en Render no hace falta: se detecta solo con la variable `RENDER`) |
 | `PUPPETEER_EXECUTABLE_PATH` | Opcional. Ruta a un Chrome/Chromium propio si no se usa el que descarga `puppeteer` al instalar |
+| `EXCHANGE_RATE_API_URLS` | Opcional. Direcciones de la API de tipo de cambio diario, separadas por coma (`{fecha}` = AAAA-MM-DD). Sin ella se usa Currency API (gratuita y sin clave) |
 
 En Render el servidor confía en el proxy de la plataforma (`trust proxy`) para leer la IP real de cada usuario; así el límite de intentos de ingreso se aplica por persona y no a todos juntos.
 
@@ -51,7 +52,8 @@ En Render el servidor confía en el proxy de la plataforma (`trust proxy`) para 
 ```bash
 npm run dev    # con recarga automática (nodemon)
 npm start      # producción
-npm test       # pruebas automáticas (Jest, carpeta tests/)
+npm test       # pruebas unitarias (Jest, sin base de datos)
+npm run test:api   # pruebas de la API (necesitan una base de prueba; ver "Pruebas automáticas")
 ```
 
 Al arrancar, el servidor programa (`node-cron`) el **resumen de pendientes**: un correo para supervisores, aprobadores, revisor y tesorero, solo a quienes tengan algo pendiente. Cada supervisor recibe solo sus propios pendientes (los asignados y los sin asignar que le corresponden por jerarquía), y al revisor se le incluyen las solicitudes de ampliación de plazo y de reemplazo. Si el envío a una persona falla, igual se envía a las demás.
@@ -243,7 +245,7 @@ src/
 │   ├── approval/              review, reviewer, approver, treasurer,
 │   │                          deadlineAuthorization, substitution
 │   ├── catalog/               role, position, section, expenseCategory, tax, audit
-│   ├── expense/               expense, invoice, supplier
+│   ├── expense/               expense, invoice, supplier, exchangeRate
 │   ├── trip/                  trip
 │   └── user/                  user, auth
 ├── controllers/             Misma división que routes
@@ -260,11 +262,13 @@ src/
 │   │                          invoiceExtractionService, receiptService,
 │   │                          supplierService
 │   ├── trip/                  tripService, tripAccessService,
-│   │                          tripCommentService, tripStatementService
+│   │                          tripCommentService, tripStatementService,
+│   │                          tripExportService
 │   ├── user/                  tokenService, userService, userDirectoryService
 │   └── shared/                alcoholDetectionService, auditLogService,
 │                              commentModerationService, dailyDigestService,
-│                              deadlineService, emailService, geminiService,
+│                              deadlineService, emailService, exchangeRateService,
+│                              geminiService,
 │                              hierarchyAssignmentService, pdfService,
 │                              reminderScheduleService
 ├── middlewares/
@@ -287,6 +291,8 @@ src/
 
 scripts/sendDigest.js         Envío manual del resumen de pendientes (npm run resumen)
 database/                     Scripts SQL del esquema (ver su README.md)
+tests/                        Pruebas: services/ (unitarias), api/ (de la API), support/ (ayudas)
+.github/workflows/pruebas.yml Ejecución automática de las pruebas en GitHub Actions
 ```
 
 ## Rutas
@@ -295,8 +301,9 @@ database/                     Scripts SQL del esquema (ver su README.md)
 |---|---|---|
 | `/auth` | `user/auth.js` | Inicio y cierre de sesión, renovación, recuperación por código |
 | `/user` | `user/user.js` | Perfil, cambio de contraseña y gestión de usuarios |
-| `/trip` | `trip/trip.js` | Ciclo de vida del viaje y planilla en PDF |
+| `/trip` | `trip/trip.js` | Ciclo de vida del viaje, planilla en PDF y datos de planillas de varios viajes para Excel (`/trip/export/statements`: revisor, tesorero y administrador) |
 | `/expense` | `expense/expense.js` | Gastos y recibos |
+| `/exchange-rate` | `expense/exchangeRate.js` | Tipo de cambio del día por moneda y lista de monedas admitidas |
 | `/invoice` | `expense/invoice.js` | Extracción y registro de facturas |
 | `/supplier` | `expense/supplier.js` | Proveedores (solo administrador) |
 | `/review` | `approval/review.js` | Revisión previa y de gastos del supervisor |
@@ -391,7 +398,9 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 | `reminderScheduleService` | Guarda los días y horas del resumen, lo reprograma sin reiniciar y permite enviarlo en el momento |
 | `emailService` | Correo transaccional mediante Brevo, con plantilla institucional común (`buildEmailLayout`) |
 | `pdfService` | Conversión de HTML a PDF con Puppeteer |
-| `expenseSummaryService` | Control de gasto diario, exceso en hoteles y alertas; usado por empleado y revisores por igual |
+| `expenseSummaryService` | Control de gasto diario por moneda, exceso en hoteles y alertas; usado por empleado y revisores por igual |
+| `exchangeRateService` | Tipo de cambio diario: lo consulta a la API una vez por fecha y lo guarda en `Tipo_Cambio_Diario` |
+| `tripExportService` | Reúne los datos de las planillas de varios viajes para exportarlas juntas a Excel |
 
 ### Retenciones impositivas
 
@@ -404,9 +413,17 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 
 Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal: se imputan íntegros como costo, sin importar el tipo de comprobante. Los valores se calculan al registrar y se persisten, de modo que los reportes históricos no varíen ante cambios de alícuota.
 
+### Monto solicitado y tope
+
+Al registrar o editar el viaje, el empleado escribe el **monto que solicita** (Bs y, en un viaje internacional, también USD) y un **hospedaje estimado** por moneda. El tope de cada moneda es *días del viaje × tarifa diaria del cargo + hospedaje estimado*; el backend rechaza un monto mayor. Tesorería ve lo solicitado y asigna el monto final.
+
 ### Control de gasto diario
 
-El presupuesto se controla día por día, no contra el total del viaje: cada día no puede superar el `monto_diario` (o `monto_diario_usd` en los días intermedios de un viaje internacional) del cargo del empleado, sin discriminar por categoría. Los gastos de hotel quedan excluidos de este control diario y se controlan en cambio contra el total asignado al viaje. Cada día excedido —y el exceso en hoteles, si corresponde— requiere su propia justificación (`Comentario.fecha_justificada`).
+El presupuesto se controla día por día y **por moneda**: en un viaje nacional, lo gastado en Bs cada día no puede superar el `monto_diario` del cargo; en uno internacional, cada día se controla con las dos tarifas por separado (gasto en Bs ≤ `monto_diario` y gasto en USD ≤ `monto_diario_usd`), y se puede gastar en cualquiera de las dos monedas cualquier día. Los gastos de hotel quedan fuera del control diario y se controlan contra el total asignado al viaje. Cada día excedido —y el exceso en hoteles, si corresponde— requiere una justificación (`Comentario.fecha_justificada`).
+
+### Tipo de cambio diario
+
+En los gastos internacionales con tramos de otra moneda (EUR, PEN, ARS, BRL, CLP, COP, MXN), el tipo de cambio ya no lo escribe el empleado: es **uno por día y moneda**, tomado de la fecha del gasto. `exchangeRateService` lo consulta a la API la primera vez y lo guarda en `Tipo_Cambio_Diario`, de modo que todos los gastos de esa fecha usan el mismo. Si la API no responde, el empleado puede escribirlo a mano y el tramo queda marcado (`tipo_cambio_manual`), lo que se ve en el recibo y en la revisión. Bs y USD no se convierten entre sí.
 
 ### Gestión de plazos
 
@@ -419,6 +436,17 @@ La extensión amplía el margen para **cargar** los gastos, no el rango de fecha
 La imagen del comprobante se envía al modelo de visión de Gemini (`invoiceExtractionService`) con una instrucción que fija el contexto tributario boliviano: el «Importe» es el total con IVA incluido, el IVA es del 13 % y debe devolverse como monto en dinero, y el resultado es un JSON con proveedor, NIT, número de factura, fecha de emisión, monto sin impuestos, IVA, total, tipo de documento (`F` o `R`) y detalle de productos.
 
 La invocación (`geminiService`) reintenta ante errores temporales y, si el modelo principal falla o agotó su cuota, usa un modelo de respaldo. La respuesta se normaliza: los datos que faltan quedan como «No Especificado» y la fecha se valida; si no es una fecha real con formato válido, el campo queda editable en el frontend para que el empleado la corrija, y si vino bien formada, queda bloqueado. El empleado revisa y puede corregir todos los datos antes de guardar.
+
+## Pruebas automáticas
+
+| Tipo | Qué prueba | Comando | Carpeta |
+|---|---|---|---|
+| Unitarias | Funciones sueltas: retenciones, control diario, topes, tipo de cambio, recordatorios | `npm test` | `tests/services/` |
+| De la API | Endpoints completos contra una base de prueba: permisos, topes, tipo de cambio, exportación | `npm run test:api` | `tests/api/` |
+
+Las pruebas de la API necesitan una base PostgreSQL de prueba con los scripts de `database/` (`01` a `04` y `testing_02_organizacion_prueba.sql`), servida por PostgREST y el proxy `tests/support/supabaseProxy.js`, que imita la ruta `/rest/v1` de Supabase. **No se corren contra Supabase real.**
+
+En GitHub las pruebas se ejecutan solas en cada `push` y pull request (`.github/workflows/pruebas.yml`): una base temporal se crea y se borra en cada corrida. El resultado aparece como ✅ o ❌ junto a cada commit, en la pestaña **Actions** del repositorio.
 
 ## Base de datos
 

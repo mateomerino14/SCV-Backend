@@ -27,7 +27,7 @@ Para el piloto la base se recrea desde cero: corre `testing_00_borrar_todo.sql` 
 |---|---|
 | `testing_00_borrar_todo.sql` | Borra las 25 tablas (estructura y datos) para volver a crear la base desde cero con `01` a `04`. No se puede deshacer |
 | `testing_01_limpieza_completa.sql` | Borra usuarios, viajes, gastos, facturas y solicitudes. No toca los catalogos (Rol, Cargo, Seccion, Categoria_Gasto, Impuesto) y repone la configuracion de recordatorios por defecto |
-| `testing_02_organizacion_prueba.sql` | Carga una organizacion de prueba completa con jerarquia de jefe directo, lista para probar el flujo de revision. Contrasenia de todos los usuarios: `Prueba1234` |
+| `testing_02_organizacion_prueba.sql` | Carga una organizacion de prueba completa con jerarquia de jefe directo, lista para probar el flujo de revision. Contrasenia de todos los usuarios: `Prueba1234`. Tambien la usan las pruebas automaticas de la API y de extremo a extremo |
 
 Solo para entornos de prueba, nunca correr en produccion.
 
