@@ -5,6 +5,7 @@ const tripController = require('../../controllers/trip/tripController');
 
 router.get('/dashboard', authMiddleware, tripController.getDashboard);
 router.get('/history', authMiddleware, tripController.getHistory);
+router.get('/export/statements', authMiddleware, tripController.getStatementsForExport);
 router.get('/:id', authMiddleware, tripController.getTripDetail);
 router.get('/:id/rendicion-pdf', authMiddleware, tripController.downloadStatementPdf);
 router.post('/', authMiddleware, tripController.createTrip);
