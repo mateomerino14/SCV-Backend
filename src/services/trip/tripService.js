@@ -109,7 +109,7 @@ const getTripDetail = async (tripId, requesterId) => {
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
+    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, tipo_cambio_manual, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
     .eq('id_viaje', tripId);
   if (expensesError) {
     return {error: expensesError.message};
@@ -152,6 +152,76 @@ const isValidDate = (value) => {
 // Indica si el monto es un numero valido y no negativo
 const isValidAmount = (value) => value !== undefined && value !== null && value !== '' && !isNaN(parseFloat(value)) && parseFloat(value) >= 0;
 
+const requestedAmountFields = ['monto_solicitado', 'monto_solicitado_usd', 'hospedaje_estimado', 'hospedaje_estimado_usd'];
+const amountTolerance = 0.005;
+
+// Convierte una fecha AAAA-MM-DD a milisegundos UTC del inicio de ese dia
+const toUtcDay = (dateText) => {
+  const [year, month, day] = dateText.split('-').map(Number);
+  return Date.UTC(year, month - 1, day);
+};
+
+// Cantidad de dias del viaje, contando el de inicio y el de fin
+const calculateTripDays = (startDate, endDate) => Math.round((toUtcDay(endDate) - toUtcDay(startDate)) / 86400000) + 1;
+
+// Redondea un monto a dos decimales
+const roundAmount = (value) => parseFloat((parseFloat(value) || 0).toFixed(2));
+
+// Calcula el tope de lo que se puede pedir: dias por tarifa diaria del cargo mas el hospedaje estimado
+const buildRequestLimits = (tripData, position) => {
+  const days = calculateTripDays(tripData.fecha_inicio, tripData.fecha_fin);
+  const isInternational = tripData.tipo === 'Internacional';
+  const lodging = roundAmount(tripData.hospedaje_estimado);
+  let lodgingUsd = 0;
+  if (isInternational) {
+    lodgingUsd = roundAmount(tripData.hospedaje_estimado_usd);
+  }
+  const limit = roundAmount(days * parseFloat(position?.monto_diario || 0) + lodging);
+  let limitUsd = 0;
+  if (isInternational) {
+    limitUsd = roundAmount(days * parseFloat(position?.monto_diario_usd || 0) + lodgingUsd);
+  }
+  return {days, lodging, lodgingUsd, limit, limitUsd, isInternational};
+};
+
+// Valida el monto solicitado contra el tope y devuelve los montos a guardar en el viaje
+const buildRequestedAmounts = async (tripData, userId) => {
+  const {data: user} = await supabase.from('Usuario').select('Cargo(monto_diario, monto_diario_usd)').eq('id_usuario', userId).single();
+  const limits = buildRequestLimits(tripData, user?.Cargo);
+  let requested = tripData.monto_solicitado;
+  if (requested === undefined || requested === null || requested === '') {
+    requested = tripData.monto_asignado;
+  }
+  requested = roundAmount(requested);
+  let requestedUsd = 0;
+  if (limits.isInternational) {
+    let requestedUsdValue = tripData.monto_solicitado_usd;
+    if (requestedUsdValue === undefined || requestedUsdValue === null || requestedUsdValue === '') {
+      requestedUsdValue = tripData.monto_asignado_usd;
+    }
+    requestedUsd = roundAmount(requestedUsdValue);
+  }
+  if (requested < 0 || requestedUsd < 0) {
+    return {error: 'El monto solicitado no puede ser negativo', status: 400};
+  }
+  if (requested > limits.limit + amountTolerance) {
+    return {error: `El monto solicitado en Bs no puede superar ${limits.limit.toFixed(2)} Bs (${limits.days} días por la tarifa diaria más el hospedaje)`, status: 400};
+  }
+  if (requestedUsd > limits.limitUsd + amountTolerance) {
+    return {error: `El monto solicitado en USD no puede superar ${limits.limitUsd.toFixed(2)} USD (${limits.days} días por la tarifa diaria más el hospedaje)`, status: 400};
+  }
+  return {
+    amounts: {
+      monto_solicitado: requested,
+      monto_solicitado_usd: requestedUsd,
+      hospedaje_estimado: limits.lodging,
+      hospedaje_estimado_usd: limits.lodgingUsd,
+      monto_asignado: requested,
+      monto_asignado_usd: requestedUsd,
+    },
+  };
+};
+
 // Valida los datos de un viaje al crearlo o reeditarlo, con los mismos limites de la base
 const validateTripData = (tripData) => {
   if (!tripData.motivo?.trim() || tripData.motivo.trim().length > 100) {
@@ -172,16 +242,58 @@ const validateTripData = (tripData) => {
   if (tripData.fecha_fin < tripData.fecha_inicio) {
     return 'La fecha de fin no puede ser anterior a la fecha de inicio';
   }
-  if (!isValidAmount(tripData.monto_asignado)) {
-    return 'El monto asignado debe ser un número mayor o igual a cero';
-  }
-  if (tripData.monto_asignado_usd !== undefined && tripData.monto_asignado_usd !== null && tripData.monto_asignado_usd !== '' && !isValidAmount(tripData.monto_asignado_usd)) {
-    return 'El monto asignado en USD debe ser un número mayor o igual a cero';
+  for (const field of requestedAmountFields) {
+    if (tripData[field] !== undefined && tripData[field] !== null && tripData[field] !== '' && !isValidAmount(tripData[field])) {
+      return 'Los montos solicitados y el hospedaje deben ser números mayores o iguales a cero';
+    }
   }
   if (tripData.transporte && String(tripData.transporte).length > 50) {
     return 'El transporte no es válido';
   }
   return null;
+};
+
+// Crea un viaje en borrador con el monto solicitado dentro del tope
+const createTrip = async (userId, tripData) => {
+  const tripDataError = validateTripData(tripData);
+  if (tripDataError) {
+    return {error: tripDataError, status: 400};
+  }
+  if (tripData.transporte === 'Vehículo de Empresa' && !tripData.placa_vehiculo?.trim()) {
+    return {error: 'La placa del vehículo es requerida', status: 400};
+  }
+  if (tripData.transporte === 'Vehículo de Empresa' && tripData.tipo === 'Internacional') {
+    return {error: 'El vehículo de empresa solo está disponible para viajes nacionales', status: 400};
+  }
+  const requestedAmounts = await buildRequestedAmounts(tripData, userId);
+  if (requestedAmounts.error) {
+    return requestedAmounts;
+  }
+  let licensePlate = null;
+  if (tripData.transporte === 'Vehículo de Empresa') {
+    licensePlate = tripData.placa_vehiculo.trim();
+  }
+  const {data, error} = await supabase
+    .from('Viaje')
+    .insert({
+      ...requestedAmounts.amounts,
+      motivo: tripData.motivo.trim(),
+      origen: tripData.origen?.trim() || null,
+      destino: tripData.destino.trim(),
+      fecha_inicio: tripData.fecha_inicio,
+      fecha_fin: tripData.fecha_fin,
+      tipo: tripData.tipo,
+      transporte: tripData.transporte || 'Terrestre',
+      placa_vehiculo: licensePlate,
+      estado: 'BORRADOR',
+      id_usuario: userId,
+    })
+    .select()
+    .single();
+  if (error) {
+    return {error: error.message, status: 500};
+  }
+  return {trip: data};
 };
 
 // Reedita un viaje en borrador o rechazado
@@ -212,7 +324,12 @@ const editTrip = async (tripId, userId, tripData) => {
   if (tripData.transporte === 'Vehículo de Empresa' && tripData.tipo === 'Internacional') {
     return {error: 'El vehículo de empresa solo está disponible para viajes nacionales', status: 400};
   }
+  const requestedAmounts = await buildRequestedAmounts(tripData, userId);
+  if (requestedAmounts.error) {
+    return requestedAmounts;
+  }
   const updateData = {
+    ...requestedAmounts.amounts,
     motivo: tripData.motivo,
     origen: tripData.origen || null,
     destino: tripData.destino,
@@ -221,8 +338,6 @@ const editTrip = async (tripId, userId, tripData) => {
     tipo: tripData.tipo,
     transporte: tripData.transporte || 'Terrestre',
     placa_vehiculo: tripData.transporte === 'Vehículo de Empresa' ? tripData.placa_vehiculo.trim() : null,
-    monto_asignado: tripData.monto_asignado,
-    monto_asignado_usd: tripData.monto_asignado_usd || 0,
   };
   const wasRejected = trip.estado === 'RECHAZADO';
   if (wasRejected) {
@@ -387,4 +502,4 @@ const confirmCompletion = async (tripId, userId, justifications) => {
   return {message: 'Viaje enviado a revisión de gastos correctamente'};
 };
 
-module.exports = {getDashboardData, getHistory, getTripDetail, editTrip, submitToReview, confirmCompletion, validateTripData};
+module.exports = {createTrip, buildRequestLimits, calculateTripDays, getDashboardData, getHistory, getTripDetail, editTrip, submitToReview, confirmCompletion, validateTripData};
