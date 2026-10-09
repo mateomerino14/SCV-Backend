@@ -85,7 +85,7 @@ const buildTramosText = (expense) => {
   if (installments.length === 0) {
     return '';
   }
-  return escapeHtml(installments.map((installment) => `${parseFloat(installment.monto_origen).toFixed(2)} ${installment.moneda} → ${parseFloat(installment.monto_usd).toFixed(2)} USD`).join(' | '));
+  return escapeHtml(installments.map((installment) => `${parseFloat(installment.monto_origen).toFixed(2)} ${installment.moneda} → ${parseFloat(installment.monto_usd).toFixed(2)} USD (T/C ${parseFloat(installment.tipo_cambio).toFixed(4)}${installment.tipo_cambio_manual ? ' manual' : ''})`).join(' | '));
 };
 
 // Formatea una fecha a dia/mes/anio
@@ -359,7 +359,7 @@ const generateStatementPdf = async (tripId) => {
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
+    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, tipo_cambio_manual, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
     .eq('id_viaje', tripId)
     .order('fecha_gasto', {ascending: true});
   if (expensesError) {

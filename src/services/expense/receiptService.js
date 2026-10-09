@@ -329,7 +329,7 @@ const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, t
     segmentsHtml = `
     <div class="tramos-box">
       <p class="tramos-titulo">TRAMOS DE CAMBIO</p>
-      ${exchangeSegments.map((segment) => `<p class="tramos-linea">${parseFloat(segment.monto_origen).toFixed(2)} ${segment.moneda} → ${parseFloat(segment.monto_usd).toFixed(2)} USD (T/C: ${parseFloat(segment.tipo_cambio).toFixed(4)})</p>`).join('')}
+      ${exchangeSegments.map((segment) => `<p class="tramos-linea">${parseFloat(segment.monto_origen).toFixed(2)} ${segment.moneda} → ${parseFloat(segment.monto_usd).toFixed(2)} USD (T/C: ${parseFloat(segment.tipo_cambio).toFixed(4)}${segment.tipo_cambio_manual ? ', ingresado a mano' : ''})</p>`).join('')}
     </div>`;
   }
   return `<!DOCTYPE html>
@@ -466,7 +466,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd)')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, tipo_cambio_manual, monto_usd)')
     .eq('id_viaje', tripId)
     .eq('tipo', type)
     .eq('es_gasto_internacional', isInternational)
@@ -527,7 +527,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
 const sendIndividualReceipt = async (expenseId) => {
   const {data: expense, error: expenseError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, estado, fecha_inicio, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad))')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, tipo_cambio_manual, monto_usd), Viaje(id_viaje, motivo, estado, fecha_inicio, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad))')
     .eq('id_gasto', expenseId)
     .single();
   if (expenseError) {

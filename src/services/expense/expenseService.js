@@ -3,6 +3,7 @@ const deadlineService = require('../shared/deadlineService');
 const alcoholDetectionService = require('../shared/alcoholDetectionService');
 const supplierService = require('./supplierService');
 const substitutionService = require('../approval/substitutionService');
+const exchangeRateService = require('../shared/exchangeRateService');
 
 // Calcula las retenciones; los gastos con alcohol se imputan completos como costo
 const calculateRetentions = (amount, type, isInternational, hasAlcohol) => {
@@ -33,34 +34,15 @@ const calculateAmountFromSubitems = (subItems) => {
   return parseFloat(subItems.reduce((sum, item) => sum + parseFloat(item.monto || 0), 0).toFixed(2));
 };
 
-// En internacionales el primer y ultimo dia van en bolivianos y los intermedios en dolares
-const validateCurrencyByDay = (trip, expenseDate, isInternational) => {
-  if (trip.tipo !== 'Internacional' || !expenseDate) {
-    return null;
-  }
-  // Una fecha fuera del viaje la rechaza el control de fechas, con su propio mensaje
-  if (expenseDate < trip.fecha_inicio || expenseDate > trip.fecha_fin) {
-    return null;
-  }
-  const isEdgeDay = expenseDate === trip.fecha_inicio || expenseDate === trip.fecha_fin;
-  if (isEdgeDay && isInternational) {
-    return 'El primer y el último día de un viaje internacional se registran en bolivianos, no en dólares';
-  }
-  if (!isEdgeDay && !isInternational) {
-    return 'Los días intermedios de un viaje internacional se registran en dólares, no en bolivianos';
-  }
-  return null;
-};
-
 // Valida tramos de moneda y subgastos antes de escribir nada
 const validateExpenseDetails = (expenseData, isInternational) => {
   if (isInternational && Array.isArray(expenseData.tramos)) {
     for (const segment of expenseData.tramos) {
-      if (!segment?.moneda || !String(segment.moneda).trim() || String(segment.moneda).trim().length > 10) {
-        return 'Cada conversión de moneda debe indicar la moneda de origen';
+      if (!exchangeRateService.isSupportedCurrency(segment?.moneda)) {
+        return 'Cada conversión de moneda debe indicar una moneda de origen disponible';
       }
-      if (!(parseFloat(segment.monto_origen) > 0) || !(parseFloat(segment.tipo_cambio) > 0)) {
-        return 'Cada conversión de moneda debe tener un monto y un tipo de cambio mayores a cero';
+      if (!(parseFloat(segment.monto_origen) > 0)) {
+        return 'Cada conversión de moneda debe tener un monto mayor a cero';
       }
     }
   }
@@ -72,6 +54,14 @@ const validateExpenseDetails = (expenseData, isInternational) => {
     }
   }
   return null;
+};
+
+// Obtiene el tipo de cambio del dia del gasto para cada tramo (sin tramos no hace nada)
+const resolveExpenseSegments = async (expenseData, usesSegments) => {
+  if (!usesSegments) {
+    return {segments: []};
+  }
+  return exchangeRateService.resolveSegmentRates(expenseData.fecha_gasto, expenseData.tramos);
 };
 
 // Sube el comprobante antes de escribir el gasto y devuelve su URL publica
@@ -96,10 +86,6 @@ const createExpense = async (expenseData, file, userId) => {
   }
   // Se acepta true o "true"; cualquier otro valor es un gasto en bolivianos
   const isInternational = expenseData.es_gasto_internacional === true || expenseData.es_gasto_internacional === 'true';
-  const currencyError = validateCurrencyByDay(access.trip, expenseData.fecha_gasto, isInternational);
-  if (currencyError) {
-    return {error: currencyError, status: 400};
-  }
   const usesSegments = isInternational && Array.isArray(expenseData.tramos) && expenseData.tramos.length > 0;
   const usesSubItems = Array.isArray(expenseData.subitems) && expenseData.subitems.length > 0;
   const detailsError = validateExpenseDetails(expenseData, isInternational);
@@ -123,6 +109,10 @@ const createExpense = async (expenseData, file, userId) => {
       return {error: deadlineValidation.error, status: 400, requiereAutorizacion: !!deadlineValidation.requiereAutorizacion};
     }
   }
+  const segmentRates = await resolveExpenseSegments(expenseData, usesSegments);
+  if (segmentRates.error) {
+    return segmentRates;
+  }
   let imageUrl = null;
   if (file) {
     const upload = await uploadReceiptImage(file);
@@ -137,12 +127,10 @@ const createExpense = async (expenseData, file, userId) => {
   const hasAlcohol = await alcoholDetectionService.analyzeAlcoholText(alcoholText);
   const retentions = calculateRetentions(totalAmount, type, isInternational, hasAlcohol);
   let firstSegment = null;
-  if (usesSegments) {
-    firstSegment = expenseData.tramos[0];
-  }
   let originAmountSum = expenseData.monto_moneda_origen || totalAmount;
   if (usesSegments) {
-    originAmountSum = expenseData.tramos.reduce((sum, segment) => sum + parseFloat(segment.monto_origen), 0);
+    firstSegment = segmentRates.segments[0];
+    originAmountSum = segmentRates.segments.reduce((sum, segment) => sum + segment.monto_origen, 0);
   }
   const {data: expense, error: expenseError} = await supabase
     .from('Gasto')
@@ -156,7 +144,7 @@ const createExpense = async (expenseData, file, userId) => {
       id_proveedor: supplierId,
       // Moneda real del gasto: BOB si es nacional; en internacionales, la del primer tramo
       moneda: isInternational ? String(firstSegment?.moneda || expenseData.moneda || 'USD').trim().toUpperCase() : 'BOB',
-      tipo_cambio: firstSegment ? parseFloat(firstSegment.tipo_cambio) : (expenseData.tipo_cambio || 1),
+      tipo_cambio: firstSegment ? firstSegment.tipo_cambio : 1,
       monto_moneda_origen: originAmountSum,
       es_gasto_internacional: isInternational,
       base_imponible: retentions.base_imponible,
@@ -172,13 +160,7 @@ const createExpense = async (expenseData, file, userId) => {
     return {error: expenseError.message, status: 500};
   }
   if (usesSegments) {
-    const segmentRows = expenseData.tramos.map((segment) => ({
-      id_gasto: expense.id_gasto,
-      moneda: segment.moneda.trim().toUpperCase(),
-      monto_origen: parseFloat(segment.monto_origen),
-      tipo_cambio: parseFloat(segment.tipo_cambio),
-      monto_usd: parseFloat((parseFloat(segment.monto_origen) / parseFloat(segment.tipo_cambio)).toFixed(2)),
-    }));
+    const segmentRows = segmentRates.segments.map((segment) => ({...segment, id_gasto: expense.id_gasto}));
     const {error: segmentsError} = await supabase.from('Gasto_Tramo_Moneda').insert(segmentRows);
     if (segmentsError) {
       await supabase.from('Gasto').delete().eq('id_gasto', expense.id_gasto);
@@ -230,10 +212,6 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
   }
   // Se acepta true o "true"; cualquier otro valor es un gasto en bolivianos
   const isInternational = expenseData.es_gasto_internacional === true || expenseData.es_gasto_internacional === 'true';
-  const currencyError = validateCurrencyByDay(access.trip, expenseData.fecha_gasto, isInternational);
-  if (currencyError) {
-    return {error: currencyError, status: 400};
-  }
   const usesSegments = isInternational && Array.isArray(expenseData.tramos) && expenseData.tramos.length > 0;
   const usesSubItems = Array.isArray(expenseData.subitems) && expenseData.subitems.length > 0;
   const detailsError = validateExpenseDetails(expenseData, isInternational);
@@ -251,6 +229,10 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
   if (!totalAmount || isNaN(totalAmount) || totalAmount <= 0) {
     return {error: 'El monto es requerido y debe ser mayor a cero', status: 400};
   }
+  const segmentRates = await resolveExpenseSegments(expenseData, usesSegments);
+  if (segmentRates.error) {
+    return segmentRates;
+  }
   let newImageUrl = null;
   if (file && !expenseData.mantener_imagen) {
     const upload = await uploadReceiptImage(file);
@@ -265,12 +247,10 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
   const hasAlcohol = await alcoholDetectionService.analyzeAlcoholText(alcoholText);
   const retentions = calculateRetentions(totalAmount, type, isInternational, hasAlcohol);
   let firstSegment = null;
-  if (usesSegments) {
-    firstSegment = expenseData.tramos[0];
-  }
   let originAmountSum = expenseData.monto_moneda_origen || totalAmount;
   if (usesSegments) {
-    originAmountSum = expenseData.tramos.reduce((sum, segment) => sum + parseFloat(segment.monto_origen), 0);
+    firstSegment = segmentRates.segments[0];
+    originAmountSum = segmentRates.segments.reduce((sum, segment) => sum + segment.monto_origen, 0);
   }
   const {error: expenseError} = await supabase
     .from('Gasto')
@@ -283,7 +263,7 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
       id_proveedor: supplierId,
       // Moneda real del gasto: BOB si es nacional; en internacionales, la del primer tramo
       moneda: isInternational ? String(firstSegment?.moneda || expenseData.moneda || 'USD').trim().toUpperCase() : 'BOB',
-      tipo_cambio: firstSegment ? parseFloat(firstSegment.tipo_cambio) : (expenseData.tipo_cambio || 1),
+      tipo_cambio: firstSegment ? firstSegment.tipo_cambio : 1,
       monto_moneda_origen: originAmountSum,
       es_gasto_internacional: isInternational,
       base_imponible: retentions.base_imponible,
@@ -302,13 +282,7 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
   await supabase.from('Gasto_Tramo_Moneda').delete().eq('id_gasto', expenseId);
   {
     if (usesSegments) {
-      const segmentRows = expenseData.tramos.map((segment) => ({
-        id_gasto: parseInt(expenseId),
-        moneda: segment.moneda.trim().toUpperCase(),
-        monto_origen: parseFloat(segment.monto_origen),
-        tipo_cambio: parseFloat(segment.tipo_cambio),
-        monto_usd: parseFloat((parseFloat(segment.monto_origen) / parseFloat(segment.tipo_cambio)).toFixed(2)),
-      }));
+      const segmentRows = segmentRates.segments.map((segment) => ({...segment, id_gasto: parseInt(expenseId)}));
       const {error: segmentsError} = await supabase.from('Gasto_Tramo_Moneda').insert(segmentRows);
       if (segmentsError) {
         return {error: childError, status: 500};
@@ -371,4 +345,4 @@ const deleteExpense = async (expenseId, userId) => {
   return {};
 };
 
-module.exports = {calculateRetentions, calculateAmountFromSubitems, validateCurrencyByDay, createExpense, updateExpense, deleteExpense};
+module.exports = {calculateRetentions, calculateAmountFromSubitems, createExpense, updateExpense, deleteExpense};

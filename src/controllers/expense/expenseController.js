@@ -25,7 +25,7 @@ const getExpenseDetail = async (req, res) => {
           )
         ),
         Imagen(url_archivo),
-        Gasto_Tramo_Moneda(id_tramo, moneda, monto_origen, tipo_cambio, monto_usd),
+        Gasto_Tramo_Moneda(id_tramo, moneda, monto_origen, tipo_cambio, tipo_cambio_manual, monto_usd),
         Gasto_Subitem(id_subitem, descripcion, monto),
         Viaje(id_viaje, fecha_inicio, fecha_fin, estado)
       `)
@@ -99,7 +99,7 @@ const registerExpense = async (req, res) => {
     }
     const result = await expenseService.createExpense(expenseData, req.file, req.user.id_usuario);
     if (result.error) {
-      return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion});
+      return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion, permiteManual: result.permiteManual});
     }
     return res.json({message: 'Gasto registrado correctamente', gasto: result.expense});
   }
@@ -118,7 +118,7 @@ const updateExpense = async (req, res) => {
     const {expenseId} = req.params;
     const result = await expenseService.updateExpense(expenseId, expenseData, req.file, req.user.id_usuario);
     if (result.error) {
-      return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion});
+      return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion, permiteManual: result.permiteManual});
     }
     return res.json({message: 'Gasto actualizado correctamente'});
   }

@@ -103,11 +103,6 @@ const saveInvoice = async (invoiceData, file, userId) => {
   if (!access.allowed) {
     return {error: access.error, status: access.status};
   }
-  // Las facturas son en bolivianos: en un viaje internacional solo valen el primer y el ultimo dia
-  const currencyError = expenseService.validateCurrencyByDay(access.trip, invoiceData.fecha_emision, false);
-  if (currencyError) {
-    return {error: currencyError, status: 400};
-  }
   const deadlineValidation = await deadlineService.validateTripDeadline(invoiceData.id_viaje, invoiceData.fecha_emision);
   if (!deadlineValidation.valid) {
     return {error: deadlineValidation.error, status: 400, requiereAutorizacion: !!deadlineValidation.requiereAutorizacion};
@@ -255,10 +250,6 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   const access = await substitutionService.canRegisterExpenseOnTrip(existingExpense.id_viaje, userId);
   if (!access.allowed) {
     return {error: access.error, status: access.status};
-  }
-  const currencyError = expenseService.validateCurrencyByDay(access.trip, invoiceData.fecha_emision, false);
-  if (currencyError) {
-    return {error: currencyError, status: 400};
   }
   // Siempre con el viaje real del gasto (no el que envie el cliente) para que no se salte el plazo
   const deadlineValidation = await deadlineService.validateTripDeadline(existingExpense.id_viaje, invoiceData.fecha_emision);
