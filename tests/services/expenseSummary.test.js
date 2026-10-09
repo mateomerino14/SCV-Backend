@@ -104,3 +104,20 @@ test('no genera alertas cuando el viaje esta conforme', () => {
   expect(result.alerts).toHaveLength(0);
   expect(result.reviewStatus).toBe('CONFORME');
 });
+
+// En viajes internacionales cada dia se controla por separado en Bs y en USD
+test('controla cada dia con la tarifa de cada moneda por separado', () => {
+  const expenses = [
+    {monto_total: '280', fecha_gasto: '2026-01-01', es_gasto_internacional: false},
+    {monto_total: '70', fecha_gasto: '2026-01-01', es_gasto_internacional: true},
+    {monto_total: '90', fecha_gasto: '2026-01-02', es_gasto_internacional: true},
+  ];
+  const trip = tripWithDailyRate(250, 80, 1000, 500);
+  const result = expenseSummaryService.calculateExpenseSummary(expenses, trip);
+  expect(result.dailyBreakdown).toEqual([
+    {fecha: '2026-01-01', montoBs: 280, montoUsd: 70, excedeBs: true, excedeUsd: false},
+    {fecha: '2026-01-02', montoBs: 0, montoUsd: 90, excedeBs: false, excedeUsd: true},
+  ]);
+  expect(result.exceedsBudget).toBe(true);
+  expect(result.exceedsBudgetUsd).toBe(true);
+});

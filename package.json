@@ -4,7 +4,8 @@
   "description": "Sistema de Control de Viaticos",
   "main": "src/index.js",
   "scripts": {
-    "test": "jest",
+    "test": "jest --testPathIgnorePatterns tests/api",
+    "test:api": "jest tests/api --runInBand",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "resumen": "node scripts/sendDigest.js"
