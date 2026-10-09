@@ -4,7 +4,7 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 
 ## Orden de ejecucion
 
-1. `01_schema.sql` - crea las 24 tablas, relaciones e indices
+1. `01_schema.sql` - crea las 25 tablas, relaciones e indices
 2. `02_functions.sql` - crea la funcion `incrementar_correlativo_recibo()`, usada por el backend para numerar recibos
 3. `03_seed.sql` - datos iniciales: roles, cargos, impuesto de IVA, categorias de gasto y la configuracion de recordatorios por defecto
 4. `04_rls_hardening.sql` - activa seguridad por fila (RLS) en todas las tablas
@@ -19,26 +19,13 @@ Estos cuatro archivos reflejan siempre el estado final y completo del esquema: a
 
 ## Si ya tenes una base de datos existente
 
-Si tu base ya tiene datos cargados con una version anterior del esquema, **no vuelvas a correr `01_schema.sql`**: en su lugar, compara tu esquema actual contra este archivo y aplica manualmente (`alter table`, etc.) las columnas o tablas que te falten. Los scripts de migracion incremental que se usaron durante el desarrollo ya se incorporaron a estos cuatro archivos y no se conservan por separado, para no acumular decenas de archivos con el tiempo. Las excepciones son `05_cambios_recientes.sql` y `06_configuracion_recordatorios.sql`, que agrupan los ultimos cambios para bases existentes; una base nueva no los necesita.
-
-## Cambios recientes para bases existentes
-
-Si tu base es anterior, aplica estos cambios (ya incluidos en `01_schema.sql` y `04_rls_hardening.sql`):
-
-- Tabla `Revision_Viaje` con sus dos índices y RLS activado.
-- Columna `Usuario.debe_cambiar_contrasenia boolean not null default false`.
-- `05_cambios_recientes.sql` (se puede correr más de una vez):
-  - Columna `Usuario.motivo_cambio_contrasenia` (`TEMPORAL` o `RECUPERACION`).
-  - Relación `Comentario.id_gasto` con `on delete set null`.
-  - `Gasto.moneda` con valor por defecto `BOB`.
-  - Corrección de datos: facturas y recibos guardados con costo en 0 y gastos en bolivianos marcados como USD.
-- `06_configuracion_recordatorios.sql` (se puede correr más de una vez): tabla `Configuracion_Recordatorio` con su fila por defecto (lunes a viernes, 08:00, 12:00 y 16:00) y RLS activado.
+Para el piloto la base se recrea desde cero: corre `testing_00_borrar_todo.sql` y luego `01` a `04`. Para una base con datos reales, **no vuelvas a correr `01_schema.sql`**: compara tu esquema contra este archivo y aplica manualmente (`alter table`, etc.) lo que falte. No se conservan scripts de migracion por separado, para no acumular archivos con el tiempo.
 
 ## Scripts de prueba
 
 | Script | Uso |
 |---|---|
-| `testing_00_borrar_todo.sql` | Borra las 24 tablas (estructura y datos) para volver a crear la base desde cero con `01` a `04`. No se puede deshacer |
+| `testing_00_borrar_todo.sql` | Borra las 25 tablas (estructura y datos) para volver a crear la base desde cero con `01` a `04`. No se puede deshacer |
 | `testing_01_limpieza_completa.sql` | Borra usuarios, viajes, gastos, facturas y solicitudes. No toca los catalogos (Rol, Cargo, Seccion, Categoria_Gasto, Impuesto) y repone la configuracion de recordatorios por defecto |
 | `testing_02_organizacion_prueba.sql` | Carga una organizacion de prueba completa con jerarquia de jefe directo, lista para probar el flujo de revision. Contrasenia de todos los usuarios: `Prueba1234` |
 
@@ -54,13 +41,13 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Seccion | Secciones/departamentos de la empresa; se usa como respaldo intermedio en la jerarquia de revision cuando falta el jefe directo |
 | Usuario | Usuarios del sistema |
 | Codigo_Verificacion | Codigos temporales de verificacion por correo |
-| Viaje | Viajes registrados, con su flujo de estados y revisores asignados |
+| Viaje | Viajes registrados, con su flujo de estados, revisores asignados, monto solicitado y hospedaje estimado (Bs y USD) y monto asignado por tesoreria |
 | Solicitud_Autorizacion_Plazo | Solicitudes de extension de plazo para seguir registrando gastos; las puede pedir el titular o su reemplazo (`id_empleado` es quien la pidio) |
 | Categoria_Gasto | Categorias de gasto con su cuenta contable de Oracle |
 | Proveedor | Proveedores/emisores de facturas |
 | Gasto | Gastos individuales de un viaje, con sus retenciones impositivas |
 | Gasto_Subitem | Desglose de un gasto en varios conceptos |
-| Gasto_Tramo_Moneda | Tramos de conversion de moneda para gastos internacionales |
+| Gasto_Tramo_Moneda | Tramos de conversion de moneda para gastos internacionales, con el tipo de cambio del dia (`tipo_cambio_manual` indica que se escribio a mano porque la API no respondio) |
 | Imagen | Imagenes/comprobantes asociados a un gasto (una por gasto) |
 | Factura | Facturas asociadas a un gasto (una por gasto) |
 | Detalle_Factura | Lineas de detalle (productos) de una factura |
@@ -73,6 +60,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Revision_Viaje | Quien aprobo o rechazo cada viaje, en que etapa y cuando (historial de revision de cada revisor) |
 | Solicitud_Reemplazo | Solicitudes para que un tercero rinda los gastos de un viaje en nombre de otro empleado |
 | Configuracion_Recordatorio | Una sola fila con los dias (`0` domingo a `6` sabado) y horas (`HH:MM`, hora Bolivia) del resumen de pendientes, si esta activo y quien lo cambio por ultima vez |
+| Tipo_Cambio_Diario | Tipo de cambio de cada moneda por dia (unidades por 1 USD), consultado a la API y guardado para que todos los gastos de una fecha usen el mismo |
 
 ## Estados de las solicitudes
 
@@ -121,6 +109,10 @@ El perfil de **Tesorero** no es un rol: se determina por el cargo del usuario.
 
 **Observaciones.** `Comentario.id_gasto` usa `on delete set null`: si el empleado borra un gasto observado, la observación del revisor se conserva.
 
+**Monto solicitado y hospedaje.** Al registrar el viaje el empleado escribe `monto_solicitado` (y `monto_solicitado_usd` si es internacional) y su `hospedaje_estimado` en cada moneda; el monto no puede superar dias × tarifa diaria del cargo + hospedaje. Tesoreria fija despues `monto_asignado`.
+
+**Tipo de cambio diario.** `Tipo_Cambio_Diario` guarda una tasa por fecha y moneda; el backend la consulta a la API la primera vez y despues la reutiliza.
+
 **Historial de revisión.** `Revision_Viaje` guarda cada aprobación o rechazo (persona, etapa, fecha). `automatica = true` marca las etapas aprobadas solas porque el responsable era el viajero; no cuentan en los historiales.
 
 **RLS.** El backend se conecta con la service_role key, que ignora las politicas de seguridad por fila. Activarlas impide que alguien lea o escriba la base directamente con la anon key.
@@ -133,7 +125,7 @@ Contar las tablas creadas:
 select count(*) from information_schema.tables where table_schema = 'public';
 ```
 
-Debe devolver 24.
+Debe devolver 25.
 
 Comprobar que las columnas temporales quedaron bien tipadas:
 
@@ -144,7 +136,7 @@ where table_schema = 'public' and data_type like 'timestamp%'
 order by table_name, column_name;
 ```
 
-Las doce filas deben indicar `timestamp with time zone`.
+Las trece filas deben indicar `timestamp with time zone`.
 
 ## Variables de entorno necesarias
 

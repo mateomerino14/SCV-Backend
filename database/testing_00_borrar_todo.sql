@@ -5,6 +5,7 @@
 -- ============================================================
 
 drop table if exists
+  "Tipo_Cambio_Diario",
   "Configuracion_Recordatorio",
   "Comentario",
   "Solicitud_Reemplazo",
