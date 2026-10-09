@@ -1,0 +1,791 @@
+\documentclass[11pt,letterpaper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla,es-nodecimaldot]{babel}
+\usepackage[scaled=0.95]{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\IfFileExists{beramono.sty}{\usepackage[scaled=0.86]{beramono}}{}
+\usepackage[top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm,headheight=15pt]{geometry}
+\usepackage[table]{xcolor}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{xltabular}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{tcolorbox}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,fit,calc}
+\PassOptionsToPackage{obeyspaces,spaces}{url}
+\usepackage[hidelinks]{hyperref}
+\usepackage{parskip}
+\usepackage{needspace}
+
+\definecolor{maxamPrimario}{HTML}{870002}
+\definecolor{maxamSecundario}{HTML}{D20F12}
+\definecolor{maxamTitulo}{HTML}{500203}
+\definecolor{maxamTexto}{HTML}{2E2827}
+\definecolor{maxamEtiqueta}{HTML}{475569}
+\definecolor{maxamFondo}{HTML}{F3F6FF}
+\definecolor{maxamBorde}{HTML}{DEE2F0}
+\definecolor{maxamCampos}{HTML}{C2C6D4}
+\definecolor{codigoFondo}{HTML}{F7F8FC}
+
+\color{maxamTexto}
+
+\titleformat{\section}{\Large\bfseries\color{maxamTitulo}}{\thesection.}{0.6em}{}[{\color{maxamPrimario}\titlerule[0.8pt]}]
+\titleformat{\subsection}{\large\bfseries\color{maxamPrimario}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{maxamTitulo}}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{18pt}{10pt}
+\titlespacing*{\subsection}{0pt}{14pt}{6pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{maxamEtiqueta}MAXAM FANEXA}
+\fancyhead[R]{\small\color{maxamEtiqueta}Sistema de Control de Viáticos --- Manual Técnico Backend}
+\fancyfoot[C]{\small\color{maxamEtiqueta}Página \thepage\ de \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{maxamBorde}\leaders\hrule height \headrulewidth\hfill}}
+
+\setlist[itemize]{leftmargin=1.4em,itemsep=2pt,topsep=4pt,label={\color{maxamPrimario}\textbullet}}
+\setlist[enumerate]{leftmargin=1.6em,itemsep=2pt,topsep=4pt}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\renewcommand{\arraystretch}{1.35}
+\newcommand{\cabecera}{\rowcolor{maxamPrimario}}
+\newcommand{\tth}[1]{\textcolor{white}{\textbf{#1}}}
+\newcommand{\code}[1]{\nolinkurl{#1}}
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\do\_\do\-\do\.\do\:\do\=\do\,}
+\makeatother
+
+\newtcolorbox{nota}[1][]{colback=maxamFondo,colframe=maxamPrimario,boxrule=0pt,leftrule=3pt,arc=0pt,left=8pt,right=8pt,top=6pt,bottom=6pt,#1}
+
+\lstdefinelanguage{JavaScript}{
+  keywords={const,let,var,function,return,if,else,async,await,new,try,catch,finally,throw,for,of,in,true,false,null,undefined,require,module,exports,import,from,export,default},
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]',
+  morestring=[b]",
+  morestring=[b]`
+}
+\lstset{
+  basicstyle=\ttfamily\footnotesize\color{maxamTexto},
+  keywordstyle=\color{maxamPrimario}\bfseries,
+  commentstyle=\color{maxamEtiqueta}\itshape,
+  stringstyle=\color{maxamTitulo},
+  backgroundcolor=\color{codigoFondo},
+  frame=leftline,
+  framerule=2pt,
+  rulecolor=\color{maxamPrimario},
+  xleftmargin=10pt,
+  framexleftmargin=6pt,
+  breaklines=true,
+  showstringspaces=false,
+  columns=fullflexible,
+  keepspaces=true,
+  aboveskip=8pt,
+  belowskip=8pt,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ñ}{{\~n}}1 {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1 {Ñ}{{\~N}}1 {—}{{---}}1 {→}{{$\rightarrow$}}1 {├}{{|}}1 {└}{{`}}1 {│}{{|}}1 {─}{{-}}1
+}
+
+\hypersetup{pdftitle={Manual Técnico Backend - Sistema de Control de Viáticos},pdfauthor={Mateo Alejandro Merino Vidal}}
+
+\begin{document}
+
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture,overlay]
+  \fill[maxamPrimario] (current page.north west) rectangle ([yshift=-1.1cm]current page.north east);
+  \fill[maxamSecundario] ([yshift=-1.1cm]current page.north west) rectangle ([yshift=-1.3cm]current page.north east);
+  \fill[maxamPrimario] (current page.south west) rectangle ([yshift=0.9cm]current page.south east);
+\end{tikzpicture}
+\centering
+\vspace*{1.6cm}
+\IfFileExists{logo-maxam.png}{\includegraphics[width=0.55\textwidth]{logo-maxam.png}\par}{{\Huge\bfseries\color{maxamTexto}MAXAM \textcolor{maxamSecundario}{|} FANEXA}\par}
+\vspace{1.4cm}
+{\color{maxamPrimario}\rule{0.7\textwidth}{1.2pt}}\par
+\vspace{0.8cm}
+{\fontsize{30}{36}\selectfont\bfseries\color{maxamPrimario}MANUAL TÉCNICO}\par
+\vspace{0.3cm}
+{\LARGE\bfseries\color{maxamTitulo}Backend}\par
+\vspace{0.7cm}
+{\Large\bfseries\color{maxamEtiqueta}Sistema de Control de Viáticos (SCV)}\par
+\vspace{0.3cm}
+{\large\itshape\color{maxamEtiqueta}Gestión de viajes corporativos y rendición de gastos}\par
+\vspace{0.8cm}
+{\color{maxamPrimario}\rule{0.7\textwidth}{1.2pt}}\par
+\vfill
+\begin{tabular}{>{\bfseries\color{maxamTitulo}}r L{7.5cm}}
+Autor: & Mateo Alejandro Merino Vidal \\
+Empresa: & MAXAM FANEXA \\
+Componente: & API REST (Node.js, Express y Supabase) \\
+Versión: & 1.1 \\
+Fecha: & 9 de octubre de 2026 \\
+\end{tabular}
+\vspace{1.8cm}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Introducción}
+
+\subsection{Propósito del documento}
+El presente manual describe la construcción interna del backend del Sistema de Control de Viáticos (SCV) de MAXAM FANEXA. Está dirigido a desarrolladores y personal técnico que necesiten instalar, mantener, extender o desplegar la API, y documenta su arquitectura, modelo de datos, reglas de negocio, seguridad, catálogo de endpoints y procedimientos de despliegue.
+
+\subsection{Descripción general del sistema}
+El SCV gestiona el ciclo completo de un viaje corporativo: el empleado registra la solicitud de viaje, que pasa por la revisión de su supervisor, la aprobación del aprobador y la asignación de fondos por tesorería. Con el viaje en curso, el empleado registra sus gastos (facturas, recibos y gastos sin factura) y, al finalizar, los envía a una segunda cadena de revisión: supervisor, aprobador (solo si hay bebidas alcohólicas) y revisor final. El backend genera los documentos oficiales (memorándum, confirmación de fondos, recibos, rendición final y planilla en PDF), envía las notificaciones por correo y calcula las retenciones impositivas de cada gasto.
+
+\subsection{Alcance}
+El backend expone una API REST consumida exclusivamente por el cliente web del sistema. No ofrece servicios a terceros. Toda la persistencia se realiza en una base de datos PostgreSQL alojada en Supabase, a la que el backend accede con la clave de servicio.
+
+\section{Stack tecnológico}
+
+\begin{xltabular}{\textwidth}{L{4.2cm} Y}
+\cabecera \tth{Tecnología} & \tth{Propósito} \\
+\endfirsthead
+\cabecera \tth{Tecnología} & \tth{Propósito} \\
+\endhead
+\rowcolor{maxamFondo} Node.js 22 y Express 5 & Servidor HTTP y enrutamiento de la API \\
+Supabase (PostgreSQL) & Base de datos relacional, almacenamiento de imágenes y cliente JavaScript \\
+\rowcolor{maxamFondo} jsonwebtoken & Emisión y verificación del token de acceso y del token de renovación \\
+bcrypt & Cifrado de contraseñas \\
+\rowcolor{maxamFondo} cookie-parser & Lectura de la cookie \code{httpOnly} del token de renovación \\
+helmet y cors & Cabeceras de seguridad y control de orígenes permitidos \\
+\rowcolor{maxamFondo} express-rate-limit & Límite de intentos de ingreso, recuperación de contraseña y extracción de facturas \\
+multer & Recepción de imágenes de comprobantes y fotos de perfil \\
+\rowcolor{maxamFondo} Puppeteer & Conversión de HTML a PDF (memorándum, recibos, rendiciones) \\
+@google/generative-ai & Modelo Gemini para extracción de comprobantes y detección de alcohol \\
+\rowcolor{maxamFondo} sib-api-v3-sdk (Brevo) & Envío de correo transaccional \\
+node-cron & Resumen de pendientes por correo en los días y horas que configura el administrador \\
+\rowcolor{maxamFondo} Jest y Supertest & Pruebas unitarias y de la API \\
+GitHub Actions & Ejecución automática de las pruebas en cada envío al repositorio \\
+\rowcolor{maxamFondo} Currency API & Tipo de cambio diario de las monedas extranjeras (gratuita, sin clave) \\
+\end{xltabular}
+
+\section{Arquitectura}
+
+\subsection{Capas}
+El backend sigue una arquitectura en capas. Cada petición atraviesa los middlewares de seguridad, llega a una ruta, que delega en un controlador; el controlador valida y traduce la petición HTTP y llama a un servicio, que concentra la lógica de negocio y el acceso a datos.
+
+\begin{center}
+\begin{tikzpicture}[
+  capa/.style={rectangle,rounded corners=3pt,draw=maxamPrimario,fill=maxamFondo,minimum width=9.5cm,minimum height=0.95cm,align=center,font=\small},
+  flecha/.style={-{Stealth[length=2.5mm]},maxamPrimario,thick}]
+\node[capa,fill=maxamPrimario,text=white] (cli) {\textbf{Cliente web} (React)};
+\node[capa,below=0.45cm of cli] (mw) {\textbf{Middlewares}: helmet, CORS, límites de intentos, \code{auth}, \code{roleAuth}, \code{treasurerPosition}};
+\node[capa,below=0.45cm of mw] (rt) {\textbf{Rutas} (\code{src/routes}): declaran endpoint, middlewares y controlador};
+\node[capa,below=0.45cm of rt] (ct) {\textbf{Controladores} (\code{src/controllers}): validan la entrada y arman la respuesta};
+\node[capa,below=0.45cm of ct] (sv) {\textbf{Servicios} (\code{src/services}): reglas de negocio, documentos y correos};
+\node[capa,below=0.45cm of sv,fill=maxamTitulo,text=white] (db) {\textbf{Supabase}: PostgreSQL y Storage};
+\draw[flecha] (cli) -- (mw); \draw[flecha] (mw) -- (rt); \draw[flecha] (rt) -- (ct); \draw[flecha] (ct) -- (sv); \draw[flecha] (sv) -- (db);
+\end{tikzpicture}
+\end{center}
+
+\begin{xltabular}{\textwidth}{L{3cm} L{4.2cm} Y}
+\cabecera \tth{Capa} & \tth{Responsabilidad} & \tth{Restricción} \\
+\endfirsthead
+\cabecera \tth{Capa} & \tth{Responsabilidad} & \tth{Restricción} \\
+\endhead
+\rowcolor{maxamFondo} Ruta & Asocia método, URL, middlewares y controlador & No contiene lógica \\
+Controlador & Lee parámetros, valida formato, responde con el código HTTP & No accede a la base de datos directamente \\
+\rowcolor{maxamFondo} Servicio & Reglas de negocio, consultas, documentos, correos & Devuelve datos o \texttt{\{error, status\}}, nunca responde HTTP \\
+\end{xltabular}
+
+Los servicios devuelven siempre un objeto con el resultado o con \code{error} y \code{status}; el controlador decide la respuesta:
+
+\Needspace{12\baselineskip}
+\begin{lstlisting}[language=JavaScript]
+const approveTrip = async (req, res) => {
+  const result = await treasurerService.approveTrip(req.params.tripId, req.user.id_usuario)
+  if (result.error) {
+    return res.status(result.status || 500).json({error: result.error})
+  }
+  else {
+    return res.json({message: result.message})
+  }
+}
+\end{lstlisting}
+
+\subsection{Estructura del proyecto}
+
+\Needspace{22\baselineskip}
+\begin{lstlisting}
+src/
+├── config/supabase.js       Cliente de conexión
+├── routes/                  Declaración de rutas
+│   ├── admin/                 admin
+│   ├── approval/              review, reviewer, approver, treasurer,
+│   │                          deadlineAuthorization, substitution
+│   ├── catalog/               role, position, section, expenseCategory, tax, audit
+│   ├── expense/               expense, invoice, supplier, exchangeRate
+│   ├── trip/                  trip
+│   └── user/                  user, auth
+├── controllers/             Misma división que routes
+├── services/
+│   ├── approval/              revisión, aprobación, tesorería, documentos
+│   ├── catalog/               cargos y secciones
+│   ├── expense/               gastos, facturas, recibos, extracción
+│   ├── trip/                  viajes, acceso, observaciones, planilla, exportación
+│   ├── user/                  tokens, usuarios, directorio
+│   └── shared/                correo, PDF, plazos, jerarquía, IA, resumen diario,
+│                              tipo de cambio
+├── middlewares/             auth, roleAuth, treasurerPosition, límites de intentos
+├── utils/                   escape HTML, importes en letras, código de viaje
+├── app.js                   Configuración de Express (seguridad, CORS, rutas)
+└── index.js                 Arranque del servidor y del cron de resúmenes
+scripts/sendDigest.js        Envío manual del resumen de pendientes
+database/                    Scripts SQL del esquema
+tests/                       Pruebas: services/ (unitarias), api/ (de la API)
+.github/workflows/           Pruebas automáticas en GitHub Actions
+\end{lstlisting}
+
+\section{Instalación y configuración}
+
+\subsection{Requisitos}
+\begin{itemize}
+  \item Node.js 22 o superior y npm.
+  \item Un proyecto de Supabase con el esquema aplicado (sección \ref{sec:bd}).
+  \item Cuentas y claves de Brevo (correo), Google Gemini (lectura de comprobantes) y AbstractAPI (validación de correos).
+  \item Chromium o las librerías del sistema que requiere Puppeteer para generar PDF.
+\end{itemize}
+
+\subsection{Instalación}
+\Needspace{9\baselineskip}
+\begin{lstlisting}
+npm install
+cp .env.example .env      # completar las variables
+npm run dev               # desarrollo con recarga automática
+npm start                 # producción
+npm test                  # pruebas automáticas
+npm run resumen -- --prueba   # simula el resumen de pendientes
+\end{lstlisting}
+
+\subsection{Variables de entorno}
+
+\begin{xltabular}{\textwidth}{L{4.6cm} Y}
+\cabecera \tth{Variable} & \tth{Propósito} \\
+\endfirsthead
+\cabecera \tth{Variable} & \tth{Propósito} \\
+\endhead
+\rowcolor{maxamFondo} \code{PORT} & Puerto del servidor (por defecto 5000) \\
+\code{NODE_ENV} & \code{production} marca la cookie de sesión como \code{secure} y \code{sameSite=none} \\
+\rowcolor{maxamFondo} \code{SUPABASE_URL} & Dirección del proyecto de Supabase \\
+\code{SUPABASE_KEY} & Clave \code{service_role} (acceso completo; nunca se publica) \\
+\rowcolor{maxamFondo} \code{JWT_SECRET} & Firma del token de acceso \\
+\code{JWT_REFRESH_SECRET} & Firma del token de renovación \\
+\rowcolor{maxamFondo} \code{GEMINI_API_KEY} & Extracción de comprobantes y detección de alcohol \\
+\code{BREVO_API_KEY} & Envío de correos \\
+\rowcolor{maxamFondo} \code{ABSTRACT_EMAIL_API_KEY} & Verifica que un correo exista antes de enviar el código de recuperación \\
+\code{FRONTEND_URL} & Enlace del botón ``Ingresar al sistema'' de los correos \\
+\rowcolor{maxamFondo} \code{CORS_ORIGINS} & Opcional. Dominios del cliente permitidos, separados por coma \\
+\code{TRUST_PROXY} & Opcional. \code{true} detrás de un proxy (Nginx); en Render se detecta solo \\
+\rowcolor{maxamFondo} \code{PUPPETEER_EXECUTABLE_PATH} & Opcional. Ruta a un Chromium propio \\
+\code{EXCHANGE_RATE_API_URLS} & Opcional. Direcciones de la API de tipo de cambio, separadas por coma; sin ella se usa Currency API \\
+\end{xltabular}
+
+\begin{xltabular}{\textwidth}{L{3.4cm} L{3.6cm} L{3.3cm} Y}
+\cabecera \tth{Variable} & \tth{Local} & \tth{Piloto (Render)} & \tth{VPS} \\
+\endfirsthead
+\cabecera \tth{Variable} & \tth{Local} & \tth{Piloto (Render)} & \tth{VPS} \\
+\endhead
+\rowcolor{maxamFondo} \code{NODE_ENV} & \code{development} & \code{production} & \code{production} \\
+\code{FRONTEND_URL} & \code{http://localhost:5173} & Dominio de Vercel & Dominio final \\
+\rowcolor{maxamFondo} \code{TRUST_PROXY} & No se define & No se define & \code{true} \\
+\end{xltabular}
+
+\section{Base de datos}\label{sec:bd}
+
+\subsection{Scripts}
+La carpeta \code{database/} contiene los scripts para levantar la base en Supabase, en este orden:
+
+\begin{xltabular}{\textwidth}{L{5.2cm} Y}
+\cabecera \tth{Archivo} & \tth{Contenido} \\
+\endfirsthead
+\cabecera \tth{Archivo} & \tth{Contenido} \\
+\endhead
+\rowcolor{maxamFondo} \code{01_schema.sql} & Las 25 tablas, relaciones e índices \\
+\code{02_functions.sql} & Función \code{incrementar_correlativo_recibo()} para numerar recibos \\
+\rowcolor{maxamFondo} \code{03_seed.sql} & Roles, cargos, impuesto IVA, categorías de gasto y configuración de recordatorios \\
+\code{04_rls_hardening.sql} & Activa seguridad por fila (RLS) en todas las tablas \\
+\rowcolor{maxamFondo} \code{testing_00_borrar_todo.sql} & Elimina las 25 tablas (solo pruebas) \\
+\code{testing_01_limpieza_completa.sql} & Borra datos operativos, conserva catálogos \\
+\rowcolor{maxamFondo} \code{testing_02_organizacion_prueba.sql} & Organización de prueba con jerarquía completa; la usan también las pruebas automáticas \\
+\end{xltabular}
+
+\subsection{Tablas}
+
+\begin{xltabular}{\textwidth}{L{4.8cm} Y}
+\cabecera \tth{Tabla} & \tth{Descripción} \\
+\endfirsthead
+\cabecera \tth{Tabla} & \tth{Descripción} \\
+\endhead
+\rowcolor{maxamFondo} \code{Rol} & Roles del sistema (identificadores fijos) \\
+\code{Cargo} & Cargos con su viático diario en bolivianos y dólares \\
+\rowcolor{maxamFondo} \code{Seccion} & Secciones de la empresa; respaldo en la jerarquía de revisión \\
+\code{Usuario} & Usuarios, jefe directo, estado de contraseña y sesión \\
+\rowcolor{maxamFondo} \code{Codigo_Verificacion} & Códigos de recuperación de contraseña (5 minutos) \\
+\code{Viaje} & Viajes, estado, revisores asignados, monto solicitado, hospedaje estimado, monto asignado y ciclo de revisión \\
+\rowcolor{maxamFondo} \code{Solicitud_Autorizacion_Plazo} & Ampliaciones de plazo; las pide el titular o su reemplazo \\
+\code{Solicitud_Reemplazo} & Solicitudes para que otra persona rinda el viaje \\
+\rowcolor{maxamFondo} \code{Categoria_Gasto} & Categorías con su cuenta contable de Oracle \\
+\code{Proveedor} & Emisores de facturas \\
+\rowcolor{maxamFondo} \code{Gasto} & Gastos con retenciones impositivas persistidas \\
+\code{Gasto_Subitem} & Desglose de un gasto en varios conceptos \\
+\rowcolor{maxamFondo} \code{Gasto_Tramo_Moneda} & Conversiones de moneda de gastos internacionales, con la marca de tipo de cambio manual \\
+\code{Imagen} & Comprobante asociado a un gasto \\
+\rowcolor{maxamFondo} \code{Factura} & Datos de la factura de un gasto \\
+\code{Detalle_Factura} & Productos de cada factura \\
+\rowcolor{maxamFondo} \code{Impuesto} y \code{Factura_Impuestos} & Catálogo de impuestos y su relación con facturas \\
+\code{Comentario} & Observaciones de revisión y justificaciones de exceso \\
+\rowcolor{maxamFondo} \code{Auditoria} & Ingresos, salidas y cambios de contraseña \\
+\code{Correlativo_Recibo} y \code{Recibo} & Numeración de recibos y número asignado a cada uno \\
+\rowcolor{maxamFondo} \code{Revision_Viaje} & Historial de aprobaciones y rechazos por persona y etapa \\
+\code{Configuracion_Recordatorio} & Una sola fila con los días y horas del resumen de pendientes \\
+\rowcolor{maxamFondo} \code{Tipo_Cambio_Diario} & Tipo de cambio de cada moneda por día, consultado a la API y guardado \\
+\end{xltabular}
+
+\subsection{Roles}
+
+\begin{xltabular}{\textwidth}{L{1.2cm} L{3.6cm} Y}
+\cabecera \tth{Id} & \tth{Rol} & \tth{Función} \\
+\endfirsthead
+\cabecera \tth{Id} & \tth{Rol} & \tth{Función} \\
+\endhead
+\rowcolor{maxamFondo} 1 & ADMINISTRADOR & Usuarios, cargos, secciones, historial de accesos y resumen general \\
+2 & SUPERVISOR & Revisión previa del viaje y revisión de la rendición \\
+\rowcolor{maxamFondo} 3 & EMPLEADO & Registra viajes y gastos \\
+4 & REVISOR & Revisión final, ampliaciones de plazo y reemplazos (rol único) \\
+\rowcolor{maxamFondo} 5 & APROBADOR & Aprobación del viaje y revisión adicional por alcohol (rol único) \\
+--- & Tesorero & No es un rol: se identifica por el cargo ``asistente de caja y tesorería'' \\
+\end{xltabular}
+
+\subsection{Decisiones de diseño}
+\begin{itemize}
+  \item \textbf{Marcas temporales} en \code{timestamptz}: el tipo sin zona horaria desplazaba las fechas cuatro horas respecto de Bolivia.
+  \item \textbf{Retenciones persistidas}: \code{base_imponible}, \code{retencion_rc_iva}, \code{retencion_iue}, \code{retencion_it} e \code{importe_costo} se guardan al registrar, para que los reportes históricos no cambien si cambian las alícuotas.
+  \item \textbf{Moneda}: los gastos en bolivianos se guardan con \code{BOB}; los internacionales con la moneda en mayúsculas.
+  \item \textbf{Observaciones}: \code{Comentario.id_gasto} usa \code{on delete set null}; al borrar un gasto la observación se conserva.
+  \item \textbf{Solicitudes cerradas solas}: si el viaje pasa a revisión con una solicitud pendiente, queda \code{RECHAZADA} sin \code{id_revisor} y con el motivo del cierre.
+  \item \textbf{RLS activo}: el backend usa la clave de servicio; RLS impide el acceso directo con la clave pública.
+\end{itemize}
+
+\section{Autenticación y sesión}
+
+\subsection{Tokens}
+\begin{xltabular}{\textwidth}{L{3.4cm} L{2.4cm} Y}
+\cabecera \tth{Token} & \tth{Duración} & \tth{Ubicación y uso} \\
+\endfirsthead
+\cabecera \tth{Token} & \tth{Duración} & \tth{Ubicación y uso} \\
+\endhead
+\rowcolor{maxamFondo} Acceso & 15 minutos & En memoria del cliente; cabecera \code{Authorization: Bearer} \\
+Renovación & 7 días & Cookie \code{httpOnly}; solo la lee \code{POST /auth/refresh} \\
+\end{xltabular}
+
+El token de acceso incluye \code{id_usuario}, \code{email_corporativo}, \code{id_rol} y el motivo de cambio de contraseña pendiente. Al vencer, el cliente pide uno nuevo a \code{/auth/refresh}; si la cookie venció, fue invalidada o el usuario está suspendido, la cookie se borra y se responde 401.
+
+\subsection{Validación en cada petición}
+El middleware \code{auth.js} verifica, además de la firma del token, el estado actual del usuario en la base:
+
+\begin{enumerate}
+  \item La cuenta sigue activa.
+  \item El rol no cambió desde que se emitió el token.
+  \item La sesión no fue invalidada: \code{refresh_token_invalido_desde} se compara con el \code{iat} del token al segundo.
+  \item No tiene un cambio de contraseña pendiente. Si lo tiene, solo se permiten \code{/user/me} y \code{/user/me/change-password}; el resto responde 403 con \code{codigo: CAMBIO_CONTRASENIA_REQUERIDO}.
+\end{enumerate}
+
+\Needspace{8\baselineskip}
+\begin{lstlisting}[language=JavaScript]
+const invalidatedAfterIssue = user.refresh_token_invalido_desde &&
+  decodedToken.iat < Math.floor(new Date(user.refresh_token_invalido_desde).getTime() / 1000)
+if (invalidatedAfterIssue || user.id_rol !== decodedToken.id_rol) {
+  return res.status(401).json({error: sessionInvalidatedMessage})
+}
+\end{lstlisting}
+
+\subsection{Cambio de contraseña obligatorio}
+\begin{xltabular}{\textwidth}{L{3.2cm} L{5.2cm} Y}
+\cabecera \tth{Motivo} & \tth{Cuándo ocurre} & \tth{Pide la contraseña actual} \\
+\endfirsthead
+\cabecera \tth{Motivo} & \tth{Cuándo ocurre} & \tth{Pide la contraseña actual} \\
+\endhead
+\rowcolor{maxamFondo} \code{TEMPORAL} & Cuenta nueva o clave puesta por el administrador & No \\
+\code{RECUPERACION} & Ingreso con código de verificación & No \\
+\rowcolor{maxamFondo} \code{VENCIDA} & 90 días o más desde el último cambio & Sí \\
+\end{xltabular}
+
+Cambiar la contraseña reinicia el conteo de 90 días, limpia el motivo, invalida las demás sesiones y entrega un token nuevo al dispositivo que la cambió. Queda registrado en \code{Auditoria} como \code{CAMBIO_CLAVE}.
+
+\subsection{Límites de intentos}
+\begin{xltabular}{\textwidth}{L{4.6cm} L{3.6cm} Y}
+\cabecera \tth{Operación} & \tth{Límite} & \tth{Observación} \\
+\endfirsthead
+\cabecera \tth{Operación} & \tth{Límite} & \tth{Observación} \\
+\endhead
+\rowcolor{maxamFondo} Inicio de sesión & 10 fallos / 15 min por IP & Los ingresos correctos no cuentan \\
+Envío de código & 10 / 15 min & También aplica a la verificación de correo \\
+\rowcolor{maxamFondo} Verificación de código & 10 fallos / 15 min & Cada código se anula tras 5 intentos fallidos \\
+Extracción de facturas & 20 / hora por usuario & Protege la cuota del modelo de IA \\
+\end{xltabular}
+
+\section{Autorización}
+
+\subsection{Por rol y por cargo}
+Cada ruta declara los roles habilitados con \code{roleMiddleware}; la restricción queda visible sin abrir el controlador:
+
+\Needspace{7\baselineskip}
+\begin{lstlisting}[language=JavaScript]
+router.post('/expense-review/:tripId/take',
+  authMiddleware,
+  roleMiddleware(['SUPERVISOR']),
+  reviewController.takeExpenseReview)
+\end{lstlisting}
+
+Las rutas de tesorería usan \code{requireTreasurerPosition}, que valida el cargo en lugar del rol.
+
+\subsection{Asignación por jerarquía}
+Aprobador y revisor son roles únicos: todo viaje de su etapa les corresponde. El supervisor se resuelve con \code{hierarchyAssignmentService}: primero el jefe directo del empleado; si no lo hay, los supervisores de su sección; y si tampoco, cualquier supervisor. Un supervisor solo ve, toma u observa viajes de su alcance, los que tiene asignados o los que ya revisó.
+
+\subsection{Acceso a un viaje}
+\code{tripAccessService} decide quién ve el detalle, los gastos y la planilla: el dueño, su reemplazo aprobado, el tesorero, el administrador, el aprobador, el revisor y el supervisor que corresponda. Un viaje inexistente responde 404 y uno sin permiso 403. Los recibos los emiten el dueño, su reemplazo o el tesorero.
+
+\subsection{Observaciones}
+\code{tripCommentService} solo permite observar a quien tiene la etapa actual del viaje. Las observaciones no se editan ni borran una vez decidida la etapa o en un ciclo anterior, y cada revisor solo gestiona las suyas. Para rechazar se exige al menos una observación propia del ciclo vigente.
+
+\section{Flujos de aprobación}
+
+\begin{center}
+\begin{tikzpicture}[
+  est/.style={rectangle,rounded corners=3pt,draw=maxamPrimario,fill=maxamFondo,minimum width=3.4cm,minimum height=0.8cm,font=\scriptsize\bfseries,align=center},
+  fin/.style={est,fill=maxamPrimario,text=white},
+  rech/.style={est,draw=maxamSecundario,fill=white,text=maxamSecundario},
+  fl/.style={-{Stealth[length=2mm]},maxamTitulo,thick},
+  node distance=0.35cm]
+\node[est] (b) {BORRADOR};
+\node[est,below=of b] (rv) {EN\_REVISION\_VIAJE};
+\node[est,below=of rv] (av) {APROBADO\_VIAJE};
+\node[est,below=of av] (rt) {EN\_REVISION\_TESORERO};
+\node[fin,below=of rt] (ec) {EN\_CURSO};
+\node[est,right=2.2cm of b] (er) {EN\_REVISION};
+\node[est,below=of er] (ea) {EN\_REVISION\_APROBADOR\\(solo con alcohol)};
+\node[est,below=of ea] (as) {APROBADO\_SUPERVISOR};
+\node[fin,below=of as] (af) {APROBADO\_FINAL};
+\node[rech,below=1.1cm of af] (r) {RECHAZADO};
+\draw[fl] (b)--(rv); \draw[fl] (rv)--(av); \draw[fl] (av)--(rt); \draw[fl] (rt)--(ec);
+\draw[fl] (ec.east) -- ++(1.1,0) |- (er.west);
+\draw[fl] (er)--(ea); \draw[fl] (ea)--(as); \draw[fl] (as)--(af);
+\draw[fl,dashed,maxamSecundario] (ec.south) |- (r.west);
+\node[font=\scriptsize\bfseries,text=maxamPrimario,above=0.25cm of b] {Primer flujo: autorización};
+\node[font=\scriptsize\bfseries,text=maxamPrimario,above=0.25cm of er] {Segundo flujo: rendición};
+\end{tikzpicture}
+\end{center}
+
+\subsection{Reglas de transición}
+\begin{itemize}
+  \item Cualquier etapa de revisión puede rechazar el viaje. El rechazo incrementa \code{ciclo_revision} y \code{fue_iniciado} indica si ocurrió en el primer o en el segundo flujo.
+  \item Un viaje rechazado antes de iniciarse se corrige editándolo y vuelve a \code{EN_REVISION_VIAJE}; uno rechazado en la rendición se corrige en sus gastos y se reenvía directamente a \code{EN_REVISION}.
+  \item Las escrituras exigen el estado leído (\code{.eq('estado', X)}); si otra persona se adelantó se responde 409 y no se duplican correos ni registros.
+  \item Si el responsable de una etapa única (aprobador, tesorero o revisor) es el propio viajero, la etapa se aprueba sola (\code{selfReviewSkipService}) y los documentos lo indican como aprobación automática. En el caso del tesorero, el fondo queda con el monto que él mismo solicitó.
+  \item Cada aprobación o rechazo se registra en \code{Revision_Viaje}; las bandejas muestran en ``Aprobados'' lo que la persona aprobó y en ``Rechazados'' lo que rechazó y sigue rechazado, ordenado por la fecha de revisión más reciente.
+\end{itemize}
+
+\section{Reglas de negocio}
+
+\subsection{Monto solicitado y tope}
+Al registrar o editar un viaje, el empleado escribe el monto que solicita (en bolivianos y, si el viaje es internacional, también en dólares) y un hospedaje estimado por moneda. El tope de cada moneda es \emph{días del viaje × tarifa diaria del cargo + hospedaje estimado}; el backend rechaza un monto mayor. Tesorería ve lo solicitado y asigna el monto final.
+
+\subsection{Control de gasto diario}
+El presupuesto se controla por día y por moneda. En un viaje nacional, lo gastado en bolivianos cada día no puede superar el \code{monto_diario} del cargo. En uno internacional, cada día se controla con las dos tarifas por separado: lo gastado en bolivianos contra \code{monto_diario} y lo gastado en dólares contra \code{monto_diario_usd}. Los hoteles quedan fuera del control diario y se comparan contra el total asignado. Cada día excedido, y el exceso en hoteles, exige una justificación en \code{Comentario.fecha_justificada}; las justificaciones con palabras inapropiadas se rechazan.
+
+\subsection{Moneda en viajes internacionales}
+En un viaje internacional se puede registrar gastos en bolivianos o en dólares cualquier día. Los tramos de conversión de otras monedas son solo referencia: el monto que vale es el ingresado por el empleado o, si el gasto tiene subítems, la suma de estos.
+
+\subsection{Tipo de cambio diario}
+El tipo de cambio de los tramos ya no lo escribe el empleado: es uno por día y moneda, tomado de la fecha del gasto. \code{exchangeRateService} lo consulta a la API la primera vez y lo guarda en \code{Tipo_Cambio_Diario}, de modo que todos los gastos de esa fecha usan el mismo. Si la API no responde, el empleado lo escribe a mano y el tramo queda marcado con \code{tipo_cambio_manual}, lo que se ve en el recibo y en la revisión. Las monedas admitidas son EUR, PEN, ARS, BRL, CLP, COP y MXN; bolivianos y dólares no se convierten entre sí.
+
+\subsection{Retenciones impositivas}
+\begin{xltabular}{\textwidth}{L{1.4cm} L{5.2cm} Y}
+\cabecera \tth{Código} & \tth{Tipo} & \tth{Retenciones} \\
+\endfirsthead
+\cabecera \tth{Código} & \tth{Tipo} & \tth{Retenciones} \\
+\endhead
+\rowcolor{maxamFondo} \code{F} & Compra o servicio con factura & Ninguna; genera crédito fiscal de IVA \\
+\code{R} & Documento sin IVA & Ninguna \\
+\rowcolor{maxamFondo} \code{C} & Compra de bien sin factura & IUE 5\% e IT 3\% sobre base incrementada \\
+\code{S} & Servicio o alquiler sin factura & RC-IVA 13\% e IT 3\% sobre base incrementada \\
+\end{xltabular}
+
+Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
+
+\subsection{Plazos de registro}
+Tras el fin del viaje hay cuatro días de tolerancia para cargar gastos. Vencido el margen, se debe pedir una ampliación al revisor, que otorga cuatro días desde su respuesta. El plazo es del viaje: la ampliación vale para el titular y para su reemplazo aprobado, cualquiera de los dos puede pedirla y la respuesta se avisa a ambos. El plazo no corre mientras el viaje está rechazado. La ampliación extiende el margen de carga, no el rango de fechas: la fecha del gasto debe pertenecer al periodo del viaje.
+
+\subsection{Rendición por terceros}
+El empleado puede pedir que otra persona activa de su sección rinda los gastos en su nombre. El revisor aprueba o rechaza; con la aprobación se avisa al titular y al reemplazo. El titular conserva siempre el acceso al viaje, y los documentos llevan su nombre. Si el viaje se envía a revisión con una solicitud pendiente de reemplazo o de plazo, esta se cierra automáticamente.
+
+\section{Catálogo de endpoints}
+Todas las rutas, salvo las de \code{/auth} y \code{/user/check-email}, requieren token de acceso. La columna ``Acceso'' indica la restricción adicional.
+
+\newcommand{\ep}[4]{\code{#1} & \code{#2} & #3 & #4 \\}
+\newcommand{\epf}[4]{\rowcolor{maxamFondo}\code{#1} & \code{#2} & #3 & #4 \\}
+\newcommand{\tablaEp}[1]{%
+\cabecera \tth{Método} & \tth{Ruta} & \tth{Acceso} & \tth{Descripción} \\
+\endfirsthead
+\cabecera \tth{Método} & \tth{Ruta} & \tth{Acceso} & \tth{Descripción} \\
+\endhead}
+
+\subsection{Autenticación y usuarios}
+{\small\begin{xltabular}{\textwidth}{L{1.45cm} L{5.4cm} L{2.4cm} Y}
+\tablaEp{}
+\epf{POST}{/auth}{Público}{Inicio de sesión}
+\ep{POST}{/auth/refresh}{Cookie}{Renueva el token de acceso}
+\epf{POST}{/auth/logout}{Público}{Cierra sesión y registra la salida}
+\ep{POST}{/auth/send-code}{Público}{Envía el código de recuperación}
+\epf{POST}{/auth/verify-code}{Público}{Valida el código e inicia sesión}
+\ep{GET}{/user/me}{Sesión}{Datos del usuario actual}
+\epf{PUT}{/user/me/update}{Sesión}{Actualiza el perfil}
+\ep{PUT}{/user/me/photo}{Sesión}{Cambia la foto de perfil}
+\epf{PUT}{/user/me/change-password}{Sesión}{Cambia la contraseña}
+\ep{GET}{/user/employees}{Roles}{Lista de empleados para filtros}
+\epf{POST}{/user/check-email}{Público}{Verifica si un correo está registrado}
+\ep{GET POST}{/user}{Administrador}{Lista y crea usuarios}
+\epf{PUT DELETE}{/user/:id}{Administrador}{Edita o elimina un usuario}
+\end{xltabular}}
+
+\subsection{Viajes, gastos y facturas}
+{\small\begin{xltabular}{\textwidth}{L{1.45cm} L{5.4cm} L{2.4cm} Y}
+\tablaEp{}
+\epf{GET}{/trip/dashboard}{Sesión}{Viajes del panel del empleado}
+\ep{GET}{/trip/history}{Sesión}{Historial paginado con filtro}
+\epf{GET}{/trip/:id}{Acceso al viaje}{Detalle con gastos y resumen}
+\ep{GET}{/trip/:id/rendicion-pdf}{Acceso al viaje}{Planilla de rendición en PDF}
+\epf{POST}{/trip}{Sesión}{Crea un viaje}
+\ep{PUT}{/trip/:id/edit}{Dueño}{Edita un borrador o un viaje rechazado}
+\epf{PUT}{/trip/:id/submit-review}{Dueño}{Envía a revisión previa}
+\ep{PUT}{/trip/:id/confirm-completion}{Dueño o reemplazo}{Finaliza y envía la rendición}
+\epf{GET}{/trip/export/statements}{Revisor, tesorero, administrador}{Datos de las planillas de varios viajes para Excel}
+\ep{GET}{/exchange-rate}{Sesión}{Tipo de cambio de una moneda en una fecha}
+\epf{GET}{/exchange-rate/currencies}{Sesión}{Monedas admitidas}
+\epf{GET}{/expense/:expenseId/detail}{Acceso al viaje}{Detalle de un gasto}
+\ep{POST}{/expense/register}{Dueño o reemplazo}{Registra un gasto con imagen}
+\epf{PUT}{/expense/:expenseId/update}{Dueño o reemplazo}{Edita un gasto}
+\ep{DELETE}{/expense/:expenseId}{Dueño o reemplazo}{Elimina un gasto}
+\epf{POST}{/expense/:expenseId/receipt}{Recibos}{Envía el recibo individual}
+\ep{POST}{/expense/trip/:tripId/receipt/:type}{Recibos}{Envía el recibo agrupado}
+\epf{POST}{/invoice/extract}{Sesión}{Extrae datos de un comprobante}
+\ep{POST}{/invoice/save}{Dueño o reemplazo}{Registra una factura}
+\epf{PUT}{/invoice/:expenseId/update}{Dueño o reemplazo}{Edita una factura}
+\end{xltabular}}
+
+\subsection{Revisión y aprobación}
+{\small\begin{xltabular}{\textwidth}{L{1.45cm} L{5.4cm} L{2.4cm} Y}
+\tablaEp{}
+\epf{GET}{/review/trip-review/pending}{Supervisor}{Viajes en revisión previa sin asignar}
+\ep{GET}{/review/trip-review/mine}{Supervisor}{Asignados e historial}
+\epf{POST}{/review/trip-review/:tripId/take}{Supervisor}{Toma el viaje}
+\ep{POST}{/review/trip-review/:tripId/return}{Supervisor}{Devuelve el viaje sin revisar}
+\epf{POST}{/review/trip-review/:tripId/approve}{Supervisor}{Aprueba}
+\ep{POST}{/review/trip-review/:tripId/reject}{Supervisor}{Rechaza con observaciones}
+\epf{GET}{/review/expense-review/*}{Supervisor}{Mismas operaciones para la rendición}
+\ep{GET}{/approver/pending-trips}{Aprobador}{Viajes por aprobar}
+\epf{POST}{/approver/trip/:tripId/approve}{Aprobador}{Aprueba y genera el memorándum}
+\ep{POST}{/approver/alcohol-review/:tripId/*}{Aprobador}{Revisión adicional por alcohol}
+\epf{GET}{/treasurer/pending-trips}{Tesorero}{Viajes esperando fondos}
+\ep{PUT}{/treasurer/:tripId/amounts}{Tesorero}{Ajusta los montos asignados}
+\epf{POST}{/treasurer/:tripId/approve}{Tesorero}{Aprueba fondos y envía la confirmación}
+\ep{GET}{/reviewer/pending}{Revisor}{Rendiciones para revisión final}
+\epf{POST}{/reviewer/:tripId/approve}{Revisor}{Aprobación final y rendición en PDF}
+\ep{POST}{/*/:tripId/comment}{Etapa actual}{Agrega, edita o borra observaciones}
+\end{xltabular}}
+
+\subsection{Solicitudes}
+{\small\begin{xltabular}{\textwidth}{L{1.45cm} L{5.4cm} L{2.4cm} Y}
+\tablaEp{}
+\epf{POST}{/deadline-authorization/trip/:tripId/request}{Dueño o reemplazo}{Pide ampliación de plazo}
+\ep{GET}{/deadline-authorization/trip/:tripId/status}{Dueño o reemplazo}{Estado de la última solicitud}
+\epf{GET}{/deadline-authorization/pending}{Revisor}{Solicitudes pendientes}
+\ep{POST}{/deadline-authorization/:requestId/approve}{Revisor}{Aprueba (4 días desde la respuesta)}
+\epf{GET}{/substitution/candidates}{Sesión}{Personas de la sección que pueden rendir}
+\ep{POST}{/substitution/trip/:tripId/request}{Dueño}{Pide un reemplazo}
+\epf{GET}{/substitution/mine}{Sesión}{Viajes que rinde como reemplazo}
+\ep{POST}{/substitution/:requestId/approve}{Revisor}{Aprueba el reemplazo}
+\end{xltabular}}
+
+\subsection{Catálogos y administración}
+{\small\begin{xltabular}{\textwidth}{L{1.45cm} L{5.4cm} L{2.4cm} Y}
+\tablaEp{}
+\epf{GET}{/position, /section}{Sesión}{Cargos y secciones}
+\ep{POST PUT}{/position, /section}{Administrador}{Crea y edita}
+\epf{PATCH}{/position/:id/suspend}{Administrador}{Suspende o activa (también secciones)}
+\ep{GET}{/expense-category}{Sesión}{Categorías de gasto}
+\epf{GET}{/role, /tax, /supplier}{Administrador}{Roles, impuestos y proveedores}
+\ep{GET}{/audit}{Administrador}{Historial de accesos con filtros; las fechas son días de Bolivia}
+\epf{GET}{/admin/dashboard}{Administrador}{Indicadores por fase; periodo opcional con fecha\_inicio y fecha\_fin}
+\ep{GET PUT}{/admin/reminders}{Administrador}{Lee o guarda los días y horas del resumen}
+\epf{GET}{/admin/reminders/preview}{Administrador}{A quién le llegaría el resumen, sin enviar}
+\ep{POST}{/admin/reminders/send-now}{Administrador}{Envía el resumen en el momento}
+\end{xltabular}}
+
+\section{Servicios transversales}
+\begin{xltabular}{\textwidth}{L{5cm} Y}
+\cabecera \tth{Servicio} & \tth{Responsabilidad} \\
+\endfirsthead
+\cabecera \tth{Servicio} & \tth{Responsabilidad} \\
+\endhead
+\rowcolor{maxamFondo} \code{hierarchyAssignmentService} & Resuelve quién revisa cada etapa \\
+\code{tripAccessService} & Permisos de lectura y de emisión de recibos \\
+\rowcolor{maxamFondo} \code{deadlineService} & Valida fecha del gasto y plazo de carga con ampliaciones \\
+\code{expenseSummaryService} & Gasto diario, exceso en hoteles y alertas \\
+\rowcolor{maxamFondo} \code{alcoholDetectionService} & Detecta bebidas alcohólicas por gasto y por viaje \\
+\code{commentModerationService} & Rechaza términos prohibidos \\
+\rowcolor{maxamFondo} \code{geminiService} & Modelo de IA con reintentos y modelo de respaldo \\
+\code{reviewLogService} & Historial de revisión por persona y etapa \\
+\rowcolor{maxamFondo} \code{selfReviewSkipService} & Aprobación automática de etapas propias \\
+\code{auditLogService} & Registra ingresos, salidas y cambios de contraseña \\
+\rowcolor{maxamFondo} \code{emailService} & Correo con plantilla institucional común \\
+\code{pdfService} & HTML a PDF con JavaScript desactivado; el navegador se cierra siempre \\
+\rowcolor{maxamFondo} \code{dailyDigestService} & Resumen de pendientes por rol; en modo prueba solo indica a quién le llegaría \\
+\code{reminderScheduleService} & Guarda los días y horas del resumen y lo reprograma sin reiniciar \\
+\rowcolor{maxamFondo} \code{exchangeRateService} & Tipo de cambio diario desde la API, guardado por fecha y moneda \\
+\code{tripExportService} & Reúne las planillas de varios viajes para exportarlas a Excel \\
+\end{xltabular}
+
+\section{Documentos y notificaciones}
+
+\subsection{Documentos PDF}
+\begin{xltabular}{\textwidth}{L{4.2cm} L{4cm} Y}
+\cabecera \tth{Documento} & \tth{Momento} & \tth{Destinatario} \\
+\endfirsthead
+\cabecera \tth{Documento} & \tth{Momento} & \tth{Destinatario} \\
+\endhead
+\rowcolor{maxamFondo} Memorándum de aprobación & Aprobación del aprobador & Empleado \\
+Confirmación de fondo & Aprobación de tesorería & Empleado (incluye origen y destino) \\
+\rowcolor{maxamFondo} Recibos de compra y servicio & A pedido & Empleado; el número se reutiliza al reenviar \\
+Rendición final & Aprobación final & Revisor y empleado, con saldo por moneda \\
+\rowcolor{maxamFondo} Planilla de rendición & A pedido & Descarga del empleado \\
+\end{xltabular}
+
+Todo texto escrito por usuarios se escapa (\code{htmlEscape}) antes de insertarse en correos y PDF. En el resultado final, cada moneda tiene su propia línea: en un viaje internacional puede corresponder devolver dólares y recibir un reembolso en bolivianos.
+
+\subsection{Correos inmediatos}
+\begin{itemize}
+  \item Al revisor: nueva solicitud de plazo o de reemplazo (indicando si la pidió el reemplazo).
+  \item Al empleado: memorándum, fondo aprobado, resultado de la rendición, respuesta a sus solicitudes, bienvenida con contraseña temporal y código de recuperación.
+  \item Al reemplazo: aviso de rendición asignada.
+\end{itemize}
+
+\subsection{Resumen de pendientes}
+Un solo correo por persona con una línea por tipo de pendiente. Solo lo reciben quienes tienen algo pendiente; si falla el envío a una persona, se envía igual a las demás.
+
+\textbf{Programación configurable.} Los días y las horas los define el administrador en la pantalla \emph{Recordatorios}, que guarda la configuración en la tabla \code{Configuracion_Recordatorio} (una sola fila). \code{reminderScheduleService} crea un \code{node-cron} por cada hora, en la zona \code{America/La_Paz} sin importar la del servidor, y al guardar detiene los anteriores y crea los nuevos, sin reiniciar el servidor.
+
+\begin{itemize}
+  \item Se puede activar o desactivar el envío.
+  \item Días de la semana a elección (\code{0} domingo a \code{6} sábado) y hasta 4 horas por día en formato \code{HH:MM}.
+  \item Configuración de fábrica: de lunes a viernes a las 08:00, 12:00 y 16:00.
+  \item Si la tabla no tiene la fila, el servidor usa la configuración de fábrica.
+\end{itemize}
+
+\begin{xltabular}{\textwidth}{L{2.6cm} Y}
+\cabecera \tth{Rol} & \tth{Contenido} \\
+\endfirsthead
+\cabecera \tth{Rol} & \tth{Contenido} \\
+\endhead
+\rowcolor{maxamFondo} Supervisor & Viajes en revisión previa y rendiciones, solo de su alcance \\
+Aprobador & Viajes por aprobar y rendiciones con alcohol \\
+\rowcolor{maxamFondo} Revisor & Rendiciones finales y solicitudes de plazo y reemplazo vigentes \\
+Tesorero & Viajes esperando asignación de fondos \\
+\end{xltabular}
+
+\Needspace{5\baselineskip}
+\begin{lstlisting}
+npm run resumen -- --prueba   # muestra destinatarios y contenido sin enviar
+npm run resumen               # envía los correos en el momento
+# o desde la pantalla Recordatorios: Vista Previa y Enviar Ahora
+\end{lstlisting}
+
+\section{Extracción de datos de comprobantes}
+La imagen del comprobante se envía al modelo de visión de Gemini (\code{invoiceExtractionService}) con una instrucción que fija el contexto tributario boliviano: el ``Importe'' es el total con IVA incluido, el IVA es del 13\% y debe devolverse como monto en dinero. El modelo responde con un JSON que contiene proveedor, NIT, número de factura, fecha de emisión, monto sin impuestos, IVA, total, tipo de documento (\code{F} o \code{R}) y detalle de productos.
+
+\begin{itemize}
+  \item \code{geminiService} reintenta ante errores temporales y, si el modelo principal falla o agotó su cuota, usa un modelo de respaldo.
+  \item La respuesta se normaliza: los datos que faltan quedan como ``No Especificado'' y la fecha se valida. Si no es una fecha real con formato válido, el campo queda editable en el cliente; si vino bien formada, queda bloqueado.
+  \item El empleado revisa y puede corregir todos los datos antes de guardar; el gasto se marca como \code{modificado} cuando hubo correcciones.
+\end{itemize}
+
+Las imágenes se suben al almacenamiento antes de escribir el gasto o la factura; si la subida falla no queda nada a medio guardar. Una factura repetida (número, fecha y proveedor) se rechaza antes de modificar datos.
+
+\section{Seguridad}
+\begin{xltabular}{\textwidth}{L{4.2cm} Y}
+\cabecera \tth{Aspecto} & \tth{Medida} \\
+\endfirsthead
+\cabecera \tth{Aspecto} & \tth{Medida} \\
+\endhead
+\rowcolor{maxamFondo} Contraseñas & bcrypt; mínimo 8 caracteres; vencen a los 90 días \\
+Sesión & Token corto en memoria, renovación en cookie \code{httpOnly}; invalidación inmediata por cambio de rol, suspensión o cambio de contraseña \\
+\rowcolor{maxamFondo} Ingreso & Mismo mensaje si el correo no existe o la clave es incorrecta \\
+Orígenes & CORS restringido a los dominios del cliente \\
+\rowcolor{maxamFondo} Proxy & \code{trust proxy} solo en Render o con \code{TRUST_PROXY=true}, para no falsear la IP \\
+Datos de usuarios & Escapados en correos y PDF; nunca se devuelve el hash de la contraseña \\
+\rowcolor{maxamFondo} Concurrencia & Escrituras condicionadas al estado leído; 409 si otra persona se adelantó \\
+Base de datos & RLS activo; la clave de servicio solo existe en el servidor \\
+\end{xltabular}
+
+\section{Despliegue}
+
+\subsection{Piloto en Render}
+El backend se publica como servicio web de Node con \code{npm start}. Render se detecta solo (\code{RENDER=true}), por lo que no hace falta \code{TRUST_PROXY}. En el plan gratuito el servicio se suspende tras unos minutos sin uso, y el resumen de pendientes puede no enviarse a su hora; para el uso definitivo se recomienda un VPS.
+
+\subsection{Servidor VPS}
+\begin{enumerate}
+  \item Instalar Node.js 20, clonar el repositorio y ejecutar \code{npm ci}.
+  \item Instalar las librerías del sistema que necesita Chromium para generar los PDF.
+  \item Crear el \code{.env} con \code{NODE_ENV=production} y \code{TRUST_PROXY=true}.
+  \item Mantener el proceso con \code{pm2} en una sola instancia, para que el resumen no se envíe duplicado.
+  \item Publicar detrás de Nginx con HTTPS (Let's Encrypt), \code{client_max_body_size} de 15 MB y tiempo de espera de 120 s.
+  \item Cerrar el puerto del backend con el firewall; solo Nginx lo usa.
+  \item Apuntar \code{VITE_API_URL} del cliente al nuevo dominio.
+\end{enumerate}
+
+\Needspace{6\baselineskip}
+\begin{lstlisting}
+pm2 start src/index.js --name scv-backend -i 1
+pm2 save && pm2 startup
+sudo certbot --nginx -d api.tuempresa.com
+\end{lstlisting}
+
+\section{Pruebas automáticas}
+Una prueba automática es código que usa el sistema como lo haría una persona y verifica que el resultado sea el correcto. Se ejecutan con un comando y, si un cambio rompe algo, fallan antes de que llegue a producción.
+
+\begin{xltabular}{\textwidth}{L{2.6cm} Y L{3.2cm}}
+\cabecera \tth{Tipo} & \tth{Qué prueba} & \tth{Comando} \\
+\endfirsthead
+\cabecera \tth{Tipo} & \tth{Qué prueba} & \tth{Comando} \\
+\endhead
+\rowcolor{maxamFondo} Unitarias & Funciones sueltas: retenciones, control diario por moneda, topes del monto solicitado, tipo de cambio, recordatorios, jerarquía, moderación (\code{tests/services/}) & \code{npm test} \\
+De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, topes, tipo de cambio con y sin API, exportación (\code{tests/api/}) & \code{npm run test:api} \\
+\end{xltabular}
+
+Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. La API de tipo de cambio se reemplaza por una de prueba (\code{tests/support/exchangeRateMock.js}) que puede simular una caída. En el estado actual pasan 54 pruebas unitarias y 16 de la API.
+
+\subsection{Integración continua}
+El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio.
+
+\section{Convenciones}
+\begin{itemize}
+  \item El código se escribe en inglés; los textos visibles y el modelo de datos, en español.
+  \item Cada función del backend lleva un comentario de una línea con su propósito; dentro de las funciones solo se dejan avisos importantes, también de una línea.
+  \item Punto y coma al final de cada sentencia y literales de objeto sin espacios internos (\texttt{\{dato: valor\}}).
+  \item Los scripts SQL llevan comentarios breves: un encabezado por sección y una línea donde haga falta.
+  \item Se prefieren bloques \code{if}/\code{else} explícitos a los operadores ternarios en la lógica.
+  \item Los commits siguen Conventional Commits: \code{feat}, \code{fix}, \code{style}, \code{refactor}, \code{docs}, \code{test} y \code{chore}.
+\end{itemize}
+
+\end{document}
