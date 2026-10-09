@@ -4,7 +4,7 @@ API REST del sistema de gestión de viajes corporativos y rendición de gastos d
 
 ## Requisitos
 
-- Node.js 18 o superior
+- Node.js 22 o superior
 - Un proyecto de Supabase con el esquema aplicado (ver `database/README.md`)
 
 ## Instalación
@@ -74,7 +74,7 @@ Guía para un servidor Ubuntu 22.04 o 24.04 con el frontend en Vercel (o en otro
 ### 1. Node.js y el proyecto
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs git
 git clone https://github.com/mateomerino14/SCV-Backend.git
 cd SCV-Backend
