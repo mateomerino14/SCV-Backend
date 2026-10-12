@@ -109,7 +109,7 @@ const getReviewDetail = async (tripId, reviewerId) => {
   }
   const {data: expenses} = await supabase
     .from('Gasto')
-    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, tipo_cambio_manual, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
+    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
     .eq('id_viaje', tripId);
   const {data: comments} = await supabase
     .from('Comentario').select('*').eq('id_viaje', tripId).order('fecha', {ascending: false});

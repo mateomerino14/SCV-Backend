@@ -43,7 +43,6 @@ FRONTEND_URL=...
 | `CORS_ORIGINS` | Opcional. Dominios del cliente web que pueden usar la API, separados por coma. Sin ella se aceptan `localhost:5173` y los dominios de Vercel del proyecto |
 | `TRUST_PROXY` | Opcional. `true` si el servidor está detrás de un proxy (en Render no hace falta: se detecta solo con la variable `RENDER`) |
 | `PUPPETEER_EXECUTABLE_PATH` | Opcional. Ruta a un Chrome/Chromium propio si no se usa el que descarga `puppeteer` al instalar |
-| `EXCHANGE_RATE_API_URLS` | Opcional. Direcciones de la API de tipo de cambio diario, separadas por coma (`{fecha}` = AAAA-MM-DD). Sin ella se usa Currency API (gratuita y sin clave) |
 
 En Render el servidor confía en el proxy de la plataforma (`trust proxy`) para leer la IP real de cada usuario; así el límite de intentos de ingreso se aplica por persona y no a todos juntos.
 
@@ -245,7 +244,7 @@ src/
 │   ├── approval/              review, reviewer, approver, treasurer,
 │   │                          deadlineAuthorization, substitution
 │   ├── catalog/               role, position, section, expenseCategory, tax, audit
-│   ├── expense/               expense, invoice, supplier, exchangeRate
+│   ├── expense/               expense, invoice, supplier
 │   ├── trip/                  trip
 │   └── user/                  user, auth
 ├── controllers/             Misma división que routes
@@ -267,8 +266,7 @@ src/
 │   ├── user/                  tokenService, userService, userDirectoryService
 │   └── shared/                alcoholDetectionService, auditLogService,
 │                              commentModerationService, dailyDigestService,
-│                              deadlineService, emailService, exchangeRateService,
-│                              geminiService,
+│                              deadlineService, emailService, geminiService,
 │                              hierarchyAssignmentService, pdfService,
 │                              reminderScheduleService
 ├── middlewares/
@@ -303,7 +301,6 @@ tests/                        Pruebas: services/ (unitarias), api/ (de la API), 
 | `/user` | `user/user.js` | Perfil, cambio de contraseña y gestión de usuarios |
 | `/trip` | `trip/trip.js` | Ciclo de vida del viaje, planilla en PDF y datos de planillas de varios viajes para Excel (`/trip/export/statements`: revisor, tesorero y administrador) |
 | `/expense` | `expense/expense.js` | Gastos y recibos |
-| `/exchange-rate` | `expense/exchangeRate.js` | Tipo de cambio del día por moneda y lista de monedas admitidas |
 | `/invoice` | `expense/invoice.js` | Extracción y registro de facturas |
 | `/supplier` | `expense/supplier.js` | Proveedores (solo administrador) |
 | `/review` | `approval/review.js` | Revisión previa y de gastos del supervisor |
@@ -399,7 +396,6 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 | `emailService` | Correo transaccional mediante Brevo, con plantilla institucional común (`buildEmailLayout`) |
 | `pdfService` | Conversión de HTML a PDF con Puppeteer |
 | `expenseSummaryService` | Control de gasto diario por moneda, exceso en hoteles y alertas; usado por empleado y revisores por igual |
-| `exchangeRateService` | Tipo de cambio diario: lo consulta a la API una vez por fecha y lo guarda en `Tipo_Cambio_Diario` |
 | `tripExportService` | Reúne los datos de las planillas de varios viajes para exportarlas juntas a Excel |
 
 ### Retenciones impositivas
@@ -413,17 +409,17 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 
 Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal: se imputan íntegros como costo, sin importar el tipo de comprobante. Los valores se calculan al registrar y se persisten, de modo que los reportes históricos no varíen ante cambios de alícuota.
 
-### Monto solicitado y tope
+### Monto del viaje
 
-Al registrar o editar el viaje, el empleado escribe el **monto que solicita** (Bs y, en un viaje internacional, también USD) y un **hospedaje estimado** por moneda. El tope de cada moneda es *días del viaje × tarifa diaria del cargo + hospedaje estimado*; el backend rechaza un monto mayor. Tesorería ve lo solicitado y asigna el monto final.
+Al registrar el viaje, el monto se calcula con las tarifas del cargo del empleado: en un viaje nacional, días × tarifa en Bs; en uno internacional, el día de salida y el de regreso con la tarifa en Bs y los días intermedios con la tarifa en USD. Tesorería revisa y ajusta el monto final al asignar los fondos.
 
 ### Control de gasto diario
 
-El presupuesto se controla día por día y **por moneda**: en un viaje nacional, lo gastado en Bs cada día no puede superar el `monto_diario` del cargo; en uno internacional, cada día se controla con las dos tarifas por separado (gasto en Bs ≤ `monto_diario` y gasto en USD ≤ `monto_diario_usd`), y se puede gastar en cualquiera de las dos monedas cualquier día. Los gastos de hotel quedan fuera del control diario y se controlan contra el total asignado al viaje. Cada día excedido —y el exceso en hoteles, si corresponde— requiere una justificación (`Comentario.fecha_justificada`).
+El presupuesto se controla día por día y **por moneda**: en un viaje nacional, lo gastado en Bs cada día no puede superar el `monto_diario` del cargo; en uno internacional, cada día se controla con las dos tarifas por separado (gasto en Bs ≤ `monto_diario` y gasto en USD ≤ `monto_diario_usd`), y se puede gastar en cualquiera de las dos monedas cualquier día. Los gastos de hotel quedan fuera del control diario y se controlan contra el total asignado al viaje. Cada día excedido —y el exceso en hoteles, si corresponde— requiere una justificación (`Comentario.fecha_justificada`). Al cerrar la rendición, el saldo se calcula por moneda: si en total se gastó más Bs (o USD) que lo asignado, aparece como exceso a reembolsar en esa moneda, y lo que sobra de la otra, como saldo a devolver.
 
-### Tipo de cambio diario
+### Tipo de cambio
 
-En los gastos internacionales con tramos de otra moneda (EUR, PEN, ARS, BRL, CLP, COP, MXN), el tipo de cambio ya no lo escribe el empleado: es **uno por día y moneda**, tomado de la fecha del gasto. `exchangeRateService` lo consulta a la API la primera vez y lo guarda en `Tipo_Cambio_Diario`, de modo que todos los gastos de esa fecha usan el mismo. Si la API no responde, el empleado puede escribirlo a mano y el tramo queda marcado (`tipo_cambio_manual`), lo que se ve en el recibo y en la revisión. Bs y USD no se convierten entre sí.
+En los gastos internacionales pagados en otra moneda (EUR, PEN, ARS, BRL, CLP, COP, MXN), el empleado registra cada tramo con su monto y el tipo de cambio que le aplicaron; el sistema calcula el equivalente en USD. Los tramos son referencia: el monto que vale es el ingresado por el empleado.
 
 ### Gestión de plazos
 
@@ -441,8 +437,8 @@ La invocación (`geminiService`) reintenta ante errores temporales y, si el mode
 
 | Tipo | Qué prueba | Comando | Carpeta |
 |---|---|---|---|
-| Unitarias | Funciones sueltas: retenciones, control diario, topes, tipo de cambio, recordatorios | `npm test` | `tests/services/` |
-| De la API | Endpoints completos contra una base de prueba: permisos, topes, tipo de cambio, exportación | `npm run test:api` | `tests/api/` |
+| Unitarias | Funciones sueltas: retenciones, control diario por moneda, recordatorios, jerarquía | `npm test` | `tests/services/` |
+| De la API | Endpoints completos contra una base de prueba: permisos, viajes, gastos en ambas monedas, tipo de cambio de los tramos, exportación | `npm run test:api` | `tests/api/` |
 
 Las pruebas de la API necesitan una base PostgreSQL de prueba con los scripts de `database/` (`01` a `04` y `testing_02_organizacion_prueba.sql`), servida por PostgREST y el proxy `tests/support/supabaseProxy.js`, que imita la ruta `/rest/v1` de Supabase. **No se corren contra Supabase real.**
 

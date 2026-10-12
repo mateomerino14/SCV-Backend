@@ -5,7 +5,7 @@ const maxTripsPerExport = 50;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const exportRoles = ['ADMINISTRADOR', 'REVISOR'];
 const tripColumns = '*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd))';
-const expenseColumns = '*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, tipo_cambio_manual, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)';
+const expenseColumns = '*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)';
 
 // Convierte la lista de ids recibida ("1,2,3") en numeros validos y sin repetir
 const parseTripIds = (idsText) => [...new Set(String(idsText || '').split(',').map((id) => parseInt(id, 10)).filter((id) => id > 0))];

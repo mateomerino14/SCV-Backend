@@ -99,11 +99,6 @@ create table if not exists "Viaje" (
   placa_vehiculo varchar(20),
   monto_asignado decimal(10, 2) not null,
   monto_asignado_usd numeric(10, 2) default 0,
-  -- Lo que pidio el empleado al registrar el viaje y su hospedaje estimado (tesoreria asigna monto_asignado)
-  monto_solicitado numeric(10, 2) not null default 0,
-  monto_solicitado_usd numeric(10, 2) not null default 0,
-  hospedaje_estimado numeric(10, 2) not null default 0,
-  hospedaje_estimado_usd numeric(10, 2) not null default 0,
   estado varchar(25) not null default 'BORRADOR' constraint viaje_estado_check check (estado in (
     'BORRADOR', 'EN_REVISION_VIAJE', 'APROBADO_VIAJE', 'EN_REVISION_TESORERO', 'EN_CURSO',
     'EN_REVISION', 'EN_REVISION_APROBADOR', 'APROBADO_SUPERVISOR', 'APROBADO_FINAL', 'RECHAZADO'
@@ -177,19 +172,7 @@ create table if not exists "Gasto_Tramo_Moneda" (
   monto_origen numeric(12, 2) not null,
   tipo_cambio numeric(12, 4) not null,
   monto_usd numeric(12, 2) not null,
-  -- true cuando la API de tipo de cambio no respondio y el empleado lo escribio a mano
-  tipo_cambio_manual boolean not null default false,
   id_gasto integer not null references "Gasto"(id_gasto) on delete cascade
-);
-
--- Tipo de cambio diario por moneda (unidades de la moneda por 1 USD), consultado a la API y guardado
-create table if not exists "Tipo_Cambio_Diario" (
-  fecha date not null,
-  moneda varchar(10) not null,
-  tasa numeric(18, 6) not null check (tasa > 0),
-  fuente varchar(50) not null,
-  fecha_consulta timestamptz not null default now(),
-  primary key (fecha, moneda)
 );
 
 create table if not exists "Imagen" (
