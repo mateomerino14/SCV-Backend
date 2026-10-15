@@ -126,8 +126,8 @@
 Autor: & Mateo Alejandro Merino Vidal \\
 Empresa: & MAXAM FANEXA \\
 Componente: & API REST (Node.js, Express y Supabase) \\
-Versión: & 1.1 \\
-Fecha: & 9 de octubre de 2026 \\
+Versión: & 1.2 \\
+Fecha: & 15 de octubre de 2026 \\
 \end{tabular}
 \vspace{1.8cm}
 \end{titlepage}
@@ -167,7 +167,6 @@ multer & Recepción de imágenes de comprobantes y fotos de perfil \\
 node-cron & Resumen de pendientes por correo en los días y horas que configura el administrador \\
 \rowcolor{maxamFondo} Jest y Supertest & Pruebas unitarias y de la API \\
 GitHub Actions & Ejecución automática de las pruebas en cada envío al repositorio \\
-\rowcolor{maxamFondo} Currency API & Tipo de cambio diario de las monedas extranjeras (gratuita, sin clave) \\
 \end{xltabular}
 
 \section{Arquitectura}
@@ -225,7 +224,7 @@ src/
 │   ├── approval/              review, reviewer, approver, treasurer,
 │   │                          deadlineAuthorization, substitution
 │   ├── catalog/               role, position, section, expenseCategory, tax, audit
-│   ├── expense/               expense, invoice, supplier, exchangeRate
+│   ├── expense/               expense, invoice, supplier
 │   ├── trip/                  trip
 │   └── user/                  user, auth
 ├── controllers/             Misma división que routes
@@ -235,8 +234,7 @@ src/
 │   ├── expense/               gastos, facturas, recibos, extracción
 │   ├── trip/                  viajes, acceso, observaciones, planilla, exportación
 │   ├── user/                  tokens, usuarios, directorio
-│   └── shared/                correo, PDF, plazos, jerarquía, IA, resumen diario,
-│                              tipo de cambio
+│   └── shared/                correo, PDF, plazos, jerarquía, IA, resumen diario
 ├── middlewares/             auth, roleAuth, treasurerPosition, límites de intentos
 ├── utils/                   escape HTML, importes en letras, código de viaje
 ├── app.js                   Configuración de Express (seguridad, CORS, rutas)
@@ -288,7 +286,6 @@ npm run resumen -- --prueba   # simula el resumen de pendientes
 \rowcolor{maxamFondo} \code{CORS_ORIGINS} & Opcional. Dominios del cliente permitidos, separados por coma \\
 \code{TRUST_PROXY} & Opcional. \code{true} detrás de un proxy (Nginx); en Render se detecta solo \\
 \rowcolor{maxamFondo} \code{PUPPETEER_EXECUTABLE_PATH} & Opcional. Ruta a un Chromium propio \\
-\code{EXCHANGE_RATE_API_URLS} & Opcional. Direcciones de la API de tipo de cambio, separadas por coma; sin ella se usa Currency API \\
 \end{xltabular}
 
 \begin{xltabular}{\textwidth}{L{3.4cm} L{3.6cm} L{3.3cm} Y}
@@ -311,11 +308,11 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \endfirsthead
 \cabecera \tth{Archivo} & \tth{Contenido} \\
 \endhead
-\rowcolor{maxamFondo} \code{01_schema.sql} & Las 25 tablas, relaciones e índices \\
+\rowcolor{maxamFondo} \code{01_schema.sql} & Las 24 tablas, relaciones e índices \\
 \code{02_functions.sql} & Función \code{incrementar_correlativo_recibo()} para numerar recibos \\
 \rowcolor{maxamFondo} \code{03_seed.sql} & Roles, cargos, impuesto IVA, categorías de gasto y configuración de recordatorios \\
 \code{04_rls_hardening.sql} & Activa seguridad por fila (RLS) en todas las tablas \\
-\rowcolor{maxamFondo} \code{testing_00_borrar_todo.sql} & Elimina las 25 tablas (solo pruebas) \\
+\rowcolor{maxamFondo} \code{testing_00_borrar_todo.sql} & Elimina las 24 tablas (solo pruebas) \\
 \code{testing_01_limpieza_completa.sql} & Borra datos operativos, conserva catálogos \\
 \rowcolor{maxamFondo} \code{testing_02_organizacion_prueba.sql} & Organización de prueba con jerarquía completa; la usan también las pruebas automáticas \\
 \end{xltabular}
@@ -332,24 +329,23 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \rowcolor{maxamFondo} \code{Seccion} & Secciones de la empresa; respaldo en la jerarquía de revisión \\
 \code{Usuario} & Usuarios, jefe directo, estado de contraseña y sesión \\
 \rowcolor{maxamFondo} \code{Codigo_Verificacion} & Códigos de recuperación de contraseña (5 minutos) \\
-\code{Viaje} & Viajes, estado, revisores asignados, monto solicitado, hospedaje estimado, monto asignado y ciclo de revisión \\
+\code{Viaje} & Viajes, estado, revisores asignados, monto asignado en Bs y USD (calculado con las tarifas del cargo) y ciclo de revisión \\
 \rowcolor{maxamFondo} \code{Solicitud_Autorizacion_Plazo} & Ampliaciones de plazo; las pide el titular o su reemplazo \\
 \code{Solicitud_Reemplazo} & Solicitudes para que otra persona rinda el viaje \\
 \rowcolor{maxamFondo} \code{Categoria_Gasto} & Categorías con su cuenta contable de Oracle \\
 \code{Proveedor} & Emisores de facturas \\
 \rowcolor{maxamFondo} \code{Gasto} & Gastos con retenciones impositivas persistidas \\
 \code{Gasto_Subitem} & Desglose de un gasto en varios conceptos \\
-\rowcolor{maxamFondo} \code{Gasto_Tramo_Moneda} & Conversiones de moneda de gastos internacionales, con la marca de tipo de cambio manual \\
+\rowcolor{maxamFondo} \code{Gasto_Tramo_Moneda} & Tramos en otra moneda de gastos internacionales, con el tipo de cambio que escribe el empleado \\
 \code{Imagen} & Comprobante asociado a un gasto \\
 \rowcolor{maxamFondo} \code{Factura} & Datos de la factura de un gasto \\
-\code{Detalle_Factura} & Productos de cada factura \\
+\code{Detalle_Factura} & Productos de cada factura; la cantidad admite hasta 2 decimales \\
 \rowcolor{maxamFondo} \code{Impuesto} y \code{Factura_Impuestos} & Catálogo de impuestos y su relación con facturas \\
 \code{Comentario} & Observaciones de revisión y justificaciones de exceso \\
 \rowcolor{maxamFondo} \code{Auditoria} & Ingresos, salidas y cambios de contraseña \\
 \code{Correlativo_Recibo} y \code{Recibo} & Numeración de recibos y número asignado a cada uno \\
 \rowcolor{maxamFondo} \code{Revision_Viaje} & Historial de aprobaciones y rechazos por persona y etapa \\
 \code{Configuracion_Recordatorio} & Una sola fila con los días y horas del resumen de pendientes \\
-\rowcolor{maxamFondo} \code{Tipo_Cambio_Diario} & Tipo de cambio de cada moneda por día, consultado a la API y guardado \\
 \end{xltabular}
 
 \subsection{Roles}
@@ -492,14 +488,14 @@ Aprobador y revisor son roles únicos: todo viaje de su etapa les corresponde. E
   \item Cualquier etapa de revisión puede rechazar el viaje. El rechazo incrementa \code{ciclo_revision} y \code{fue_iniciado} indica si ocurrió en el primer o en el segundo flujo.
   \item Un viaje rechazado antes de iniciarse se corrige editándolo y vuelve a \code{EN_REVISION_VIAJE}; uno rechazado en la rendición se corrige en sus gastos y se reenvía directamente a \code{EN_REVISION}.
   \item Las escrituras exigen el estado leído (\code{.eq('estado', X)}); si otra persona se adelantó se responde 409 y no se duplican correos ni registros.
-  \item Si el responsable de una etapa única (aprobador, tesorero o revisor) es el propio viajero, la etapa se aprueba sola (\code{selfReviewSkipService}) y los documentos lo indican como aprobación automática. En el caso del tesorero, el fondo queda con el monto que él mismo solicitó.
+  \item Si el responsable de una etapa única (aprobador, tesorero o revisor) es el propio viajero, la etapa se aprueba sola (\code{selfReviewSkipService}) y los documentos lo indican como aprobación automática. En el caso del tesorero, el fondo queda con el monto calculado al registrar el viaje.
   \item Cada aprobación o rechazo se registra en \code{Revision_Viaje}; las bandejas muestran en ``Aprobados'' lo que la persona aprobó y en ``Rechazados'' lo que rechazó y sigue rechazado, ordenado por la fecha de revisión más reciente.
 \end{itemize}
 
 \section{Reglas de negocio}
 
-\subsection{Monto solicitado y tope}
-Al registrar o editar un viaje, el empleado escribe el monto que solicita (en bolivianos y, si el viaje es internacional, también en dólares) y un hospedaje estimado por moneda. El tope de cada moneda es \emph{días del viaje × tarifa diaria del cargo + hospedaje estimado}; el backend rechaza un monto mayor. Tesorería ve lo solicitado y asigna el monto final.
+\subsection{Monto del viaje}
+Al registrar o editar un viaje, el monto se calcula con las tarifas del cargo del empleado y se envía en \code{monto_asignado} y \code{monto_asignado_usd}. En un viaje nacional es \emph{días × tarifa en Bs}. En uno internacional, el día de salida y el de regreso se calculan con la tarifa en Bs y los días intermedios con la tarifa en USD. Tesorería revisa el monto y lo ajusta al asignar los fondos.
 
 \subsection{Control de gasto diario}
 El presupuesto se controla por día y por moneda. En un viaje nacional, lo gastado en bolivianos cada día no puede superar el \code{monto_diario} del cargo. En uno internacional, cada día se controla con las dos tarifas por separado: lo gastado en bolivianos contra \code{monto_diario} y lo gastado en dólares contra \code{monto_diario_usd}. Los hoteles quedan fuera del control diario y se comparan contra el total asignado. Cada día excedido, y el exceso en hoteles, exige una justificación en \code{Comentario.fecha_justificada}; las justificaciones con palabras inapropiadas se rechazan.
@@ -507,8 +503,8 @@ El presupuesto se controla por día y por moneda. En un viaje nacional, lo gasta
 \subsection{Moneda en viajes internacionales}
 En un viaje internacional se puede registrar gastos en bolivianos o en dólares cualquier día. Los tramos de conversión de otras monedas son solo referencia: el monto que vale es el ingresado por el empleado o, si el gasto tiene subítems, la suma de estos.
 
-\subsection{Tipo de cambio diario}
-El tipo de cambio de los tramos ya no lo escribe el empleado: es uno por día y moneda, tomado de la fecha del gasto. \code{exchangeRateService} lo consulta a la API la primera vez y lo guarda en \code{Tipo_Cambio_Diario}, de modo que todos los gastos de esa fecha usan el mismo. Si la API no responde, el empleado lo escribe a mano y el tramo queda marcado con \code{tipo_cambio_manual}, lo que se ve en el recibo y en la revisión. Las monedas admitidas son EUR, PEN, ARS, BRL, CLP, COP y MXN; bolivianos y dólares no se convierten entre sí.
+\subsection{Tipo de cambio}
+En los gastos internacionales pagados en otra moneda (EUR, PEN, ARS, BRL, CLP, COP o MXN), el empleado registra cada tramo con su monto y el tipo de cambio que le aplicaron (1 USD = cuántas unidades de esa moneda); el sistema calcula el equivalente en dólares y lo guarda en \code{Gasto_Tramo_Moneda}. Bolivianos y dólares no se convierten entre sí.
 
 \subsection{Retenciones impositivas}
 \begin{xltabular}{\textwidth}{L{1.4cm} L{5.2cm} Y}
@@ -516,13 +512,13 @@ El tipo de cambio de los tramos ya no lo escribe el empleado: es uno por día y 
 \endfirsthead
 \cabecera \tth{Código} & \tth{Tipo} & \tth{Retenciones} \\
 \endhead
-\rowcolor{maxamFondo} \code{F} & Compra o servicio con factura & Ninguna; genera crédito fiscal de IVA \\
-\code{R} & Documento sin IVA & Ninguna \\
+\rowcolor{maxamFondo} \code{F} & Compra o servicio con factura & Ninguna; genera crédito fiscal de IVA (13\% sobre el subtotal) \\
+\code{R} & Recibo: documento sin IVA & Ninguna; no lleva IVA ni crédito fiscal \\
 \rowcolor{maxamFondo} \code{C} & Compra de bien sin factura & IUE 5\% e IT 3\% sobre base incrementada \\
 \code{S} & Servicio o alquiler sin factura & RC-IVA 13\% e IT 3\% sobre base incrementada \\
 \end{xltabular}
 
-Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
+En la factura (\code{F}) el total es subtotal + IVA del 13\%. Ese IVA no se descuenta de lo que se reconoce al empleado (el costo es el total): se muestra aparte en la planilla como crédito fiscal de la empresa. El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
 
 \subsection{Plazos de registro}
 Tras el fin del viaje hay cuatro días de tolerancia para cargar gastos. Vencido el margen, se debe pedir una ampliación al revisor, que otorga cuatro días desde su respuesta. El plazo es del viaje: la ampliación vale para el titular y para su reemplazo aprobado, cualquiera de los dos puede pedirla y la respuesta se avisa a ambos. El plazo no corre mientras el viaje está rechazado. La ampliación extiende el margen de carga, no el rango de fechas: la fecha del gasto debe pertenecer al periodo del viaje.
@@ -571,17 +567,15 @@ Todas las rutas, salvo las de \code{/auth} y \code{/user/check-email}, requieren
 \epf{PUT}{/trip/:id/submit-review}{Dueño}{Envía a revisión previa}
 \ep{PUT}{/trip/:id/confirm-completion}{Dueño o reemplazo}{Finaliza y envía la rendición}
 \epf{GET}{/trip/export/statements}{Revisor, tesorero, administrador}{Datos de las planillas de varios viajes para Excel}
-\ep{GET}{/exchange-rate}{Sesión}{Tipo de cambio de una moneda en una fecha}
-\epf{GET}{/exchange-rate/currencies}{Sesión}{Monedas admitidas}
-\epf{GET}{/expense/:expenseId/detail}{Acceso al viaje}{Detalle de un gasto}
-\ep{POST}{/expense/register}{Dueño o reemplazo}{Registra un gasto con imagen}
-\epf{PUT}{/expense/:expenseId/update}{Dueño o reemplazo}{Edita un gasto}
-\ep{DELETE}{/expense/:expenseId}{Dueño o reemplazo}{Elimina un gasto}
-\epf{POST}{/expense/:expenseId/receipt}{Recibos}{Envía el recibo individual}
-\ep{POST}{/expense/trip/:tripId/receipt/:type}{Recibos}{Envía el recibo agrupado}
-\epf{POST}{/invoice/extract}{Sesión}{Extrae datos de un comprobante}
-\ep{POST}{/invoice/save}{Dueño o reemplazo}{Registra una factura}
-\epf{PUT}{/invoice/:expenseId/update}{Dueño o reemplazo}{Edita una factura}
+\ep{GET}{/expense/:expenseId/detail}{Acceso al viaje}{Detalle de un gasto}
+\epf{POST}{/expense/register}{Dueño o reemplazo}{Registra un gasto con imagen}
+\ep{PUT}{/expense/:expenseId/update}{Dueño o reemplazo}{Edita un gasto}
+\epf{DELETE}{/expense/:expenseId}{Dueño o reemplazo}{Elimina un gasto}
+\ep{POST}{/expense/:expenseId/receipt}{Recibos}{Envía el recibo individual}
+\epf{POST}{/expense/trip/:tripId/receipt/:type}{Recibos}{Envía el recibo agrupado}
+\ep{POST}{/invoice/extract}{Sesión}{Extrae datos de un comprobante}
+\epf{POST}{/invoice/save}{Dueño o reemplazo}{Registra una factura}
+\ep{PUT}{/invoice/:expenseId/update}{Dueño o reemplazo}{Edita una factura}
 \end{xltabular}}
 
 \subsection{Revisión y aprobación}
@@ -653,8 +647,7 @@ Todas las rutas, salvo las de \code{/auth} y \code{/user/check-email}, requieren
 \code{pdfService} & HTML a PDF con JavaScript desactivado; el navegador se cierra siempre \\
 \rowcolor{maxamFondo} \code{dailyDigestService} & Resumen de pendientes por rol; en modo prueba solo indica a quién le llegaría \\
 \code{reminderScheduleService} & Guarda los días y horas del resumen y lo reprograma sin reiniciar \\
-\rowcolor{maxamFondo} \code{exchangeRateService} & Tipo de cambio diario desde la API, guardado por fecha y moneda \\
-\code{tripExportService} & Reúne las planillas de varios viajes para exportarlas a Excel \\
+\rowcolor{maxamFondo} \code{tripExportService} & Reúne las planillas de varios viajes para exportarlas a Excel \\
 \end{xltabular}
 
 \section{Documentos y notificaciones}
@@ -716,8 +709,9 @@ La imagen del comprobante se envía al modelo de visión de Gemini (\code{invoic
 
 \begin{itemize}
   \item \code{geminiService} reintenta ante errores temporales y, si el modelo principal falla o agotó su cuota, usa un modelo de respaldo.
-  \item La respuesta se normaliza: los datos que faltan quedan como ``No Especificado'' y la fecha se valida. Si no es una fecha real con formato válido, el campo queda editable en el cliente; si vino bien formada, queda bloqueado.
-  \item El empleado revisa y puede corregir todos los datos antes de guardar; el gasto se marca como \code{modificado} cuando hubo correcciones.
+  \item La respuesta se normaliza: los datos que faltan quedan como ``No Especificado'', la fecha se valida (\code{fecha_emision_valida}) y la cantidad de cada producto se redondea a 2 decimales (por ejemplo 53.34 litros de combustible).
+  \item Al registrar, el empleado revisa y puede corregir todos los datos antes de guardar, incluida la fecha de emisión por si la IA la leyó mal; al modificar una factura ya guardada, la fecha queda bloqueada. El gasto se marca como \code{modificado} cuando hubo correcciones.
+  \item Al guardar, cada producto debe tener nombre, precio válido y una cantidad mayor a cero con hasta 2 decimales, igual que la columna \code{Detalle_Factura.cantidad numeric(10, 2)}.
 \end{itemize}
 
 Las imágenes se suben al almacenamiento antes de escribir el gasto o la factura; si la subida falla no queda nada a medio guardar. Una factura repetida (número, fecha y proveedor) se rechaza antes de modificar datos.
@@ -769,11 +763,11 @@ Una prueba automática es código que usa el sistema como lo haría una persona 
 \endfirsthead
 \cabecera \tth{Tipo} & \tth{Qué prueba} & \tth{Comando} \\
 \endhead
-\rowcolor{maxamFondo} Unitarias & Funciones sueltas: retenciones, control diario por moneda, topes del monto solicitado, tipo de cambio, recordatorios, jerarquía, moderación (\code{tests/services/}) & \code{npm test} \\
-De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, topes, tipo de cambio con y sin API, exportación (\code{tests/api/}) & \code{npm run test:api} \\
+\rowcolor{maxamFondo} Unitarias & Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, cantidades con decimales, control diario por moneda, exportación, recordatorios, jerarquía, moderación (\code{tests/services/}) & \code{npm test} \\
+De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, exportación (\code{tests/api/}) & \code{npm run test:api} \\
 \end{xltabular}
 
-Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. La API de tipo de cambio se reemplaza por una de prueba (\code{tests/support/exchangeRateMock.js}) que puede simular una caída. En el estado actual pasan 54 pruebas unitarias y 16 de la API.
+Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. En el estado actual pasan 47 pruebas unitarias y 16 de la API.
 
 \subsection{Integración continua}
 El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio.
