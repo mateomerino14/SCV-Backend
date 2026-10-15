@@ -50,7 +50,7 @@ const uploadInvoiceImage = async (file) => {
   return {url: supabase.storage.from('facturas').getPublicUrl(fileName).data.publicUrl};
 };
 
-// Valida que cada producto tenga nombre, cantidad mayor a cero y precio no negativo
+// Valida que cada producto tenga nombre, cantidad mayor a cero (hasta 2 decimales) y precio no negativo
 const validateInvoiceLines = (lines) => {
   for (const item of lines) {
     if (!String(item?.nombre_producto || '').trim()) {
@@ -58,6 +58,10 @@ const validateInvoiceLines = (lines) => {
     }
     if (!(parseFloat(item.cantidad) > 0) || isNaN(parseFloat(item.precio)) || parseFloat(item.precio) < 0) {
       return 'Cada producto debe tener una cantidad mayor a cero y un precio válido';
+    }
+    // La cantidad admite decimales (litros, kilos) pero solo hasta 2, como la columna numeric(10, 2)
+    if (!/^\d{1,8}(\.\d{1,2})?$/.test(String(item.cantidad))) {
+      return 'La cantidad de cada producto admite como máximo 2 decimales';
     }
   }
   return null;

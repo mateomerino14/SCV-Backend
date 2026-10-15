@@ -49,3 +49,28 @@ test('guarda el tipo de cambio escrito por el empleado', async () => {
   expect(parseFloat(segment.tipo_cambio)).toBe(3.75);
   expect(parseFloat(segment.monto_usd)).toBe(40);
 });
+
+// El recibo se guarda sin IVA y la cantidad del detalle admite decimales
+test('guarda un recibo sin IVA con cantidad decimal', async () => {
+  const response = await employee.postForm('/invoice/save', {
+    id_viaje: tripId, proveedor: 'Surtidor de prueba', numero_factura: 'R-5334', nit: '1020304', fecha_emision: boliviaDate(), tipo_doc: 'R',
+    monto: 199.49, iva: 0, monto_total: 199.49, id_categoria_gasto: 1, detalle: [{nombre_producto: 'Gasolina', cantidad: 53.34, precio: 3.74}],
+  });
+  expect(response.status).toBe(200);
+  const expenseId = response.body.gasto?.id_gasto || response.body.id_gasto;
+  const detail = await employee.get(`/expense/${expenseId}/detail`);
+  const expense = detail.body.gasto || detail.body;
+  expect(expense.tipo).toBe('R');
+  expect(expense.Factura.Factura_Impuestos || []).toHaveLength(0);
+  expect(parseFloat(expense.Factura.Detalle_Factura[0].cantidad)).toBe(53.34);
+});
+
+// Una cantidad con mas de 2 decimales se rechaza
+test('rechaza una cantidad con más de 2 decimales', async () => {
+  const response = await employee.postForm('/invoice/save', {
+    id_viaje: tripId, proveedor: 'Surtidor de prueba', numero_factura: 'R-5335', fecha_emision: boliviaDate(), tipo_doc: 'R',
+    monto: 10, iva: 0, monto_total: 10, id_categoria_gasto: 1, detalle: [{nombre_producto: 'Gasolina', cantidad: 2.345, precio: 4}],
+  });
+  expect(response.status).toBe(400);
+  expect(response.body.error).toMatch(/2 decimales/);
+});

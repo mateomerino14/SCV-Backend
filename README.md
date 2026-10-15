@@ -402,12 +402,12 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 
 | Código | Tipo | Retenciones |
 |---|---|---|
-| `F` | Compra o servicio con factura | Ninguna; genera crédito fiscal de IVA |
-| `R` | Documento sin IVA | Ninguna |
+| `F` | Compra o servicio con factura | Ninguna; genera crédito fiscal de IVA (13 % sobre el subtotal) |
+| `R` | Recibo: documento sin IVA | Ninguna; no lleva IVA ni crédito fiscal |
 | `C` | Compra de bien sin factura | IUE 5% e IT 3% sobre base incrementada |
 | `S` | Servicio o alquiler sin factura | RC-IVA 13% e IT 3% sobre base incrementada |
 
-Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal: se imputan íntegros como costo, sin importar el tipo de comprobante. Los valores se calculan al registrar y se persisten, de modo que los reportes históricos no varíen ante cambios de alícuota.
+En la factura (`F`) el total es subtotal + IVA del 13 %; el IVA no se descuenta de lo que se le reconoce al empleado (el costo es el total), sino que se muestra aparte en la planilla como crédito fiscal de la empresa. El recibo (`R`) no lleva IVA: subtotal y total son iguales y la planilla (PDF y Excel) muestra IVA 0. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal: se imputan íntegros como costo, sin importar el tipo de comprobante. Los valores se calculan al registrar y se persisten, de modo que los reportes históricos no varíen ante cambios de alícuota.
 
 ### Monto del viaje
 
@@ -431,14 +431,14 @@ La extensión amplía el margen para **cargar** los gastos, no el rango de fecha
 
 La imagen del comprobante se envía al modelo de visión de Gemini (`invoiceExtractionService`) con una instrucción que fija el contexto tributario boliviano: el «Importe» es el total con IVA incluido, el IVA es del 13 % y debe devolverse como monto en dinero, y el resultado es un JSON con proveedor, NIT, número de factura, fecha de emisión, monto sin impuestos, IVA, total, tipo de documento (`F` o `R`) y detalle de productos.
 
-La invocación (`geminiService`) reintenta ante errores temporales y, si el modelo principal falla o agotó su cuota, usa un modelo de respaldo. La respuesta se normaliza: los datos que faltan quedan como «No Especificado» y la fecha se valida; si no es una fecha real con formato válido, el campo queda editable en el frontend para que el empleado la corrija, y si vino bien formada, queda bloqueado. El empleado revisa y puede corregir todos los datos antes de guardar.
+La invocación (`geminiService`) reintenta ante errores temporales y, si el modelo principal falla o agotó su cuota, usa un modelo de respaldo. La respuesta se normaliza: los datos que faltan quedan como «No Especificado» y la fecha se valida (`fecha_emision_valida` indica si es una fecha real con formato válido). Al **registrar**, el empleado revisa y puede corregir todos los datos antes de guardar, incluida la fecha de emisión (por si la IA la leyó mal); al **modificar** una factura ya guardada, la fecha queda bloqueada. La cantidad de cada producto admite hasta 2 decimales (por ejemplo 53.34 litros de combustible o 6 unidades), igual que la columna `Detalle_Factura.cantidad numeric(10, 2)`; la extracción la redondea a 2 decimales y el guardado rechaza una cantidad con más.
 
 ## Pruebas automáticas
 
 | Tipo | Qué prueba | Comando | Carpeta |
 |---|---|---|---|
-| Unitarias | Funciones sueltas: retenciones, control diario por moneda, recordatorios, jerarquía | `npm test` | `tests/services/` |
-| De la API | Endpoints completos contra una base de prueba: permisos, viajes, gastos en ambas monedas, tipo de cambio de los tramos, exportación | `npm run test:api` | `tests/api/` |
+| Unitarias | Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, cantidades con decimales, control diario por moneda, recordatorios, jerarquía | `npm test` | `tests/services/` |
+| De la API | Endpoints completos contra una base de prueba: permisos, viajes, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, exportación | `npm run test:api` | `tests/api/` |
 
 Las pruebas de la API necesitan una base PostgreSQL de prueba con los scripts de `database/` (`01` a `04` y `testing_02_organizacion_prueba.sql`), servida por PostgREST y el proxy `tests/support/supabaseProxy.js`, que imita la ruta `/rest/v1` de Supabase. **No se corren contra Supabase real.**
 

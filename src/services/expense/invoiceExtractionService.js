@@ -13,7 +13,7 @@ const buildPrompt = () => {
   "monto_total": monto_numerico_total_con_impuestos,
   "tipo_doc": "F si tiene IVA o impuesto, R si es recibo sin impuesto",
   "detalle": [
-    { "nombre_producto": "descripcion del producto o servicio", "cantidad": numero, "precio": numero_decimal }
+    { "nombre_producto": "descripcion del producto o servicio", "cantidad": numero_decimal, "precio": numero_decimal }
   ]
 }
 
@@ -23,6 +23,7 @@ IMPORTANTE:
 - El IVA boliviano es del 13% sobre el subtotal — si no aparece explícito, calcúlalo como monto_total / 1.13 * 0.13
 - Si no encuentras algún dato, usa null para números y "No Especificado" para textos
 - La fecha debe estar en formato YYYY-MM-DD obligatoriamente
+- La cantidad puede tener decimales (por ejemplo 53.34 litros de combustible); usa como máximo 2 decimales
 - Devuelve SOLO el JSON, sin explicaciones ni texto adicional`;
 };
 
@@ -38,6 +39,15 @@ const isValidEmissionDate = (value) => {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 };
 
+// Redondea la cantidad extraida a 2 decimales (litros, kilos o unidades)
+const normalizeQuantity = (value) => {
+  const quantity = parseFloat(value);
+  if (!(quantity > 0)) {
+    return 1;
+  }
+  return parseFloat(quantity.toFixed(2));
+};
+
 // Normaliza la respuesta del modelo al formato que espera el sistema
 const normalizeResult = (parsedData) => {
   return {
@@ -50,7 +60,7 @@ const normalizeResult = (parsedData) => {
     monto: parsedData.monto || 0,
     monto_total: parsedData.monto_total || 0,
     tipo_doc: parsedData.tipo_doc || 'F',
-    detalle: parsedData.detalle || [],
+    detalle: (parsedData.detalle || []).map((item) => ({...item, cantidad: normalizeQuantity(item?.cantidad)})),
   };
 };
 
@@ -65,4 +75,4 @@ const extractInvoiceData = async (file) => {
   return normalizeResult(JSON.parse(cleanJson));
 };
 
-module.exports = {extractInvoiceData};
+module.exports = {extractInvoiceData, normalizeResult};

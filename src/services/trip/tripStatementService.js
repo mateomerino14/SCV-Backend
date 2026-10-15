@@ -50,6 +50,10 @@ const getExpenseTaxValues = (expense) => {
     return {vat: 0, rcIva: 0, iue: 0, it: 0, cost: amount};
   }
   if (hasInvoice) {
+    // Solo la factura (F) genera credito fiscal; el recibo (R) no lleva IVA
+    if (expense.tipo !== 'F') {
+      return {vat: 0, rcIva: 0, iue: 0, it: 0, cost: amount};
+    }
     const partial = parseFloat(expense.Factura?.monto_parcial || 0);
     const vat = parseFloat((partial * vatRate).toFixed(2));
     return {vat, rcIva: 0, iue: 0, it: 0, cost: amount};
@@ -381,4 +385,4 @@ const generateStatementPdf = async (tripId) => {
   return {buffer: pdfBuffer, fileName: `Rendicion_${tripId}_${safeReason}.pdf`};
 };
 
-module.exports = {generateStatementPdf};
+module.exports = {generateStatementPdf, getExpenseTaxValues};
