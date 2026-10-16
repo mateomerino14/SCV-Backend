@@ -16,9 +16,15 @@ test('el recibo no muestra IVA en la planilla', () => {
   expect(getExpenseTaxValues(expense)).toEqual({vat: 0, rcIva: 0, iue: 0, it: 0, cost: 80});
 });
 
-// La extraccion conserva cantidades con decimales redondeadas a 2
+// La extraccion conserva cantidades con decimales redondeadas a 3
 test('la extracción admite cantidades con decimales', () => {
   const result = normalizeResult({detalle: [{nombre_producto: 'Gasolina', cantidad: 53.3456, precio: 3.74}, {nombre_producto: 'Naranja', cantidad: null, precio: 1}]});
-  expect(result.detalle[0].cantidad).toBe(53.35);
+  expect(result.detalle[0].cantidad).toBe(53.346);
   expect(result.detalle[1].cantidad).toBe(1);
+});
+
+// En un recibo extraido el monto es el total pagado, sin el 13% descontado
+test('el recibo extraído no descuenta el IVA del total', () => {
+  const result = normalizeResult({tipo_doc: 'R', monto: 88.5, iva: 11.5, monto_total: 100, numero_factura: 'BOL-$45@7'});
+  expect(result).toMatchObject({tipo_doc: 'R', monto: 100, iva: 0, monto_total: 100, numero_factura: 'BOL-$45@7'});
 });

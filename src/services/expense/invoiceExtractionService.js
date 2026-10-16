@@ -5,7 +5,7 @@ const buildPrompt = () => {
   return `Analiza esta imagen de una factura o recibo boliviano y devuelve SOLO un JSON sin texto adicional ni backticks con esta estructura exacta:
 {
   "proveedor": "nombre del proveedor o empresa emisora",
-  "numero_factura": "número de factura",
+  "numero_factura": "número de factura; si es un recibo o boleto sin número, su código (puede tener letras y símbolos)",
   "nit": "NIT o CI del proveedor (solo números, máximo 10 dígitos)",
   "fecha_emision": "fecha en formato YYYY-MM-DD",
   "iva": monto_numerico_del_impuesto_en_dinero_NO_el_porcentaje,
@@ -23,7 +23,8 @@ IMPORTANTE:
 - El IVA boliviano es del 13% sobre el subtotal — si no aparece explícito, calcúlalo como monto_total / 1.13 * 0.13
 - Si no encuentras algún dato, usa null para números y "No Especificado" para textos
 - La fecha debe estar en formato YYYY-MM-DD obligatoriamente
-- La cantidad puede tener decimales (por ejemplo 53.34 litros de combustible); usa como máximo 2 decimales
+- La cantidad puede tener decimales (por ejemplo 53.345 litros de combustible); usa como máximo 3 decimales
+- En un recibo (R) no hay impuesto: iva es 0 y monto es igual a monto_total
 - Devuelve SOLO el JSON, sin explicaciones ni texto adicional`;
 };
 
@@ -39,27 +40,38 @@ const isValidEmissionDate = (value) => {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 };
 
-// Redondea la cantidad extraida a 2 decimales (litros, kilos o unidades)
+// Redondea la cantidad extraida a 3 decimales (litros, kilos o unidades)
 const normalizeQuantity = (value) => {
   const quantity = parseFloat(value);
   if (!(quantity > 0)) {
     return 1;
   }
-  return parseFloat(quantity.toFixed(2));
+  return parseFloat(quantity.toFixed(3));
 };
 
 // Normaliza la respuesta del modelo al formato que espera el sistema
 const normalizeResult = (parsedData) => {
+  let docType = 'F';
+  let amount = parsedData.monto || 0;
+  let vat = parsedData.iva || 0;
+  let total = parsedData.monto_total || 0;
+  // El recibo no lleva IVA: el monto es el total pagado, sin descontar nada
+  if (parsedData.tipo_doc === 'R') {
+    docType = 'R';
+    amount = parsedData.monto_total || parsedData.monto || 0;
+    vat = 0;
+    total = amount;
+  }
   return {
     proveedor: parsedData.proveedor || 'No Especificado',
     numero_factura: parsedData.numero_factura || 'No Especificado',
     nit: parsedData.nit || null,
     fecha_emision: parsedData.fecha_emision || '',
     fecha_emision_valida: isValidEmissionDate(parsedData.fecha_emision),
-    iva: parsedData.iva || 0,
-    monto: parsedData.monto || 0,
-    monto_total: parsedData.monto_total || 0,
-    tipo_doc: parsedData.tipo_doc || 'F',
+    iva: vat,
+    monto: amount,
+    monto_total: total,
+    tipo_doc: docType,
     detalle: (parsedData.detalle || []).map((item) => ({...item, cantidad: normalizeQuantity(item?.cantidad)})),
   };
 };
