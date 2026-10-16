@@ -3,6 +3,7 @@ const deadlineService = require('../shared/deadlineService');
 const emailService = require('../shared/emailService');
 const {escapeHtml} = require('../../utils/htmlEscape');
 const substitutionService = require('./substitutionService');
+const {shortenText} = require('../../utils/textNormalizer');
 
 const toleranceDays = 4;
 const boliviaOffsetHours = -4;
@@ -280,7 +281,7 @@ const approveRequest = async (requestId, reviewerId) => {
         ${emailService.emailButton()}
       `;
       const html = emailService.buildEmailLayout('Autorización de plazo aprobada', body);
-      await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Autorización Aprobada — ${request.Viaje?.motivo}`, html);
+      await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Autorización Aprobada — ${shortenText(request.Viaje?.motivo)}`, html);
     }
   }
   catch (error) {
@@ -337,7 +338,7 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
         ${emailService.emailNote('Si consideras que hubo un error, comunícate con tu revisor asignado.')}
       `;
       const html = emailService.buildEmailLayout('Autorización de plazo rechazada', body);
-      await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Autorización Rechazada — ${request.Viaje?.motivo}`, html);
+      await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Autorización Rechazada — ${shortenText(request.Viaje?.motivo)}`, html);
     }
   }
   catch (error) {

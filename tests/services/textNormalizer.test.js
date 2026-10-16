@@ -23,3 +23,10 @@ test('recorta espacios sobrantes', () => {
   const result = textNormalizer.normalizeText('  texto con espacios  ');
   expect(result).toBe('texto con espacios');
 });
+// Los motivos largos se acortan en los asuntos de correo
+test('acorta un texto largo para el asunto', () => {
+  expect(textNormalizer.shortenText('Corto')).toBe('Corto');
+  const long = textNormalizer.shortenText('a'.repeat(120));
+  expect(long).toHaveLength(60);
+  expect(long.endsWith('…')).toBe(true);
+});

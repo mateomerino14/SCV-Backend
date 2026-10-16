@@ -1,6 +1,7 @@
 const supabase = require('../../config/supabase');
 const emailService = require('../shared/emailService');
 const {escapeHtml} = require('../../utils/htmlEscape');
+const {shortenText} = require('../../utils/textNormalizer');
 
 // Obtiene los revisores activos con correo corporativo
 const getActiveReviewers = async () => {
@@ -263,7 +264,7 @@ const approveRequest = async (requestId, reviewerId) => {
       `;
       const html = emailService.buildEmailLayout('Reemplazo aprobado', body);
       // Si falla este correo, igual se avisa al reemplazo
-      await emailService.sendEmail([{email: employee.email_corporativo, name: employeeName}], `Reemplazo Aprobado — ${request.Viaje?.motivo}`, html)
+      await emailService.sendEmail([{email: employee.email_corporativo, name: employeeName}], `Reemplazo Aprobado — ${shortenText(request.Viaje?.motivo)}`, html)
         .catch((employeeEmailError) => console.warn('Error notificando al titular del reemplazo:', employeeEmailError.message));
     }
     if (substitute?.email_corporativo) {
@@ -278,7 +279,7 @@ const approveRequest = async (requestId, reviewerId) => {
         ${emailService.emailButton()}
       `;
       const html = emailService.buildEmailLayout('Nueva rendición asignada', body);
-      await emailService.sendEmail([{email: substitute.email_corporativo, name: substituteName}], `Rendición de ${employeeName} — ${request.Viaje?.motivo}`, html);
+      await emailService.sendEmail([{email: substitute.email_corporativo, name: substituteName}], `Rendición de ${employeeName} — ${shortenText(request.Viaje?.motivo)}`, html);
     }
   }
   catch (emailError) {
@@ -333,7 +334,7 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
         ${emailService.emailHighlightBox('Motivo del rechazo', observation.trim())}
       `;
       const html = emailService.buildEmailLayout('Reemplazo rechazado', body);
-      await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Reemplazo Rechazado — ${request.Viaje?.motivo}`, html);
+      await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Reemplazo Rechazado — ${shortenText(request.Viaje?.motivo)}`, html);
     }
   }
   catch (emailError) {

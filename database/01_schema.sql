@@ -89,7 +89,7 @@ create table if not exists "Auditoria" (
 
 create table if not exists "Viaje" (
   id_viaje serial primary key,
-  motivo varchar(100) not null,
+  motivo varchar(500) not null,
   origen text,
   destino varchar(200) not null,
   fecha_inicio date not null,

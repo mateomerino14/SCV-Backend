@@ -154,8 +154,8 @@ const isValidAmount = (value) => value !== undefined && value !== null && value 
 
 // Valida los datos de un viaje al crearlo o reeditarlo, con los mismos limites de la base
 const validateTripData = (tripData) => {
-  if (!tripData.motivo?.trim() || tripData.motivo.trim().length > 100) {
-    return 'El motivo es requerido y no puede superar los 100 caracteres';
+  if (!tripData.motivo?.trim() || tripData.motivo.trim().length > 500) {
+    return 'El motivo es requerido y no puede superar los 500 caracteres';
   }
   if (!tripData.destino?.trim() || tripData.destino.trim().length > 200) {
     return 'El destino es requerido y no puede superar los 200 caracteres';

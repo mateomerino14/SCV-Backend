@@ -39,3 +39,12 @@ test('reedita un borrador con otro monto', async () => {
   const detail = await employee.get(`/trip/${created.body.id_viaje}`);
   expect(parseFloat(detail.body.viaje.monto_asignado)).toBe(1000);
 });
+
+// El motivo admite hasta 500 caracteres
+test('acepta un motivo de 500 caracteres y rechaza uno más largo', async () => {
+  const employee = api(await login('juan.empleado'));
+  const accepted = await employee.post('/trip', tripData({motivo: 'm'.repeat(500)}));
+  expect(accepted.status).toBe(200);
+  const rejected = await employee.post('/trip', tripData({motivo: 'm'.repeat(501)}));
+  expect(rejected.status).toBe(400);
+});
