@@ -514,11 +514,11 @@ En los gastos internacionales pagados en otra moneda (EUR, PEN, ARS, BRL, CLP, C
 \endhead
 \rowcolor{maxamFondo} \code{F} & Compra o servicio con factura & Ninguna; genera crédito fiscal de IVA (13\% sobre el subtotal) \\
 \code{R} & Recibo: documento sin IVA & Ninguna; no lleva IVA ni crédito fiscal \\
-\rowcolor{maxamFondo} \code{C} & Compra de bien sin factura & IUE 5\% e IT 3\% sobre base incrementada \\
-\code{S} & Servicio o alquiler sin factura & RC-IVA 13\% e IT 3\% sobre base incrementada \\
+\rowcolor{maxamFondo} \code{C} & Compra de bien sin factura & IUE 5\% e IT 3\% sobre el total \\
+\code{S} & Servicio o alquiler sin factura & RC-IVA 13\% e IT 3\% sobre el total \\
 \end{xltabular}
 
-En la factura (\code{F}) el total es subtotal + IVA del 13\%. Ese IVA no se descuenta de lo que se reconoce al empleado (el costo es el total): se muestra aparte en la planilla como crédito fiscal de la empresa. El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. En los gastos sin factura la empresa asume los impuestos (base incrementada): la base imponible es el monto pagado $\div$ 0.84 en servicios (100\% $-$ 13\% $-$ 3\%) o $\div$ 0.92 en compras (100\% $-$ 5\% $-$ 3\%), y las alícuotas se aplican sobre esa base, no sobre el monto pagado. Por ejemplo, con 47.62 pagados la base es 56.69, el RC-IVA 7.37 y el IT 1.70, y 47.62 + 7.37 + 1.70 = 56.69. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
+En la factura (\code{F}) el total es subtotal + IVA del 13\%. Ese IVA no se descuenta de lo que se reconoce al empleado (el costo es el total): se muestra aparte en la planilla como crédito fiscal de la empresa. El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. En los gastos sin factura, las retenciones se calculan sobre el total del documento y al proveedor se le cancela el total menos las retenciones. Por ejemplo, en un servicio de 47.62 el RC-IVA es 6.19, el IT 1.43 y el importe a cancelar 40.00. El total cuenta para el presupuesto y como costo en la planilla. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
 
 \subsection{Plazos de registro}
 Tras el fin del viaje hay cuatro días de tolerancia para cargar gastos. Vencido el margen, se debe pedir una ampliación al revisor, que otorga cuatro días desde su respuesta. El plazo es del viaje: la ampliación vale para el titular y para su reemplazo aprobado, cualquiera de los dos puede pedirla y la respuesta se avisa a ambos. El plazo no corre mientras el viaje está rechazado. La ampliación extiende el margen de carga, no el rango de fechas: la fecha del gasto debe pertenecer al periodo del viaje.
@@ -767,7 +767,7 @@ Una prueba automática es código que usa el sistema como lo haría una persona 
 De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, exportación (\code{tests/api/}) & \code{npm run test:api} \\
 \end{xltabular}
 
-Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. En el estado actual pasan 48 pruebas unitarias y 17 de la API.
+Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. En el estado actual pasan 52 pruebas unitarias y 17 de la API.
 
 \subsection{Integración continua}
 El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio.
