@@ -88,7 +88,8 @@ const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, typ
   if (!isInternational) {
     totalIt = expenses.reduce((sum, expense) => sum + parseFloat(expense.retencion_it || 0), 0);
   }
-  const totalToPay = expenses.reduce((sum, expense) => sum + parseFloat(expense.importe_costo || expense.monto_total || 0), 0);
+  // Al proveedor se le cancela el total menos las retenciones
+  const totalToPay = parseFloat((totalAmount - totalRetention - totalIt).toFixed(2));
   const costCenter = employee?.Seccion?.nombre || '';
   const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords);
   const expenseRows = expenses.map((expense, index) => {
@@ -285,7 +286,8 @@ const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, t
   if (!isInternational) {
     totalIt = parseFloat(expense.retencion_it || 0);
   }
-  const totalToPay = parseFloat(expense.importe_costo || expense.monto_total || 0);
+  // Al proveedor se le cancela el total menos las retenciones
+  const totalToPay = parseFloat((totalAmount - totalRetention - totalIt).toFixed(2));
   const costCenter = employee?.Seccion?.nombre || '';
   const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords);
   let expenseRows = '';
@@ -582,4 +584,4 @@ const sendIndividualReceipt = async (expenseId) => {
   return {message: reissued ? 'Recibo reenviado correctamente' : 'Recibo generado y enviado correctamente', numeroRecibo: receiptNumber, reenvio: reissued};
 };
 
-module.exports = {sendGroupedReceipt, sendIndividualReceipt};
+module.exports = {sendGroupedReceipt, sendIndividualReceipt, generateIndividualReceiptHtml};

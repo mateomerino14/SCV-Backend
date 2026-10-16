@@ -52,8 +52,9 @@ test('guarda el tipo de cambio escrito por el empleado', async () => {
 
 // El recibo se guarda sin IVA, con un codigo con simbolos como numero y una cantidad con 3 decimales
 test('guarda un recibo sin IVA con código y cantidad decimal', async () => {
+  const invoiceCode = `BOL-$${Date.now() % 100000}@34`;
   const response = await employee.postForm('/invoice/save', {
-    id_viaje: tripId, proveedor: 'Surtidor de prueba', numero_factura: 'BOL-$53@34', nit: '1020304', fecha_emision: boliviaDate(), tipo_doc: 'R',
+    id_viaje: tripId, proveedor: 'Surtidor de prueba', numero_factura: invoiceCode, nit: '1020304', fecha_emision: boliviaDate(), tipo_doc: 'R',
     monto: 199.51, iva: 0, monto_total: 199.51, id_categoria_gasto: 1, detalle: [{nombre_producto: 'Gasolina', cantidad: 53.345, precio: 3.74}],
   });
   expect(response.status).toBe(200);
@@ -62,7 +63,7 @@ test('guarda un recibo sin IVA con código y cantidad decimal', async () => {
   const expense = detail.body.gasto || detail.body;
   expect(expense.tipo).toBe('R');
   expect(expense.Factura.Factura_Impuestos || []).toHaveLength(0);
-  expect(expense.Factura.numero_factura).toBe('BOL-$53@34');
+  expect(expense.Factura.numero_factura).toBe(invoiceCode);
   expect(parseFloat(expense.Factura.Detalle_Factura[0].cantidad)).toBe(53.345);
 });
 

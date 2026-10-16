@@ -4,25 +4,19 @@ const alcoholDetectionService = require('../shared/alcoholDetectionService');
 const supplierService = require('./supplierService');
 const substitutionService = require('../approval/substitutionService');
 
-// Calcula las retenciones; los gastos con alcohol se imputan completos como costo
+// Calcula las retenciones sobre el total del documento; al proveedor se le cancela el total menos las retenciones
 const calculateRetentions = (amount, type, isInternational, hasAlcohol) => {
   const amountNum = parseFloat(amount);
-  if (hasAlcohol || isInternational || type === 'F' || type === 'R') {
-    return {base_imponible: amountNum, retencion_rc_iva: 0, retencion_iue: 0, retencion_it: 0, importe_costo: amountNum};
+  const noRetentions = {base_imponible: amountNum, retencion_rc_iva: 0, retencion_iue: 0, retencion_it: 0, importe_costo: amountNum};
+  if (hasAlcohol || isInternational || !['C', 'S'].includes(type)) {
+    return noRetentions;
   }
+  const it = parseFloat((amountNum * 0.03).toFixed(2));
+  // Compra sin factura: IUE 5% e IT 3%; servicio sin factura: RC-IVA 13% e IT 3%
   if (type === 'C') {
-    const base = parseFloat((amountNum / 0.92).toFixed(2));
-    const iue = parseFloat((base * 0.05).toFixed(2));
-    const it = parseFloat((base * 0.03).toFixed(2));
-    return {base_imponible: base, retencion_rc_iva: 0, retencion_iue: iue, retencion_it: it, importe_costo: base};
+    return {...noRetentions, retencion_iue: parseFloat((amountNum * 0.05).toFixed(2)), retencion_it: it};
   }
-  if (type === 'S') {
-    const base = parseFloat((amountNum / 0.84).toFixed(2));
-    const rcIva = parseFloat((base * 0.13).toFixed(2));
-    const it = parseFloat((base * 0.03).toFixed(2));
-    return {base_imponible: base, retencion_rc_iva: rcIva, retencion_iue: 0, retencion_it: it, importe_costo: base};
-  }
-  return {base_imponible: amountNum, retencion_rc_iva: 0, retencion_iue: 0, retencion_it: 0, importe_costo: amountNum};
+  return {...noRetentions, retencion_rc_iva: parseFloat((amountNum * 0.13).toFixed(2)), retencion_it: it};
 };
 
 // Calcula el monto total a partir de un arreglo de subitems
