@@ -413,6 +413,8 @@ En la factura (`F`) el total es subtotal + IVA del 13 %; al empleado se le recon
 
 Al registrar el viaje, el monto se calcula con las tarifas del cargo del empleado: en un viaje nacional, días × tarifa en Bs; en uno internacional, el día de salida y el de regreso con la tarifa en Bs y los días intermedios con la tarifa en USD. Tesorería revisa y ajusta el monto final al asignar los fondos.
 
+El motivo del viaje admite hasta 500 caracteres; en los asuntos de correo se acorta (`shortenText`) y en el nombre de los archivos se usan sus primeros caracteres.
+
 ### Control de gasto diario
 
 El presupuesto se controla día por día y **por moneda**: en un viaje nacional, lo gastado en Bs cada día no puede superar el `monto_diario` del cargo; en uno internacional, cada día se controla con las dos tarifas por separado (gasto en Bs ≤ `monto_diario` y gasto en USD ≤ `monto_diario_usd`), y se puede gastar en cualquiera de las dos monedas cualquier día. Los gastos de hotel quedan fuera del control diario y se controlan contra el total asignado al viaje. Cada día excedido —y el exceso en hoteles, si corresponde— requiere una justificación (`Comentario.fecha_justificada`). Al cerrar la rendición, el saldo se calcula por moneda: si en total se gastó más Bs (o USD) que lo asignado, aparece como exceso a reembolsar en esa moneda, y lo que sobra de la otra, como saldo a devolver.
