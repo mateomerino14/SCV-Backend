@@ -4,10 +4,12 @@ jest.mock('../../src/services/shared/geminiService', () => ({}));
 const {getExpenseTaxValues} = require('../../src/services/trip/tripStatementService');
 const {normalizeResult} = require('../../src/services/expense/invoiceExtractionService');
 
-// La factura (F) calcula el IVA del 13% sobre el subtotal
-test('la factura muestra el IVA del 13% en la planilla', () => {
+// La factura (F) calcula el IVA del 13% sobre el subtotal y el costo es el importe sin IVA
+test('la factura muestra el IVA del 13% y el costo sin IVA en la planilla', () => {
   const expense = {tipo: 'F', monto_total: '113.00', Factura: {monto_parcial: '100.00'}};
-  expect(getExpenseTaxValues(expense)).toEqual({vat: 13, rcIva: 0, iue: 0, it: 0, cost: 113});
+  expect(getExpenseTaxValues(expense)).toEqual({vat: 13, rcIva: 0, iue: 0, it: 0, cost: 100});
+  const fuel = {tipo: 'F', monto_total: '305.00', Factura: {monto_parcial: '269.91'}};
+  expect(getExpenseTaxValues(fuel)).toEqual({vat: 35.09, rcIva: 0, iue: 0, it: 0, cost: 269.91});
 });
 
 // El recibo (R) no lleva IVA aunque tenga registro de factura
