@@ -339,7 +339,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \rowcolor{maxamFondo} \code{Gasto_Tramo_Moneda} & Tramos en otra moneda de gastos internacionales, con el tipo de cambio que escribe el empleado \\
 \code{Imagen} & Comprobante asociado a un gasto \\
 \rowcolor{maxamFondo} \code{Factura} & Datos de la factura de un gasto \\
-\code{Detalle_Factura} & Productos de cada factura; la cantidad admite hasta 2 decimales \\
+\code{Detalle_Factura} & Productos de cada factura; la cantidad admite hasta 3 decimales \\
 \rowcolor{maxamFondo} \code{Impuesto} y \code{Factura_Impuestos} & Catálogo de impuestos y su relación con facturas \\
 \code{Comentario} & Observaciones de revisión y justificaciones de exceso \\
 \rowcolor{maxamFondo} \code{Auditoria} & Ingresos, salidas y cambios de contraseña \\
@@ -425,9 +425,9 @@ Cambiar la contraseña reinicia el conteo de 90 días, limpia el motivo, invalid
 \endfirsthead
 \cabecera \tth{Operación} & \tth{Límite} & \tth{Observación} \\
 \endhead
-\rowcolor{maxamFondo} Inicio de sesión & 10 fallos / 15 min por IP & Los ingresos correctos no cuentan \\
-Envío de código & 10 / 15 min & También aplica a la verificación de correo \\
-\rowcolor{maxamFondo} Verificación de código & 10 fallos / 15 min & Cada código se anula tras 5 intentos fallidos \\
+\rowcolor{maxamFondo} Inicio de sesión & 10 fallos / 15 min por cuenta (IP + correo); 100 por IP & Los errores de un usuario no bloquean a los demás de la misma red; los ingresos correctos no cuentan \\
+Envío de código & 10 / 15 min por cuenta; 50 por IP & También aplica a la verificación de correo \\
+\rowcolor{maxamFondo} Verificación de código & 10 fallos / 15 min por cuenta; 50 por IP & Cada código se anula tras 5 intentos fallidos \\
 Extracción de facturas & 20 / hora por usuario & Protege la cuota del modelo de IA \\
 \end{xltabular}
 
@@ -518,7 +518,7 @@ En los gastos internacionales pagados en otra moneda (EUR, PEN, ARS, BRL, CLP, C
 \code{S} & Servicio o alquiler sin factura & RC-IVA 13\% e IT 3\% sobre base incrementada \\
 \end{xltabular}
 
-En la factura (\code{F}) el total es subtotal + IVA del 13\%. Ese IVA no se descuenta de lo que se reconoce al empleado (el costo es el total): se muestra aparte en la planilla como crédito fiscal de la empresa. El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
+En la factura (\code{F}) el total es subtotal + IVA del 13\%. Ese IVA no se descuenta de lo que se reconoce al empleado (el costo es el total): se muestra aparte en la planilla como crédito fiscal de la empresa. El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. En los gastos sin factura la empresa asume los impuestos (base incrementada): la base imponible es el monto pagado $\div$ 0.84 en servicios (100\% $-$ 13\% $-$ 3\%) o $\div$ 0.92 en compras (100\% $-$ 5\% $-$ 3\%), y las alícuotas se aplican sobre esa base, no sobre el monto pagado. Por ejemplo, con 47.62 pagados la base es 56.69, el RC-IVA 7.37 y el IT 1.70, y 47.62 + 7.37 + 1.70 = 56.69. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
 
 \subsection{Plazos de registro}
 Tras el fin del viaje hay cuatro días de tolerancia para cargar gastos. Vencido el margen, se debe pedir una ampliación al revisor, que otorga cuatro días desde su respuesta. El plazo es del viaje: la ampliación vale para el titular y para su reemplazo aprobado, cualquiera de los dos puede pedirla y la respuesta se avisa a ambos. El plazo no corre mientras el viaje está rechazado. La ampliación extiende el margen de carga, no el rango de fechas: la fecha del gasto debe pertenecer al periodo del viaje.
@@ -709,9 +709,9 @@ La imagen del comprobante se envía al modelo de visión de Gemini (\code{invoic
 
 \begin{itemize}
   \item \code{geminiService} reintenta ante errores temporales y, si el modelo principal falla o agotó su cuota, usa un modelo de respaldo.
-  \item La respuesta se normaliza: los datos que faltan quedan como ``No Especificado'', la fecha se valida (\code{fecha_emision_valida}) y la cantidad de cada producto se redondea a 2 decimales (por ejemplo 53.34 litros de combustible).
+  \item La respuesta se normaliza: los datos que faltan quedan como ``No Especificado'', la fecha se valida (\code{fecha_emision_valida}) y la cantidad de cada producto se redondea a 3 decimales (por ejemplo 53.345 litros de combustible). En un recibo el monto es el total pagado y el IVA es 0. Si un recibo o boleto no tiene número, se usa su código, que puede tener símbolos como \code{@} o \code{\$}.
   \item Al registrar, el empleado revisa y puede corregir todos los datos antes de guardar, incluida la fecha de emisión por si la IA la leyó mal; al modificar una factura ya guardada, la fecha queda bloqueada. El gasto se marca como \code{modificado} cuando hubo correcciones.
-  \item Al guardar, cada producto debe tener nombre, precio válido y una cantidad mayor a cero con hasta 2 decimales, igual que la columna \code{Detalle_Factura.cantidad numeric(10, 2)}.
+  \item Al guardar, cada producto debe tener nombre, precio válido y una cantidad mayor a cero con hasta 3 decimales, igual que la columna \code{Detalle_Factura.cantidad numeric(12, 3)}.
 \end{itemize}
 
 Las imágenes se suben al almacenamiento antes de escribir el gasto o la factura; si la subida falla no queda nada a medio guardar. Una factura repetida (número, fecha y proveedor) se rechaza antes de modificar datos.
@@ -767,7 +767,7 @@ Una prueba automática es código que usa el sistema como lo haría una persona 
 De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, exportación (\code{tests/api/}) & \code{npm run test:api} \\
 \end{xltabular}
 
-Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. En el estado actual pasan 47 pruebas unitarias y 16 de la API.
+Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. En el estado actual pasan 48 pruebas unitarias y 17 de la API.
 
 \subsection{Integración continua}
 El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio.
