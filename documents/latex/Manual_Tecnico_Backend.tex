@@ -126,8 +126,8 @@
 Autor: & Mateo Alejandro Merino Vidal \\
 Empresa: & MAXAM FANEXA \\
 Componente: & API REST (Node.js, Express y Supabase) \\
-Versión: & 1.2 \\
-Fecha: & 15 de octubre de 2026 \\
+Versión: & 1.3 \\
+Fecha: & 17 de octubre de 2026 \\
 \end{tabular}
 \vspace{1.8cm}
 \end{titlepage}
@@ -368,6 +368,8 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
   \item \textbf{Marcas temporales} en \code{timestamptz}: el tipo sin zona horaria desplazaba las fechas cuatro horas respecto de Bolivia.
   \item \textbf{Retenciones persistidas}: \code{base_imponible}, \code{retencion_rc_iva}, \code{retencion_iue}, \code{retencion_it} e \code{importe_costo} se guardan al registrar, para que los reportes históricos no cambien si cambian las alícuotas.
   \item \textbf{Moneda}: los gastos en bolivianos se guardan con \code{BOB}; los internacionales con la moneda en mayúsculas.
+  \item \textbf{Cantidades}: \code{Detalle_Factura.cantidad} es \code{numeric(12, 3)} para admitir litros o kilos con hasta tres decimales.
+  \item \textbf{Motivo del viaje}: \code{Viaje.motivo} admite 500 caracteres; los asuntos de correo lo acortan con \code{shortenText}.
   \item \textbf{Observaciones}: \code{Comentario.id_gasto} usa \code{on delete set null}; al borrar un gasto la observación se conserva.
   \item \textbf{Solicitudes cerradas solas}: si el viaje pasa a revisión con una solicitud pendiente, queda \code{RECHAZADA} sin \code{id_revisor} y con el motivo del cierre.
   \item \textbf{RLS activo}: el backend usa la clave de servicio; RLS impide el acceso directo con la clave pública.
@@ -660,7 +662,7 @@ Todas las rutas, salvo las de \code{/auth} y \code{/user/check-email}, requieren
 \endhead
 \rowcolor{maxamFondo} Memorándum de aprobación & Aprobación del aprobador & Empleado \\
 Confirmación de fondo & Aprobación de tesorería & Empleado (incluye origen y destino) \\
-\rowcolor{maxamFondo} Recibos de compra y servicio & A pedido & Empleado; el número se reutiliza al reenviar \\
+\rowcolor{maxamFondo} Recibos de compra y servicio & A pedido & Empleado; muestran el total, las retenciones y el importe a cancelar (total $-$ retenciones); el número se reutiliza al reenviar \\
 Rendición final & Aprobación final & Revisor y empleado, con saldo por moneda \\
 \rowcolor{maxamFondo} Planilla de rendición & A pedido & Descarga del empleado \\
 \end{xltabular}

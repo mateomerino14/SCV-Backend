@@ -41,7 +41,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Seccion | Secciones/departamentos de la empresa; se usa como respaldo intermedio en la jerarquia de revision cuando falta el jefe directo |
 | Usuario | Usuarios del sistema |
 | Codigo_Verificacion | Codigos temporales de verificacion por correo |
-| Viaje | Viajes registrados, con su flujo de estados, revisores asignados y monto asignado (Bs y USD) |
+| Viaje | Viajes registrados (motivo de hasta 500 caracteres), con su flujo de estados, revisores asignados y monto asignado (Bs y USD) |
 | Solicitud_Autorizacion_Plazo | Solicitudes de extension de plazo para seguir registrando gastos; las puede pedir el titular o su reemplazo (`id_empleado` es quien la pidio) |
 | Categoria_Gasto | Categorias de gasto con su cuenta contable de Oracle |
 | Proveedor | Proveedores/emisores de facturas |
@@ -49,8 +49,8 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Gasto_Subitem | Desglose de un gasto en varios conceptos |
 | Gasto_Tramo_Moneda | Tramos de conversion de moneda para gastos internacionales, con el tipo de cambio que registra el empleado |
 | Imagen | Imagenes/comprobantes asociados a un gasto (una por gasto) |
-| Factura | Facturas asociadas a un gasto (una por gasto) |
-| Detalle_Factura | Lineas de detalle (productos) de una factura |
+| Factura | Facturas o recibos asociados a un gasto (una por gasto); el numero puede ser un codigo con simbolos |
+| Detalle_Factura | Lineas de detalle (productos) de una factura; la cantidad admite hasta 3 decimales (litros, kilos o unidades) |
 | Impuesto | Catalogo de impuestos (IVA, etc) |
 | Factura_Impuestos | Relacion muchos a muchos entre facturas e impuestos |
 | Comentario | Observaciones sobre un viaje o gasto especifico, y justificaciones (una por dia excedido) |
