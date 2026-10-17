@@ -30,3 +30,11 @@ test('el recibo extraído no descuenta el IVA del total', () => {
   const result = normalizeResult({tipo_doc: 'R', monto: 88.5, iva: 11.5, monto_total: 100, numero_factura: 'BOL-$45@7'});
   expect(result).toMatchObject({tipo_doc: 'R', monto: 100, iva: 0, monto_total: 100, numero_factura: 'BOL-$45@7'});
 });
+
+// Una factura con solo el total separa el IVA por dentro, sin cambiar el total
+test('la factura extraída con solo el total separa el IVA por dentro', () => {
+  const result = normalizeResult({tipo_doc: 'F', monto_total: 305});
+  expect(result).toMatchObject({tipo_doc: 'F', monto: 269.91, iva: 35.09, monto_total: 305});
+  const explicit = normalizeResult({tipo_doc: 'F', monto: 100, iva: 13, monto_total: 113});
+  expect(explicit).toMatchObject({monto: 100, iva: 13, monto_total: 113});
+});

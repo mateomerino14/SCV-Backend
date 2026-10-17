@@ -62,6 +62,12 @@ const normalizeResult = (parsedData) => {
     vat = 0;
     total = amount;
   }
+  // Si la factura no trae subtotal e IVA coherentes con el total, el IVA se separa por dentro del total
+  const totalNum = parseFloat(total) || 0;
+  if (docType === 'F' && totalNum > 0 && Math.abs((parseFloat(amount) || 0) + (parseFloat(vat) || 0) - totalNum) > 0.02) {
+    amount = parseFloat((totalNum / 1.13).toFixed(2));
+    vat = parseFloat((totalNum - amount).toFixed(2));
+  }
   return {
     proveedor: parsedData.proveedor || 'No Especificado',
     numero_factura: parsedData.numero_factura || 'No Especificado',
