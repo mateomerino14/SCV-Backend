@@ -27,8 +27,7 @@ const getMyTrips = async (req, res) => {
 // Obtiene el detalle de un viaje junto con los comentarios del aprobador
 const getTripDetail = async (req, res) => {
   const {tripId} = req.params;
-  const approverId = req.user.id_usuario;
-  const result = await approverService.getTripDetail(tripId, approverId);
+  const result = await approverService.getTripDetail(tripId);
   if (result.error) {
     return res.status(result.status).json({error: result.error});
   }

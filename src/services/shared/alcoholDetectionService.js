@@ -130,32 +130,6 @@ const analyzeAlcoholText = async (text) => {
   }
 };
 
-// Recalcula y actualiza el indicador de alcohol de un gasto puntual a partir del detalle de su factura
-const updateAlcoholInExpenseFromDetails = async (expenseId, details) => {
-  try {
-    const result = await analyzeAlcohol(details);
-    await supabase.from('Gasto').update({tiene_alcohol: result}).eq('id_gasto', expenseId);
-    return result;
-  }
-  catch (error) {
-    console.warn('Error en updateAlcoholInExpenseFromDetails:', error.message);
-    return false;
-  }
-};
-
-// Recalcula y actualiza el indicador de alcohol de un gasto puntual a partir de su descripcion libre
-const updateAlcoholInExpenseFromText = async (expenseId, text) => {
-  try {
-    const result = await analyzeAlcoholText(text);
-    await supabase.from('Gasto').update({tiene_alcohol: result}).eq('id_gasto', expenseId);
-    return result;
-  }
-  catch (error) {
-    console.warn('Error en updateAlcoholInExpenseFromText:', error.message);
-    return false;
-  }
-};
-
 // Recalcula el indicador de alcohol del viaje a partir de sus gastos, sin consultar a la IA
 const updateAlcoholInTrip = async (tripId) => {
   try {
@@ -173,62 +147,8 @@ const updateAlcoholInTrip = async (tripId) => {
   }
 };
 
-// Lista de palabras inapropiadas que se bloquean sin necesidad de IA
-const hardcodedBadWords = [
-  'puta', 'mierda', 'coño', 'polla', 'gilipollas', 'imbécil', 'imbecil',
-  'idiota', 'estúpido', 'estupido', 'pendejo', 'culero', 'chingada',
-  'verga', 'maricón', 'maricon', 'cabrón', 'cabron', 'bastardo',
-  'hijo de puta', 'hdp', 'conchetumare', 'weon', 'weón', 'huevon', 'huevón',
-];
-
-// Verifica si el texto contiene alguna palabra de la lista negra
-const containsHardcodedBadWord = (text) => {
-  const lower = text.toLowerCase();
-  return hardcodedBadWords.some((word) => lower.includes(word));
-};
-
-// Usa Gemini para detectar si un texto contiene lenguaje inapropiado o agresivo
-const detectWithGemini = async (text) => {
-  const prompt = `Eres un moderador de contenido para un sistema corporativo de gestión de viáticos.
-Tu tarea es determinar si el siguiente texto contiene lenguaje inapropiado, ofensivo, agresivo, vulgar o que no corresponde a un contexto profesional empresarial.
-
-Texto a evaluar: "${text}"
-
-Responde ÚNICAMENTE con un JSON sin texto adicional ni backticks:
-{"inapropiado": true/false, "motivo": "explicación breve solo si es inapropiado, sino null"}`;
-
-  const responseText = await geminiService.generateText(prompt, {taskName: 'moderacion de comentario', maxAttempts: 2});
-  const cleanJson = responseText.replace(/```json|```/g, '').trim();
-  const parsed = JSON.parse(cleanJson);
-  return parsed.inapropiado === true;
-};
-
-// Valida si un texto es apropiado para usarse en observaciones del sistema
-const validateText = async (text) => {
-  if (!text || text.trim().length === 0) {
-    return {valid: true};
-  }
-  if (containsHardcodedBadWord(text)) {
-    return {valid: false, error: 'El comentario contiene palabras inapropiadas'};
-  }
-  try {
-    const isInappropriate = await detectWithGemini(text);
-    if (isInappropriate) {
-      return {valid: false, error: 'El comentario contiene palabras inapropiadas'};
-    }
-    return {valid: true};
-  }
-  catch (error) {
-    console.warn('Error en detección con Gemini:', error.message);
-    return {valid: true};
-  }
-};
-
 module.exports = {
   analyzeAlcohol,
   analyzeAlcoholText,
   updateAlcoholInTrip,
-  updateAlcoholInExpenseFromDetails,
-  updateAlcoholInExpenseFromText,
-  validateText,
 };

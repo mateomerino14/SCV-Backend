@@ -66,7 +66,7 @@ const getMyTrips = async (treasurerId, filters) => {
 };
 
 // Obtiene el detalle de un viaje para tesoreria
-const getTripDetail = async (tripId, treasurerId) => {
+const getTripDetail = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')

@@ -130,7 +130,7 @@ const getMyTrips = async (approverId, filters) => {
 };
 
 // Obtiene el detalle de un viaje junto con los comentarios del aprobador
-const getTripDetail = async (tripId, approverId) => {
+const getTripDetail = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')

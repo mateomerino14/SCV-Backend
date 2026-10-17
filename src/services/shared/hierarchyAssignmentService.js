@@ -80,7 +80,10 @@ const assignNextReviewer = async (tripId, personId, roleName, assignedField) => 
       holderId = null;
     }
     await supabase.from('Viaje').update({[assignedField]: holderId}).eq('id_viaje', tripId);
-    return {level: 'unico', userIds: holderId ? [holderId] : []};
+    if (!holderId) {
+      return {level: 'unico', userIds: []};
+    }
+    return {level: 'unico', userIds: [holderId]};
   }
   const substituteIds = await getTripSubstituteIds(tripId);
   const scope = await resolveReviewerScope(personId, roleName, substituteIds);

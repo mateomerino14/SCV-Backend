@@ -88,4 +88,4 @@ const buildReviewAlerts = (summary, trip) => {
   return {alerts, reviewStatus};
 };
 
-module.exports = {calculateExpenseSummary, buildReviewAlerts, isHotelExpense};
+module.exports = {calculateExpenseSummary, buildReviewAlerts};

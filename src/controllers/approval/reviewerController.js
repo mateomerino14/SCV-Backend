@@ -27,8 +27,7 @@ const getMyReviews = async (req, res) => {
 // Obtiene el detalle de un viaje en revision final
 const getReviewDetail = async (req, res) => {
   const {tripId} = req.params;
-  const reviewerId = req.user.id_usuario;
-  const result = await reviewerService.getReviewDetail(tripId, reviewerId);
+  const result = await reviewerService.getReviewDetail(tripId);
   if (result.error) {
     return res.status(result.status).json({error: result.error});
   }

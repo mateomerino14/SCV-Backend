@@ -66,6 +66,11 @@ const createTrip = async (req, res) => {
   if (transporte === 'Vehículo de Empresa' && tipo === 'Internacional') {
     return res.status(400).json({error: 'El vehículo de empresa solo está disponible para viajes nacionales'});
   }
+  // La placa solo se guarda cuando el viaje es en vehiculo de la empresa
+  let vehiclePlate = null;
+  if (transporte === 'Vehículo de Empresa') {
+    vehiclePlate = placa_vehiculo.trim();
+  }
   const {data, error} = await supabase
     .from('Viaje')
     .insert({
@@ -76,7 +81,7 @@ const createTrip = async (req, res) => {
       fecha_fin,
       tipo,
       transporte: transporte || 'Terrestre',
-      placa_vehiculo: transporte === 'Vehículo de Empresa' ? placa_vehiculo.trim() : null,
+      placa_vehiculo: vehiclePlate,
       monto_asignado,
       monto_asignado_usd: monto_asignado_usd || 0,
       estado: 'BORRADOR',

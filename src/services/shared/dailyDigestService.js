@@ -161,4 +161,4 @@ const sendDailyDigest = async ({dryRun = false} = {}) => {
   return {mensajes: report};
 };
 
-module.exports = {getPendingCounts, getSupervisorPendingCounts, sendDailyDigest};
+module.exports = {sendDailyDigest};

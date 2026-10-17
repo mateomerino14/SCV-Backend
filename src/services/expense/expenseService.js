@@ -19,6 +19,28 @@ const calculateRetentions = (amount, type, isInternational, hasAlcohol) => {
   return {...noRetentions, retencion_rc_iva: parseFloat((amountNum * 0.13).toFixed(2)), retencion_it: it};
 };
 
+// Junta la descripcion y los subitems para buscar bebidas alcoholicas
+const buildAlcoholText = (expenseData, usesSubItems) => {
+  const texts = [expenseData.descripcion];
+  if (usesSubItems) {
+    texts.push(...expenseData.subitems.map((item) => item.descripcion));
+  }
+  return texts.join(' ');
+};
+
+// Moneda real del gasto: BOB si es nacional; en internacionales, la del primer tramo
+const getExpenseCurrency = (expenseData, isInternational, firstSegment) => {
+  let currency = 'BOB';
+  if (isInternational) {
+    currency = String(firstSegment?.moneda || expenseData.moneda || 'USD').trim().toUpperCase();
+  }
+  let exchangeRate = expenseData.tipo_cambio || 1;
+  if (firstSegment) {
+    exchangeRate = parseFloat(firstSegment.tipo_cambio);
+  }
+  return {moneda: currency, tipo_cambio: exchangeRate};
+};
+
 // Calcula el monto total a partir de un arreglo de subitems
 const calculateAmountFromSubitems = (subItems) => {
   if (!Array.isArray(subItems) || subItems.length === 0) {
@@ -104,7 +126,7 @@ const createExpense = async (expenseData, file, userId) => {
   }
   const supplierId = await supplierService.findOrCreateSupplier(expenseData.proveedor);
   const type = expenseData.tipo || 'S';
-  const alcoholText = [expenseData.descripcion, ...(usesSubItems ? expenseData.subitems.map((item) => item.descripcion) : [])].join(' ');
+  const alcoholText = buildAlcoholText(expenseData, usesSubItems);
   const hasAlcohol = await alcoholDetectionService.analyzeAlcoholText(alcoholText);
   const retentions = calculateRetentions(totalAmount, type, isInternational, hasAlcohol);
   let firstSegment = null;
@@ -125,9 +147,7 @@ const createExpense = async (expenseData, file, userId) => {
       id_viaje: expenseData.id_viaje,
       id_categoria: expenseData.id_categoria_gasto || null,
       id_proveedor: supplierId,
-      // Moneda real del gasto: BOB si es nacional; en internacionales, la del primer tramo
-      moneda: isInternational ? String(firstSegment?.moneda || expenseData.moneda || 'USD').trim().toUpperCase() : 'BOB',
-      tipo_cambio: firstSegment ? parseFloat(firstSegment.tipo_cambio) : (expenseData.tipo_cambio || 1),
+      ...getExpenseCurrency(expenseData, isInternational, firstSegment),
       monto_moneda_origen: originAmountSum,
       es_gasto_internacional: isInternational,
       base_imponible: retentions.base_imponible,
@@ -228,7 +248,7 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
   }
   const supplierId = await supplierService.findOrCreateSupplier(expenseData.proveedor);
   const type = expenseData.tipo || 'S';
-  const alcoholText = [expenseData.descripcion, ...(usesSubItems ? expenseData.subitems.map((item) => item.descripcion) : [])].join(' ');
+  const alcoholText = buildAlcoholText(expenseData, usesSubItems);
   const hasAlcohol = await alcoholDetectionService.analyzeAlcoholText(alcoholText);
   const retentions = calculateRetentions(totalAmount, type, isInternational, hasAlcohol);
   let firstSegment = null;
@@ -248,9 +268,7 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
       tipo: type,
       id_categoria: expenseData.id_categoria_gasto || null,
       id_proveedor: supplierId,
-      // Moneda real del gasto: BOB si es nacional; en internacionales, la del primer tramo
-      moneda: isInternational ? String(firstSegment?.moneda || expenseData.moneda || 'USD').trim().toUpperCase() : 'BOB',
-      tipo_cambio: firstSegment ? parseFloat(firstSegment.tipo_cambio) : (expenseData.tipo_cambio || 1),
+      ...getExpenseCurrency(expenseData, isInternational, firstSegment),
       monto_moneda_origen: originAmountSum,
       es_gasto_internacional: isInternational,
       base_imponible: retentions.base_imponible,
@@ -338,4 +356,4 @@ const deleteExpense = async (expenseId, userId) => {
   return {};
 };
 
-module.exports = {calculateRetentions, calculateAmountFromSubitems, createExpense, updateExpense, deleteExpense};
+module.exports = {calculateRetentions, createExpense, updateExpense, deleteExpense};

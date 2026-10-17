@@ -212,6 +212,10 @@ const editTrip = async (tripId, userId, tripData) => {
   if (tripData.transporte === 'Vehículo de Empresa' && tripData.tipo === 'Internacional') {
     return {error: 'El vehículo de empresa solo está disponible para viajes nacionales', status: 400};
   }
+  let vehiclePlate = null;
+  if (tripData.transporte === 'Vehículo de Empresa') {
+    vehiclePlate = tripData.placa_vehiculo.trim();
+  }
   const updateData = {
     motivo: tripData.motivo,
     origen: tripData.origen || null,
@@ -220,7 +224,7 @@ const editTrip = async (tripId, userId, tripData) => {
     fecha_fin: tripData.fecha_fin,
     tipo: tripData.tipo,
     transporte: tripData.transporte || 'Terrestre',
-    placa_vehiculo: tripData.transporte === 'Vehículo de Empresa' ? tripData.placa_vehiculo.trim() : null,
+    placa_vehiculo: vehiclePlate,
     monto_asignado: tripData.monto_asignado,
     monto_asignado_usd: tripData.monto_asignado_usd || 0,
   };
@@ -307,7 +311,10 @@ const confirmCompletion = async (tripId, userId, justifications) => {
   if (trip.estado !== 'EN_CURSO' && !isExpensePhaseRejection) {
     return {error: 'Solo puedes finalizar viajes en curso o rechazados en la fase de gastos', status: 400};
   }
-  const justificationList = Array.isArray(justifications) ? justifications : [];
+  let justificationList = [];
+  if (Array.isArray(justifications)) {
+    justificationList = justifications;
+  }
   for (const item of justificationList) {
     if (item.descripcion && item.descripcion.length > 300) {
       return {error: 'Cada justificación no puede superar los 300 caracteres', status: 400};

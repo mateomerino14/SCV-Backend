@@ -438,7 +438,11 @@ const approveExpenseReview = async (tripId, supervisorId) => {
   if ((await hierarchyAssignmentService.getTripSubstituteIds(tripId)).includes(supervisorId)) {
     return {error: 'No puedes aprobar una rendición que registraste como reemplazo', status: 403};
   }
-  const nextState = trip.tiene_alcohol ? 'EN_REVISION_APROBADOR' : 'APROBADO_SUPERVISOR';
+  // Con alcohol pasa por el aprobador antes del revisor final
+  let nextState = 'APROBADO_SUPERVISOR';
+  if (trip.tiene_alcohol) {
+    nextState = 'EN_REVISION_APROBADOR';
+  }
   const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: nextState}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION').select('id_viaje');
   if (error) {
     return {error: error.message, status: 500};

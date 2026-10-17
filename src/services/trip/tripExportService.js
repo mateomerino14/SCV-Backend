@@ -66,4 +66,4 @@ const getStatementsForExport = async (query, userId) => {
   return {statements};
 };
 
-module.exports = {getStatementsForExport, parseTripIds, maxTripsPerExport};
+module.exports = {getStatementsForExport, parseTripIds};

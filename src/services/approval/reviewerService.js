@@ -31,6 +31,14 @@ const attachSummaryToTrips = (trips) => {
   });
 };
 
+// Quien reviso antes al revisor final: el aprobador si hubo alcohol, si no el supervisor
+const getPreviousReviewerId = (trip) => {
+  if (trip.tiene_alcohol) {
+    return trip.id_aprobador_asignado;
+  }
+  return trip.id_supervisor_asignado;
+};
+
 // Lista los viajes pendientes de revision final
 const getPendingReviews = async (reviewerId, filters) => {
   let query = supabase
@@ -54,7 +62,7 @@ const getPendingReviews = async (reviewerId, filters) => {
   }
   else {
     const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
-      data || [], reviewerId, 'REVISOR', (trip) => (trip.tiene_alcohol ? trip.id_aprobador_asignado : trip.id_supervisor_asignado)
+      data || [], reviewerId, 'REVISOR', getPreviousReviewerId
     );
     return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(trips, filters.id_seccion))};
   }
@@ -95,7 +103,7 @@ const getMyReviews = async (reviewerId, filters) => {
 };
 
 // Obtiene el detalle de un viaje en revision final
-const getReviewDetail = async (tripId, reviewerId) => {
+const getReviewDetail = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd))')

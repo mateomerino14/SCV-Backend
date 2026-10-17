@@ -22,8 +22,13 @@ const configuredOrigins = (process.env.CORS_ORIGINS || '')
   .map((origin) => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
+let allowedOrigins = defaultOrigins;
+if (configuredOrigins.length > 0) {
+  allowedOrigins = configuredOrigins;
+}
+
 app.use(cors({
-  origin: configuredOrigins.length > 0 ? configuredOrigins : defaultOrigins,
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json());

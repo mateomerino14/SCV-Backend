@@ -29,4 +29,4 @@ const validateSectionNotDuplicated = async (name, excludeId) => {
   }
 };
 
-module.exports = {normalizeSectionName, validateSectionNotDuplicated};
+module.exports = {validateSectionNotDuplicated};
