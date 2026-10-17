@@ -282,7 +282,7 @@ src/
 │   ├── htmlEscape.js         Escape de textos de usuario en correos y PDF
 │   ├── numberToWords.js      Importes en letras
 │   ├── requestData.js        Lectura segura de los datos enviados en formularios con archivo
-│   ├── textNormalizer.js     Normalización para comparaciones
+│   ├── textNormalizer.js     Normalización para comparaciones y recorte de textos largos (asuntos de correo)
 │   └── tripCode.js           Código legible de cada viaje
 ├── app.js                    Configuración de Express (seguridad, CORS, rutas)
 └── index.js                  Arranque del servidor y programación del resumen de pendientes
