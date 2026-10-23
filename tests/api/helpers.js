@@ -25,6 +25,7 @@ const api = (token) => ({
   post: (path, body = {}) => request(app).post(path).set('authorization', `Bearer ${token}`).send(body),
   put: (path, body = {}) => request(app).put(path).set('authorization', `Bearer ${token}`).send(body),
   postForm: (path, data) => request(app).post(path).set('authorization', `Bearer ${token}`).field('datos', JSON.stringify(data)),
+  putForm: (path, data) => request(app).put(path).set('authorization', `Bearer ${token}`).field('datos', JSON.stringify(data)),
 });
 
 module.exports = {app, request, login, api, boliviaDate};
