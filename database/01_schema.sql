@@ -23,7 +23,7 @@ create table if not exists "Seccion" (
 
 create table if not exists "Categoria_Gasto" (
   id_categoria serial primary key,
-  nombre varchar(50) not null unique,
+  nombre varchar(100) not null unique,
   requiere_comprobante boolean not null default true
 );
 
