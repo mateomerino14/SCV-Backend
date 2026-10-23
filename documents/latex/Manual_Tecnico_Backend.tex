@@ -126,7 +126,7 @@
 Autor: & Mateo Alejandro Merino Vidal \\
 Empresa: & MAXAM FANEXA \\
 Componente: & API REST (Node.js, Express y Supabase) \\
-Versión: & 1.6 \\
+Versión: & 1.7 \\
 Fecha: & 23 de octubre de 2026 \\
 \end{tabular}
 \vspace{1.8cm}
@@ -236,7 +236,7 @@ src/
 │   ├── user/                  tokens, usuarios, directorio
 │   └── shared/                correo, PDF, plazos, jerarquía, IA, resumen diario
 ├── middlewares/             auth, roleAuth, treasurerPosition, límites de intentos
-├── utils/                   escape HTML, importes en letras, código de viaje
+├── utils/                   escape HTML, importes en letras, código de viaje, retenciones
 ├── app.js                   Configuración de Express (seguridad, CORS, rutas)
 └── index.js                 Arranque del servidor y del cron de resúmenes
 scripts/sendDigest.js        Envío manual del resumen de pendientes
@@ -334,7 +334,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \code{Solicitud_Reemplazo} & Solicitudes para que otra persona rinda el viaje \\
 \rowcolor{maxamFondo} \code{Categoria_Gasto} & Plan de cuentas de la empresa (112 cuentas de la planilla de Castro más OTROS), con la cuenta contable de Oracle en el nombre y una nota de cuándo usarla (\code{descripcion}) \\
 \code{Proveedor} & Emisores de facturas \\
-\rowcolor{maxamFondo} \code{Gasto} & Gastos con retenciones impositivas persistidas \\
+\rowcolor{maxamFondo} \code{Gasto} & Gastos con sus retenciones impositivas \\
 \code{Gasto_Subitem} & Desglose de un gasto en varios conceptos \\
 \rowcolor{maxamFondo} \code{Gasto_Tramo_Moneda} & Tramos en otra moneda de gastos internacionales, con el tipo de cambio que escribe el empleado \\
 \code{Imagen} & Comprobante asociado a un gasto \\
@@ -366,7 +366,8 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \subsection{Decisiones de diseño}
 \begin{itemize}
   \item \textbf{Marcas temporales} en \code{timestamptz}: el tipo sin zona horaria desplazaba las fechas cuatro horas respecto de Bolivia.
-  \item \textbf{Retenciones persistidas}: \code{base_imponible}, \code{retencion_rc_iva}, \code{retencion_iue}, \code{retencion_it} e \code{importe_costo} se guardan al registrar, para que los reportes históricos no cambien si cambian las alícuotas.
+  \item \textbf{Retenciones}: \code{base_imponible}, \code{retencion_rc_iva}, \code{retencion_iue}, \code{retencion_it} e \code{importe_costo} se guardan al registrar como referencia, pero las pantallas, la planilla y los recibos las calculan siempre desde el total del gasto con \code{utils/retentions.js}, para que ningún gasto muestre un cálculo anterior.
+  \item \textbf{Orden de los gastos}: las consultas del detalle de un viaje, las revisiones y las planillas ordenan los gastos por fecha y, dentro del mismo día, por orden de registro.
   \item \textbf{Moneda}: los gastos en bolivianos se guardan con \code{BOB}; los internacionales con la moneda en mayúsculas.
   \item \textbf{Cantidades}: \code{Detalle_Factura.cantidad} es \code{numeric(12, 3)} para admitir litros o kilos con hasta tres decimales.
   \item \textbf{Motivo del viaje}: \code{Viaje.motivo} admite 500 caracteres; los asuntos de correo lo acortan con \code{shortenText}.
@@ -769,7 +770,7 @@ Una prueba automática es código que usa el sistema como lo haría una persona 
 De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, exportación (\code{tests/api/}) & \code{npm run test:api} \\
 \end{xltabular}
 
-Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. En el estado actual pasan 54 pruebas unitarias y 18 de la API.
+Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. En el estado actual pasan 56 pruebas unitarias y 19 de la API.
 
 \subsection{Integración continua}
 El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio.
