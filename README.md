@@ -388,7 +388,7 @@ Un empleado puede solicitar que otra persona rinda los gastos de su viaje en su 
 |---|---|
 | `hierarchyAssignmentService` | Resuelve quién revisa cada etapa (jefe directo, sección o roles únicos) |
 | `deadlineService` | Valida la fecha del gasto contra el período del viaje y el plazo de carga, considerando extensiones; no bloquea las correcciones de un rechazo |
-| `alcoholDetectionService` | Detecta bebidas alcohólicas en los productos facturados o en la descripción del gasto, por gasto y agregado por viaje |
+| `alcoholDetectionService` | Detecta bebidas alcohólicas en los productos facturados o en la descripción del gasto, por gasto y agregado por viaje. Compara palabras completas ("ron" no coincide con "patrón"), reconoce como inocuos el combustible y sus abreviaturas de surtidor (G.ESPECIAL+, G.PREMIUM, D.OIL) y solo consulta a la IA los productos dudosos, pidiéndole marcar únicamente lo que es claramente alcohol. Un gasto con alcohol pierde el crédito fiscal y las retenciones; al editar y guardar el gasto se vuelve a analizar |
 | `geminiService` | Llamadas al modelo con reintentos y modelo de respaldo ante cuota agotada |
 | `commentModerationService` | Verifica que el texto no contenga términos prohibidos |
 | `auditLogService` | Registra ingresos, salidas y cambios de contraseña |

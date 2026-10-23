@@ -126,7 +126,7 @@
 Autor: & Mateo Alejandro Merino Vidal \\
 Empresa: & MAXAM FANEXA \\
 Componente: & API REST (Node.js, Express y Supabase) \\
-Versión: & 1.8 \\
+Versión: & 1.9 \\
 Fecha: & 23 de octubre de 2026 \\
 \end{tabular}
 \vspace{1.8cm}
@@ -640,7 +640,7 @@ Todas las rutas, salvo las de \code{/auth} y \code{/user/check-email}, requieren
 \code{tripAccessService} & Permisos de lectura y de emisión de recibos \\
 \rowcolor{maxamFondo} \code{deadlineService} & Valida fecha del gasto y plazo de carga con ampliaciones \\
 \code{expenseSummaryService} & Gasto diario, exceso en hoteles y alertas \\
-\rowcolor{maxamFondo} \code{alcoholDetectionService} & Detecta bebidas alcohólicas por gasto y por viaje \\
+\rowcolor{maxamFondo} \code{alcoholDetectionService} & Detecta bebidas alcohólicas por gasto y por viaje: compara palabras completas, trata el combustible y sus abreviaturas de surtidor (G.ESPECIAL+) como inocuos y solo consulta a la IA los productos dudosos \\
 \code{commentModerationService} & Rechaza términos prohibidos \\
 \rowcolor{maxamFondo} \code{geminiService} & Modelo de IA con reintentos y modelo de respaldo \\
 \code{reviewLogService} & Historial de revisión por persona y etapa \\
@@ -770,7 +770,7 @@ Una prueba automática es código que usa el sistema como lo haría una persona 
 De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, exportación (\code{tests/api/}) & \code{npm run test:api} \\
 \end{xltabular}
 
-Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. En el estado actual pasan 56 pruebas unitarias y 20 de la API.
+Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. En el estado actual pasan 59 pruebas unitarias y 20 de la API.
 
 \subsection{Integración continua}
 El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio.
