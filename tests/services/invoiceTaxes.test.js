@@ -40,3 +40,9 @@ test('la factura extraída resta del total un IVA del 13%', () => {
   const explicit = normalizeResult({tipo_doc: 'F', monto: 87, iva: 13, monto_total: 100});
   expect(explicit).toMatchObject({monto: 87, iva: 13, monto_total: 100});
 });
+
+// En la planilla, el costo de un gasto sin factura es su total aunque tenga guardado el calculo viejo
+test('la planilla calcula las retenciones desde el total y el costo es el total', () => {
+  const oldService = {tipo: 'S', monto_total: '47.62', retencion_rc_iva: '7.37', retencion_it: '1.70', importe_costo: '56.69'};
+  expect(getExpenseTaxValues(oldService)).toEqual({vat: 0, rcIva: 6.19, iue: 0, it: 1.43, cost: 47.62});
+});

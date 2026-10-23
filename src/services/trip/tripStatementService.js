@@ -2,6 +2,7 @@ const supabase = require('../../config/supabase');
 const pdfService = require('../shared/pdfService');
 const tripCodeUtil = require('../../utils/tripCode');
 const {escapeDeep} = require('../../utils/htmlEscape');
+const {getExpenseRetentions} = require('../../utils/retentions');
 
 const vatRate = 0.13;
 
@@ -58,13 +59,8 @@ const getExpenseTaxValues = (expense) => {
     const vat = parseFloat((amount * vatRate).toFixed(2));
     return {vat, rcIva: 0, iue: 0, it: 0, cost: parseFloat((amount - vat).toFixed(2))};
   }
-  return {
-    vat: 0,
-    rcIva: parseFloat(expense.retencion_rc_iva || 0),
-    iue: parseFloat(expense.retencion_iue || 0),
-    it: parseFloat(expense.retencion_it || 0),
-    cost: parseFloat(expense.importe_costo || amount),
-  };
+  const retentions = getExpenseRetentions(expense);
+  return {vat: 0, rcIva: retentions.retencion_rc_iva, iue: retentions.retencion_iue, it: retentions.retencion_it, cost: amount};
 };
 
 // Arma la descripcion visible de un gasto segun tenga factura o subitems
@@ -365,7 +361,7 @@ const generateStatementPdf = async (tripId) => {
     .from('Gasto')
     .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
     .eq('id_viaje', tripId)
-    .order('fecha_gasto', {ascending: true});
+    .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   if (expensesError) {
     return {error: expensesError.message, status: 500};
   }

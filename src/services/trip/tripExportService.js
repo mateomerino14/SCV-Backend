@@ -49,7 +49,7 @@ const getStatementsForExport = async (query, userId) => {
   }
   const [{data: trips, error: tripsError}, {data: expenses, error: expensesError}, {data: comments}] = await Promise.all([
     supabase.from('Viaje').select(tripColumns).in('id_viaje', tripIds),
-    supabase.from('Gasto').select(expenseColumns).in('id_viaje', tripIds).order('fecha_gasto', {ascending: true}),
+    supabase.from('Gasto').select(expenseColumns).in('id_viaje', tripIds).order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true}),
     supabase.from('Comentario').select('id_viaje, descripcion, fecha_justificada, tipo, fecha').in('id_viaje', tripIds).eq('tipo', 'JUSTIFICACION').order('fecha', {ascending: false}),
   ]);
   if (tripsError || expensesError) {

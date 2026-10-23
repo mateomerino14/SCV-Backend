@@ -167,7 +167,8 @@ const getAlcoholReviewDetail = async (tripId, approverId) => {
   const {data: expenses} = await supabase
     .from('Gasto')
     .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
-    .eq('id_viaje', tripId);
+    .eq('id_viaje', tripId)
+    .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   const {data: comments} = await supabase
     .from('Comentario').select('*').eq('id_viaje', tripId).order('fecha', {ascending: false});
   const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip);

@@ -1,9 +1,9 @@
 const supabase = require('../../config/supabase');
-const expenseService = require('./expenseService');
 const deadlineService = require('../shared/deadlineService');
 const alcoholDetectionService = require('../shared/alcoholDetectionService');
 const supplierService = require('./supplierService');
 const substitutionService = require('../approval/substitutionService');
+const {calculateRetentions} = require('../../utils/retentions');
 
 const ivaPercentageBolivia = 13;
 
@@ -161,7 +161,7 @@ const saveInvoice = async (invoiceData, file, userId) => {
       moneda: 'BOB',
       monto_moneda_origen: parseFloat(invoiceData.monto_total),
       // Factura o recibo: sin retenciones, el costo es el monto completo
-      ...expenseService.calculateRetentions(invoiceData.monto_total, invoiceData.tipo_doc, false, hasAlcohol),
+      ...calculateRetentions(invoiceData.monto_total, invoiceData.tipo_doc, false, hasAlcohol),
     })
     .select()
     .single();
@@ -318,7 +318,7 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
       id_categoria: invoiceData.id_categoria_gasto || null,
       tiene_alcohol: hasAlcohol,
       monto_moneda_origen: parseFloat(invoiceData.monto_total),
-      ...expenseService.calculateRetentions(invoiceData.monto_total, invoiceData.tipo_doc || 'F', false, hasAlcohol),
+      ...calculateRetentions(invoiceData.monto_total, invoiceData.tipo_doc || 'F', false, hasAlcohol),
     })
     .eq('id_gasto', expenseId);
   if (expenseError) {

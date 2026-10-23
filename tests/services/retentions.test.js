@@ -1,5 +1,5 @@
 jest.mock('../../src/config/supabase', () => ({}));
-const {calculateRetentions} = require('../../src/services/expense/expenseService');
+const {calculateRetentions, getExpenseRetentions} = require('../../src/utils/retentions');
 
 // Servicio sin factura: RC-IVA 13% e IT 3% sobre el total; se cancela el total menos las retenciones
 test('calcula las retenciones de un servicio sobre el total del documento', () => {
@@ -33,4 +33,10 @@ test('el recibo cancela el total menos las retenciones', () => {
     expect(html).toContain('<span>TOTAL IMPORTE</span><span>47.62</span>');
     expect(html).toContain('<span>IMPORTE A CANCELAR</span><span>40.00</span>');
   });
+});
+
+// Un gasto viejo guardado con el calculo anterior se muestra con las retenciones sobre su total
+test('recalcula las retenciones de un gasto registrado desde su total', () => {
+  const oldExpense = {tipo: 'S', monto_total: '47.62', retencion_rc_iva: '7.37', retencion_it: '1.70', importe_costo: '56.69'};
+  expect(getExpenseRetentions(oldExpense)).toMatchObject({retencion_rc_iva: 6.19, retencion_it: 1.43, importe_costo: 47.62});
 });

@@ -4,6 +4,7 @@ const emailService = require('../shared/emailService');
 const pdfService = require('../shared/pdfService');
 const {buildTripCode} = require('../../utils/tripCode');
 const {escapeDeep, escapeHtml: escapeText} = require('../../utils/htmlEscape');
+const {getExpenseRetentions} = require('../../utils/retentions');
 
 // Los datos se escapan al entrar a cada plantilla (escapeDeep); aqui solo se normaliza el vacio
 const escapeHtml = (text) => text || '';
@@ -75,19 +76,10 @@ const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, typ
   const retentionLabel = isService ? 'RETENCIÓN RC-IVA 13%' : 'RETENCIÓN IUE 5%';
   const typeTitle = isService ? 'RECIBO PAGO DE SERVICIOS' : 'RECIBO DE COMPRAS';
   const totalAmount = expenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
-  let totalRetention = 0;
-  if (!isInternational) {
-    if (isService) {
-      totalRetention = expenses.reduce((sum, expense) => sum + parseFloat(expense.retencion_rc_iva || 0), 0);
-    }
-    else {
-      totalRetention = expenses.reduce((sum, expense) => sum + parseFloat(expense.retencion_iue || 0), 0);
-    }
-  }
-  let totalIt = 0;
-  if (!isInternational) {
-    totalIt = expenses.reduce((sum, expense) => sum + parseFloat(expense.retencion_it || 0), 0);
-  }
+  // Las retenciones se calculan desde el total de cada gasto
+  const retentionList = expenses.map((expense) => getExpenseRetentions(expense));
+  const totalRetention = retentionList.reduce((sum, item) => sum + item.retencion_rc_iva + item.retencion_iue, 0);
+  const totalIt = retentionList.reduce((sum, item) => sum + item.retencion_it, 0);
   // Al proveedor se le cancela el total menos las retenciones
   const totalToPay = parseFloat((totalAmount - totalRetention - totalIt).toFixed(2));
   const costCenter = employee?.Seccion?.nombre || '';
@@ -273,19 +265,10 @@ const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, t
   const hasSubItems = subItems.length > 0;
   const hasSegments = isInternational && exchangeSegments.length > 0;
   const totalAmount = parseFloat(expense.monto_total || 0);
-  let totalRetention = 0;
-  if (!isInternational) {
-    if (isService) {
-      totalRetention = parseFloat(expense.retencion_rc_iva || 0);
-    }
-    else {
-      totalRetention = parseFloat(expense.retencion_iue || 0);
-    }
-  }
-  let totalIt = 0;
-  if (!isInternational) {
-    totalIt = parseFloat(expense.retencion_it || 0);
-  }
+  // Las retenciones se calculan desde el total del gasto
+  const retentions = getExpenseRetentions(expense);
+  const totalRetention = retentions.retencion_rc_iva + retentions.retencion_iue;
+  const totalIt = retentions.retencion_it;
   // Al proveedor se le cancela el total menos las retenciones
   const totalToPay = parseFloat((totalAmount - totalRetention - totalIt).toFixed(2));
   const costCenter = employee?.Seccion?.nombre || '';

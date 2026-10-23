@@ -76,3 +76,15 @@ test('rechaza una cantidad con más de 3 decimales', async () => {
   expect(response.status).toBe(400);
   expect(response.body.error).toMatch(/3 decimales/);
 });
+
+// Los gastos del viaje se devuelven ordenados por fecha, sin importar el orden en que se registraron
+test('devuelve los gastos del viaje ordenados por fecha', async () => {
+  for (const offset of [1, -1, 0]) {
+    await employee.postForm('/expense/register', {
+      id_viaje: tripId, monto_total: 10, fecha_gasto: boliviaDate(offset), tipo: 'S', descripcion: `Gasto del día ${offset}`, id_categoria_gasto: 1, es_gasto_internacional: false,
+    });
+  }
+  const detail = await employee.get(`/trip/${tripId}`);
+  const dates = detail.body.gastos.map((expense) => expense.fecha_gasto);
+  expect(dates).toEqual([...dates].sort());
+});

@@ -110,7 +110,8 @@ const getTripDetail = async (tripId, requesterId) => {
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
     .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
-    .eq('id_viaje', tripId);
+    .eq('id_viaje', tripId)
+    .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   if (expensesError) {
     return {error: expensesError.message};
   }
