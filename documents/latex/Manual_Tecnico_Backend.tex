@@ -126,8 +126,8 @@
 Autor: & Mateo Alejandro Merino Vidal \\
 Empresa: & MAXAM FANEXA \\
 Componente: & API REST (Node.js, Express y Supabase) \\
-Versión: & 1.3 \\
-Fecha: & 17 de octubre de 2026 \\
+Versión: & 1.4 \\
+Fecha: & 23 de octubre de 2026 \\
 \end{tabular}
 \vspace{1.8cm}
 \end{titlepage}
@@ -514,13 +514,13 @@ En los gastos internacionales pagados en otra moneda (EUR, PEN, ARS, BRL, CLP, C
 \endfirsthead
 \cabecera \tth{Código} & \tth{Tipo} & \tth{Retenciones} \\
 \endhead
-\rowcolor{maxamFondo} \code{F} & Compra o servicio con factura & Ninguna; genera crédito fiscal de IVA (13\% sobre el subtotal) \\
+\rowcolor{maxamFondo} \code{F} & Compra o servicio con factura & Ninguna; genera crédito fiscal de IVA (13\% del total) \\
 \code{R} & Recibo: documento sin IVA & Ninguna; no lleva IVA ni crédito fiscal \\
 \rowcolor{maxamFondo} \code{C} & Compra de bien sin factura & IUE 5\% e IT 3\% sobre el total \\
 \code{S} & Servicio o alquiler sin factura & RC-IVA 13\% e IT 3\% sobre el total \\
 \end{xltabular}
 
-En la factura (\code{F}) el total es subtotal + IVA del 13\%. Al empleado se le reconoce el total; en la planilla, en PDF y en Excel, el IVA va en su columna como crédito fiscal y el importe costo/gasto es el total menos el IVA (por ejemplo, 305.00 $-$ 35.09 = 269.91). El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. En los gastos sin factura, las retenciones se calculan sobre el total del documento y al proveedor se le cancela el total menos las retenciones. Por ejemplo, en un servicio de 47.62 el RC-IVA es 6.19, el IT 1.43 y el importe a cancelar 40.00. El total cuenta para el presupuesto y como costo en la planilla. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
+En la factura (\code{F}) el IVA es el 13\% del total y se resta de él, igual que las retenciones: subtotal = total $-$ IVA. Al empleado se le reconoce el total; en la planilla, en PDF y en Excel, el IVA va en su columna como crédito fiscal y el importe costo/gasto es el total menos el IVA (por ejemplo, 305.00 $-$ 39.65 = 265.35). El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. En los gastos sin factura, las retenciones se calculan sobre el total del documento y al proveedor se le cancela el total menos las retenciones. Por ejemplo, en un servicio de 47.62 el RC-IVA es 6.19, el IT 1.43 y el importe a cancelar 40.00. El total cuenta para el presupuesto y como costo en la planilla. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
 
 \subsection{Plazos de registro}
 Tras el fin del viaje hay cuatro días de tolerancia para cargar gastos. Vencido el margen, se debe pedir una ampliación al revisor, que otorga cuatro días desde su respuesta. El plazo es del viaje: la ampliación vale para el titular y para su reemplazo aprobado, cualquiera de los dos puede pedirla y la respuesta se avisa a ambos. El plazo no corre mientras el viaje está rechazado. La ampliación extiende el margen de carga, no el rango de fechas: la fecha del gasto debe pertenecer al periodo del viaje.
@@ -711,7 +711,7 @@ La imagen del comprobante se envía al modelo de visión de Gemini (\code{invoic
 
 \begin{itemize}
   \item \code{geminiService} reintenta ante errores temporales y, si el modelo principal falla o agotó su cuota, usa un modelo de respaldo.
-  \item La respuesta se normaliza: los datos que faltan quedan como ``No Especificado'', la fecha se valida (\code{fecha_emision_valida}) y la cantidad de cada producto se redondea a 3 decimales (por ejemplo 53.345 litros de combustible). En un recibo el monto es el total pagado y el IVA es 0. En una factura que solo muestra el total, o cuyo subtotal e IVA no cuadran con él, el IVA se separa por dentro del total (subtotal = total $\div$ 1.13) sin cambiar el total. Si un recibo o boleto no tiene número, se usa su código, que puede tener símbolos como \code{@} o \code{\$}.
+  \item La respuesta se normaliza: los datos que faltan quedan como ``No Especificado'', la fecha se valida (\code{fecha_emision_valida}) y la cantidad de cada producto se redondea a 3 decimales (por ejemplo 53.345 litros de combustible). En un recibo el monto es el total pagado y el IVA es 0. En una factura, el IVA es el 13\% del total y se resta de él (subtotal = total $-$ IVA); si la IA devuelve otros valores, se recalculan así sin cambiar el total. Si un recibo o boleto no tiene número, se usa su código, que puede tener símbolos como \code{@} o \code{\$}.
   \item Al registrar, el empleado revisa y puede corregir todos los datos antes de guardar, incluida la fecha de emisión por si la IA la leyó mal; al modificar una factura ya guardada, la fecha queda bloqueada. El gasto se marca como \code{modificado} cuando hubo correcciones.
   \item Al guardar, cada producto debe tener nombre, precio válido y una cantidad mayor a cero con hasta 3 decimales, igual que la columna \code{Detalle_Factura.cantidad numeric(12, 3)}.
 \end{itemize}
