@@ -146,6 +146,44 @@ update "Categoria_Gasto"
 set requiere_comprobante = false
 where nombre = '626010 TAXIS (VIAJE)';
 
+-- Nota de cuando usar cada cuenta, tomada de la planilla de Castro
+update "Categoria_Gasto" set descripcion = 'Solo gastos de personal registrado en planilla de sueldos; no estibadores ni personal externo' where nombre = '649001 SEGUROS ACCIDENTES PERSONAL';
+update "Categoria_Gasto" set descripcion = 'Almuerzos, leches, agua' where nombre = '649200 ALIMENTACION (PERSONAL)';
+update "Categoria_Gasto" set descripcion = 'Transporte personal domicilio/planta/domicilio' where nombre = '649300 TRANSPORTE PERSONAL';
+update "Categoria_Gasto" set descripcion = 'Alquiler maquinaria pesada' where nombre = '621050 ALQUILER MAQUINARIA';
+update "Categoria_Gasto" set descripcion = 'Alquiler vehículos/cisterna' where nombre = '621100 ALQUILER ELEMEMTOS TRANSPORTE';
+update "Categoria_Gasto" set descripcion = 'Mantenimiento edificación planta productiva' where nombre = '622010 MANTENIMIENTO EDIF. INDUSTRIALES';
+update "Categoria_Gasto" set descripcion = 'Mantenimiento oficinas administrativas' where nombre = '622020 MANTENIMIENTO EDIF. ADMINISTRATIVOS';
+update "Categoria_Gasto" set descripcion = 'Mantenimiento almacenes' where nombre = '622030 MANTENIMIENTO ALMACENES';
+update "Categoria_Gasto" set descripcion = 'Mantenimiento equipo y maquinaria' where nombre = '622070 MANTENIMIENTO MAQUINARIA';
+update "Categoria_Gasto" set descripcion = 'Mantenimiento herramientas' where nombre = '622080 MANTENIMIENTO UTILLAJE';
+update "Categoria_Gasto" set descripcion = 'Mantenimiento pararrayos, postes de luz, accesos a planta' where nombre = '622090 MANTENIMIENTO OTRAS INSTALACIONES';
+update "Categoria_Gasto" set descripcion = 'Mantenimiento muebles y enseres' where nombre = '622100 MANTENIMIENTO MOBILIARIO';
+update "Categoria_Gasto" set descripcion = 'Mantenimiento aparatos eléctricos y/o electrónicos (equipos de computación, cámaras, balanzas electrónicas y otros eléctricos)' where nombre = '622110 MANTENIMIENTO EQUIP. INFORMATICOS';
+update "Categoria_Gasto" set descripcion = 'Mantenimiento montacargas/grúas' where nombre = '622120 MANTENIMIENTO ELEM. TRANSPORTE';
+update "Categoria_Gasto" set descripcion = 'Mantenimiento vehículos' where nombre = '622121 MANTENIMIENTO VEHICULOS';
+update "Categoria_Gasto" set descripcion = 'Servicios de recojo de basura, limpieza de oficinas o predios' where nombre = '623000 SERVICIOS DE LIMPIEZA';
+update "Categoria_Gasto" set descripcion = 'Servicios de tratamiento de residuos' where nombre = '623040 GESTION DE RESIDUOS';
+update "Categoria_Gasto" set descripcion = 'Análisis de laboratorio' where nombre = '623080 ANALISIS DE LABORATORIO';
+update "Categoria_Gasto" set descripcion = 'Todos los gastos de alimentación, dotación de ropa o menaje para la guardia' where nombre = '623010 SERV. SEGURIDAD Y VIGILANCIA';
+update "Categoria_Gasto" set descripcion = 'Servicios contratados a consultores externos para trabajos definidos' where nombre = '623200 AUDITORES';
+update "Categoria_Gasto" set descripcion = 'Gastos de capacitación al personal' where nombre = '623800 TRAINING';
+update "Categoria_Gasto" set descripcion = 'Transporte para movilización cuando el personal está de viaje' where nombre = '626010 TAXIS (VIAJE)';
+update "Categoria_Gasto" set descripcion = 'Alimentación cuando el personal está de viaje' where nombre = '626040 MANUTENCION (VIAJE)';
+update "Categoria_Gasto" set descripcion = 'En caso de que se utilice para la producción' where nombre = '628010 AGUA';
+update "Categoria_Gasto" set descripcion = 'Diesel' where nombre = '628022 GASOLEO (DIESEL)';
+update "Categoria_Gasto" set descripcion = 'Tachos, recipientes, bolsas o film y otros materiales auxiliares para producción' where nombre = '628040 SUMINISTRO MATERIALES AUXILIARE';
+update "Categoria_Gasto" set descripcion = 'Internet' where nombre = '629020 TELETRANSMISION';
+update "Categoria_Gasto" set descripcion = 'Transporte de movilización para trámites operativos o propios de la planta (no de viaje)' where nombre = '629060 TAXIS GESTION OFICINA (BOLIVIA)';
+update "Categoria_Gasto" set descripcion = 'Material de escritorio, mouse, teclado, engrapadora, perforadora, hojas y otros materiales para el funcionamiento de la oficina' where nombre = '629200 MATERIAL DE OFICINA';
+update "Categoria_Gasto" set descripcion = 'Para gastos inespecíficos o que no se encuentran en el detalle de cuentas' where nombre = '629300 OTROS GASTOS SERVICIOS GENERALES';
+update "Categoria_Gasto" set descripcion = 'Fletes de envíos de otros materiales o MP pequeñas y estibajes internos planta productiva' where nombre = '629302 TRANSPORTE DE MATERIALES VARIOS';
+update "Categoria_Gasto" set descripcion = 'Medicamentos' where nombre = '629303 OTROS SERVICIOS GENERALES- MEDICAMENTOS';
+update "Categoria_Gasto" set descripcion = 'Equipo de protección personal (EPP)' where nombre = '629305 MATERIAL DE SEGURIDAD INDUSTRIAL';
+update "Categoria_Gasto" set descripcion = 'Trámites exportaciones, trámites sustancias controladas, trámites licencia de funcionamiento, trámites instituciones públicas, preocupacionales' where nombre = '629306 TRAMITES Y GASTOS LEGALES';
+update "Categoria_Gasto" set descripcion = 'Ropa de trabajo' where nombre = '629307 OTROS SERVICIOS GENERALES- WORK (ROPA DE TRABAJO)';
+update "Categoria_Gasto" set descripcion = 'Activos fungibles (impresoras, sillas de escritorio y otros activos de menor valor, menos de USD 1000, y con durabilidad menor a 3 años); se aplica el segmento complementario según el tipo de activo' where nombre = '629350 HERRAMIENTAS Y OTROS DE RAPIDO DESGASTE';
+
 -- Recordatorios: de lunes a viernes a las 08:00, 12:00 y 16:00 (hora Bolivia)
 insert into "Configuracion_Recordatorio" (id) values (1)
 on conflict (id) do nothing;

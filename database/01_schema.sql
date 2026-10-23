@@ -24,6 +24,7 @@ create table if not exists "Seccion" (
 create table if not exists "Categoria_Gasto" (
   id_categoria serial primary key,
   nombre varchar(100) not null unique,
+  descripcion text, -- cuando usar la cuenta, segun la planilla de Castro
   requiere_comprobante boolean not null default true
 );
 
