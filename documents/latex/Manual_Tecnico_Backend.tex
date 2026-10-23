@@ -126,7 +126,7 @@
 Autor: & Mateo Alejandro Merino Vidal \\
 Empresa: & MAXAM FANEXA \\
 Componente: & API REST (Node.js, Express y Supabase) \\
-Versión: & 1.7 \\
+Versión: & 1.8 \\
 Fecha: & 23 de octubre de 2026 \\
 \end{tabular}
 \vspace{1.8cm}
@@ -366,7 +366,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \subsection{Decisiones de diseño}
 \begin{itemize}
   \item \textbf{Marcas temporales} en \code{timestamptz}: el tipo sin zona horaria desplazaba las fechas cuatro horas respecto de Bolivia.
-  \item \textbf{Retenciones}: \code{base_imponible}, \code{retencion_rc_iva}, \code{retencion_iue}, \code{retencion_it} e \code{importe_costo} se guardan al registrar como referencia, pero las pantallas, la planilla y los recibos las calculan siempre desde el total del gasto con \code{utils/retentions.js}, para que ningún gasto muestre un cálculo anterior.
+  \item \textbf{Retenciones}: \code{base_imponible}, \code{retencion_rc_iva}, \code{retencion_iue}, \code{retencion_it} e \code{importe_costo} se guardan al registrar como referencia, pero las pantallas, la planilla y los recibos las calculan siempre desde lo pagado con \code{utils/retentions.js}, para que ningún gasto muestre otro cálculo.
   \item \textbf{Orden de los gastos}: las consultas del detalle de un viaje, las revisiones y las planillas ordenan los gastos por fecha y, dentro del mismo día, por orden de registro.
   \item \textbf{Moneda}: los gastos en bolivianos se guardan con \code{BOB}; los internacionales con la moneda en mayúsculas.
   \item \textbf{Cantidades}: \code{Detalle_Factura.cantidad} es \code{numeric(12, 3)} para admitir litros o kilos con hasta tres decimales.
@@ -517,11 +517,11 @@ En los gastos internacionales pagados en otra moneda (EUR, PEN, ARS, BRL, CLP, C
 \endhead
 \rowcolor{maxamFondo} \code{F} & Compra o servicio con factura & Ninguna; genera crédito fiscal de IVA (13\% del total) \\
 \code{R} & Recibo: documento sin IVA & Ninguna; no lleva IVA ni crédito fiscal \\
-\rowcolor{maxamFondo} \code{C} & Compra de bien sin factura & IUE 5\% e IT 3\% sobre el total \\
-\code{S} & Servicio o alquiler sin factura & RC-IVA 13\% e IT 3\% sobre el total \\
+\rowcolor{maxamFondo} \code{C} & Compra de bien sin factura & IUE 5\% e IT 3\% sobre la base incrementada (pagado $\div$ 0.92) \\
+\code{S} & Servicio o alquiler sin factura & RC-IVA 13\% e IT 3\% sobre la base incrementada (pagado $\div$ 0.84) \\
 \end{xltabular}
 
-En la factura (\code{F}) el IVA es el 13\% del total y se resta de él, igual que las retenciones: subtotal = total $-$ IVA. Al empleado se le reconoce el total; en la planilla, en PDF y en Excel, el IVA va en su columna como crédito fiscal y el importe costo/gasto es el total menos el IVA (por ejemplo, 305.00 $-$ 39.65 = 265.35). El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. En los gastos sin factura, las retenciones se calculan sobre el total del documento y al proveedor se le cancela el total menos las retenciones. Por ejemplo, en un servicio de 47.62 el RC-IVA es 6.19, el IT 1.43 y el importe a cancelar 40.00. El total cuenta para el presupuesto y como costo en la planilla. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
+En la factura (\code{F}) el IVA es el 13\% del total y se resta de él, igual que las retenciones: subtotal = total $-$ IVA. Al empleado se le reconoce el total; en la planilla, en PDF y en Excel, el IVA va en su columna como crédito fiscal y el importe costo/gasto es el total menos el IVA (por ejemplo, 305.00 $-$ 39.65 = 265.35). El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. En los gastos sin factura la empresa asume los impuestos (base incrementada): el empleado registra lo que pagó, la base es lo pagado $\div$ 0.84 en servicios ($\div$ 0.92 en compras) y de ella salen el RC-IVA o IUE y el IT, de modo que pagado + retenciones = base. Por ejemplo, con 40.00 pagados en un servicio la base es 47.62, el RC-IVA 6.19 y el IT 1.43. Lo pagado cuenta para el presupuesto y la base es el importe costo/gasto de la planilla. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
 
 \subsection{Plazos de registro}
 Tras el fin del viaje hay cuatro días de tolerancia para cargar gastos. Vencido el margen, se debe pedir una ampliación al revisor, que otorga cuatro días desde su respuesta. El plazo es del viaje: la ampliación vale para el titular y para su reemplazo aprobado, cualquiera de los dos puede pedirla y la respuesta se avisa a ambos. El plazo no corre mientras el viaje está rechazado. La ampliación extiende el margen de carga, no el rango de fechas: la fecha del gasto debe pertenecer al periodo del viaje.
@@ -663,7 +663,7 @@ Todas las rutas, salvo las de \code{/auth} y \code{/user/check-email}, requieren
 \endhead
 \rowcolor{maxamFondo} Memorándum de aprobación & Aprobación del aprobador & Empleado \\
 Confirmación de fondo & Aprobación de tesorería & Empleado (incluye origen y destino) \\
-\rowcolor{maxamFondo} Recibos de compra y servicio & A pedido & Empleado; muestran el total, las retenciones y el importe a cancelar (total $-$ retenciones); el número se reutiliza al reenviar \\
+\rowcolor{maxamFondo} Recibos de compra y servicio & A pedido & Empleado; muestran la base incrementada como total, las retenciones y lo pagado como importe a cancelar; el número se reutiliza al reenviar \\
 Rendición final & Aprobación final & Revisor y empleado, con saldo por moneda \\
 \rowcolor{maxamFondo} Planilla de rendición & A pedido & Descarga del empleado \\
 \end{xltabular}
