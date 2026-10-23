@@ -43,7 +43,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Codigo_Verificacion | Codigos temporales de verificacion por correo |
 | Viaje | Viajes registrados (motivo de hasta 500 caracteres), con su flujo de estados, revisores asignados y monto asignado (Bs y USD) |
 | Solicitud_Autorizacion_Plazo | Solicitudes de extension de plazo para seguir registrando gastos; las puede pedir el titular o su reemplazo (`id_empleado` es quien la pidio) |
-| Categoria_Gasto | Categorias de gasto con su cuenta contable de Oracle |
+| Categoria_Gasto | Categorias de gasto: el plan de cuentas de la empresa (112 cuentas de la planilla de Castro mas OTROS), con su cuenta contable de Oracle |
 | Proveedor | Proveedores/emisores de facturas |
 | Gasto | Gastos individuales de un viaje, con sus retenciones impositivas |
 | Gasto_Subitem | Desglose de un gasto en varios conceptos |
@@ -100,7 +100,7 @@ En cualquier etapa de revision (2, 3, 4, 6, 7 u 8), el viaje tambien puede pasar
 
 El perfil de **Tesorero** no es un rol: se determina por el cargo del usuario.
 
-**Categorias de gasto.** El nombre incorpora la cuenta contable de Oracle seguida de la denominacion, por ejemplo `626030 HOTELES (VIAJE)`. La exportacion de la planilla extrae ese codigo del nombre, por lo que el formato debe conservarse al agregar nuevas categorias.
+**Categorias de gasto.** El nombre incorpora la cuenta contable de Oracle seguida de la denominacion, por ejemplo `626030 HOTELES (VIAJE)`. La exportacion de la planilla extrae ese codigo del nombre, por lo que el formato debe conservarse al agregar nuevas categorias. El nombre admite hasta 100 caracteres; la API devuelve las categorias ordenadas por numero de cuenta.
 
 **Retenciones persistidas.** Las columnas `base_imponible`, `retencion_rc_iva`, `retencion_iue`, `retencion_it` e `importe_costo` guardan el calculo hecho al registrar el gasto, en lugar de recalcularse en cada consulta. Asi los reportes historicos no varian si cambian las alicuotas.
 

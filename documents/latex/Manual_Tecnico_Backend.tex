@@ -126,7 +126,7 @@
 Autor: & Mateo Alejandro Merino Vidal \\
 Empresa: & MAXAM FANEXA \\
 Componente: & API REST (Node.js, Express y Supabase) \\
-Versión: & 1.4 \\
+Versión: & 1.5 \\
 Fecha: & 23 de octubre de 2026 \\
 \end{tabular}
 \vspace{1.8cm}
@@ -332,7 +332,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \code{Viaje} & Viajes, estado, revisores asignados, monto asignado en Bs y USD (calculado con las tarifas del cargo) y ciclo de revisión \\
 \rowcolor{maxamFondo} \code{Solicitud_Autorizacion_Plazo} & Ampliaciones de plazo; las pide el titular o su reemplazo \\
 \code{Solicitud_Reemplazo} & Solicitudes para que otra persona rinda el viaje \\
-\rowcolor{maxamFondo} \code{Categoria_Gasto} & Categorías con su cuenta contable de Oracle \\
+\rowcolor{maxamFondo} \code{Categoria_Gasto} & Plan de cuentas de la empresa (112 cuentas de la planilla de Castro más OTROS), con la cuenta contable de Oracle en el nombre \\
 \code{Proveedor} & Emisores de facturas \\
 \rowcolor{maxamFondo} \code{Gasto} & Gastos con retenciones impositivas persistidas \\
 \code{Gasto_Subitem} & Desglose de un gasto en varios conceptos \\
@@ -620,7 +620,7 @@ Todas las rutas, salvo las de \code{/auth} y \code{/user/check-email}, requieren
 \epf{GET}{/position, /section}{Sesión}{Cargos y secciones}
 \ep{POST PUT}{/position, /section}{Administrador}{Crea y edita}
 \epf{PATCH}{/position/:id/suspend}{Administrador}{Suspende o activa (también secciones)}
-\ep{GET}{/expense-category}{Sesión}{Categorías de gasto}
+\ep{GET}{/expense-category}{Sesión}{Categorías de gasto, ordenadas por número de cuenta}
 \epf{GET}{/role, /tax, /supplier}{Administrador}{Roles, impuestos y proveedores}
 \ep{GET}{/audit}{Administrador}{Historial de accesos con filtros; las fechas son días de Bolivia}
 \epf{GET}{/admin/dashboard}{Administrador}{Indicadores por fase; periodo opcional con fecha\_inicio y fecha\_fin}
