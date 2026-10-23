@@ -59,6 +59,18 @@ const getReceiptNumber = async ({tripId, expenseId = null, type, isInternational
   return {receiptNumber: formatReceiptNumber(correlativeData), reissued: false};
 };
 
+// Lleva cada subgasto a la base incrementada en la misma proporcion; el ultimo cierra la suma exacta
+const grossUpSubItems = (subItems, paid, base) => {
+  let ratio = 1;
+  if (paid > 0) {
+    ratio = base / paid;
+  }
+  const amounts = subItems.map((item) => parseFloat((parseFloat(item.monto || 0) * ratio).toFixed(2)));
+  const others = amounts.slice(0, -1).reduce((sum, value) => sum + value, 0);
+  amounts[amounts.length - 1] = parseFloat((base - others).toFixed(2));
+  return amounts;
+};
+
 // Genera el HTML de un recibo agrupado por tipo de gasto
 const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, type, isInternational, tripCode, rawMotivo, rawSupervisor) => {
   const expenses = escapeDeep(rawExpenses);
@@ -75,13 +87,12 @@ const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, typ
   const isService = type === 'S';
   const retentionLabel = isService ? 'RETENCIÓN RC-IVA 13%' : 'RETENCIÓN IUE 5%';
   const typeTitle = isService ? 'RECIBO PAGO DE SERVICIOS' : 'RECIBO DE COMPRAS';
-  const totalAmount = expenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
-  // Las retenciones se calculan desde el total de cada gasto
+  // El importe de cada gasto es su base incrementada; al proveedor se le cancela lo pagado
   const retentionList = expenses.map((expense) => getExpenseRetentions(expense));
+  const totalAmount = retentionList.reduce((sum, item) => sum + item.base_imponible, 0);
   const totalRetention = retentionList.reduce((sum, item) => sum + item.retencion_rc_iva + item.retencion_iue, 0);
   const totalIt = retentionList.reduce((sum, item) => sum + item.retencion_it, 0);
-  // Al proveedor se le cancela el total menos las retenciones
-  const totalToPay = parseFloat((totalAmount - totalRetention - totalIt).toFixed(2));
+  const totalToPay = parseFloat(expenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0).toFixed(2));
   const costCenter = employee?.Seccion?.nombre || '';
   const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords);
   const expenseRows = expenses.map((expense, index) => {
@@ -109,7 +120,7 @@ const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, typ
       <td class="col-fecha">${dateStr}</td>
       <td class="col-desc">${description}</td>
       ${segmentsColumn}
-      <td class="col-importe">${parseFloat(expense.monto_total || 0).toFixed(2)}</td>
+      <td class="col-importe">${retentionList[index].base_imponible.toFixed(2)}</td>
     </tr>`;
   }).join('');
   const minRows = Math.max(0, 12 - expenses.length);
@@ -264,23 +275,23 @@ const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, t
   const exchangeSegments = expense.Gasto_Tramo_Moneda || [];
   const hasSubItems = subItems.length > 0;
   const hasSegments = isInternational && exchangeSegments.length > 0;
-  const totalAmount = parseFloat(expense.monto_total || 0);
-  // Las retenciones se calculan desde el total del gasto
+  // El importe es la base incrementada; al proveedor se le cancela lo pagado
   const retentions = getExpenseRetentions(expense);
+  const totalAmount = retentions.base_imponible;
   const totalRetention = retentions.retencion_rc_iva + retentions.retencion_iue;
   const totalIt = retentions.retencion_it;
-  // Al proveedor se le cancela el total menos las retenciones
-  const totalToPay = parseFloat((totalAmount - totalRetention - totalIt).toFixed(2));
+  const totalToPay = parseFloat(expense.monto_total || 0);
   const costCenter = employee?.Seccion?.nombre || '';
   const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords);
   let expenseRows = '';
   if (hasSubItems) {
+    const subItemAmounts = grossUpSubItems(subItems, totalToPay, totalAmount);
     expenseRows = subItems.map((item, index) => `
     <tr>
       <td class="col-n">${index + 1}</td>
       <td class="col-fecha">${formatShortDate(expense.fecha_gasto)}</td>
       <td class="col-desc">${escapeHtml(item.descripcion)}</td>
-      <td class="col-importe">${parseFloat(item.monto).toFixed(2)}</td>
+      <td class="col-importe">${subItemAmounts[index].toFixed(2)}</td>
     </tr>`).join('');
   }
   else {

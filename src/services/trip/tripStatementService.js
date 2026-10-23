@@ -60,7 +60,7 @@ const getExpenseTaxValues = (expense) => {
     return {vat, rcIva: 0, iue: 0, it: 0, cost: parseFloat((amount - vat).toFixed(2))};
   }
   const retentions = getExpenseRetentions(expense);
-  return {vat: 0, rcIva: retentions.retencion_rc_iva, iue: retentions.retencion_iue, it: retentions.retencion_it, cost: amount};
+  return {vat: 0, rcIva: retentions.retencion_rc_iva, iue: retentions.retencion_iue, it: retentions.retencion_it, cost: retentions.importe_costo};
 };
 
 // Arma la descripcion visible de un gasto segun tenga factura o subitems
