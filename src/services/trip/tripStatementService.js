@@ -54,9 +54,8 @@ const getExpenseTaxValues = (expense) => {
     if (expense.tipo !== 'F') {
       return {vat: 0, rcIva: 0, iue: 0, it: 0, cost: amount};
     }
-    const partial = parseFloat(expense.Factura?.monto_parcial || 0);
-    const vat = parseFloat((partial * vatRate).toFixed(2));
-    // El costo de una factura es el importe sin el IVA, que queda como credito fiscal
+    // El IVA es el 13% del total y se resta del costo, porque queda como credito fiscal
+    const vat = parseFloat((amount * vatRate).toFixed(2));
     return {vat, rcIva: 0, iue: 0, it: 0, cost: parseFloat((amount - vat).toFixed(2))};
   }
   return {

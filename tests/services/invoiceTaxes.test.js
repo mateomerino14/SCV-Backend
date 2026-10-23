@@ -4,12 +4,12 @@ jest.mock('../../src/services/shared/geminiService', () => ({}));
 const {getExpenseTaxValues} = require('../../src/services/trip/tripStatementService');
 const {normalizeResult} = require('../../src/services/expense/invoiceExtractionService');
 
-// La factura (F) calcula el IVA del 13% sobre el subtotal y el costo es el importe sin IVA
-test('la factura muestra el IVA del 13% y el costo sin IVA en la planilla', () => {
-  const expense = {tipo: 'F', monto_total: '113.00', Factura: {monto_parcial: '100.00'}};
-  expect(getExpenseTaxValues(expense)).toEqual({vat: 13, rcIva: 0, iue: 0, it: 0, cost: 100});
-  const fuel = {tipo: 'F', monto_total: '305.00', Factura: {monto_parcial: '269.91'}};
-  expect(getExpenseTaxValues(fuel)).toEqual({vat: 35.09, rcIva: 0, iue: 0, it: 0, cost: 269.91});
+// La factura (F) tiene un IVA del 13% del total, que se resta del costo
+test('la factura muestra el IVA del 13% del total y el costo sin IVA en la planilla', () => {
+  const expense = {tipo: 'F', monto_total: '100.00', Factura: {monto_parcial: '87.00'}};
+  expect(getExpenseTaxValues(expense)).toEqual({vat: 13, rcIva: 0, iue: 0, it: 0, cost: 87});
+  const fuel = {tipo: 'F', monto_total: '305.00', Factura: {monto_parcial: '265.35'}};
+  expect(getExpenseTaxValues(fuel)).toEqual({vat: 39.65, rcIva: 0, iue: 0, it: 0, cost: 265.35});
 });
 
 // El recibo (R) no lleva IVA aunque tenga registro de factura
@@ -31,10 +31,12 @@ test('el recibo extraído no descuenta el IVA del total', () => {
   expect(result).toMatchObject({tipo_doc: 'R', monto: 100, iva: 0, monto_total: 100, numero_factura: 'BOL-$45@7'});
 });
 
-// Una factura con solo el total separa el IVA por dentro, sin cambiar el total
-test('la factura extraída con solo el total separa el IVA por dentro', () => {
+// En una factura extraida el IVA es el 13% del total y se resta de el, sin cambiar el total
+test('la factura extraída resta del total un IVA del 13%', () => {
   const result = normalizeResult({tipo_doc: 'F', monto_total: 305});
-  expect(result).toMatchObject({tipo_doc: 'F', monto: 269.91, iva: 35.09, monto_total: 305});
-  const explicit = normalizeResult({tipo_doc: 'F', monto: 100, iva: 13, monto_total: 113});
-  expect(explicit).toMatchObject({monto: 100, iva: 13, monto_total: 113});
+  expect(result).toMatchObject({tipo_doc: 'F', monto: 265.35, iva: 39.65, monto_total: 305});
+  const subtotalBased = normalizeResult({tipo_doc: 'F', monto: 100, iva: 13, monto_total: 113});
+  expect(subtotalBased).toMatchObject({monto: 98.31, iva: 14.69, monto_total: 113});
+  const explicit = normalizeResult({tipo_doc: 'F', monto: 87, iva: 13, monto_total: 100});
+  expect(explicit).toMatchObject({monto: 87, iva: 13, monto_total: 100});
 });

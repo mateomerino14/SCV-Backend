@@ -20,7 +20,7 @@ const buildPrompt = () => {
 IMPORTANTE:
 - El campo iva debe ser el MONTO EN DINERO del impuesto, no el porcentaje
 - En facturas bolivianas "Importe" generalmente es el monto total con IVA incluido — úsalo como monto_total
-- El IVA boliviano es del 13% sobre el subtotal — si no aparece explícito, calcúlalo como monto_total / 1.13 * 0.13
+- El IVA boliviano (crédito fiscal) es el 13% del total — si no aparece explícito, calcúlalo como monto_total * 0.13, y monto es monto_total - iva
 - Si no encuentras algún dato, usa null para números y "No Especificado" para textos
 - La fecha debe estar en formato YYYY-MM-DD obligatoriamente
 - La cantidad puede tener decimales (por ejemplo 53.345 litros de combustible); usa como máximo 3 decimales
@@ -62,11 +62,12 @@ const normalizeResult = (parsedData) => {
     vat = 0;
     total = amount;
   }
-  // Si la factura no trae subtotal e IVA coherentes con el total, el IVA se separa por dentro del total
+  // El IVA es el 13% del total y se resta de el; si la IA no lo devolvio asi, se recalcula
   const totalNum = parseFloat(total) || 0;
-  if (docType === 'F' && totalNum > 0 && Math.abs((parseFloat(amount) || 0) + (parseFloat(vat) || 0) - totalNum) > 0.02) {
-    amount = parseFloat((totalNum / 1.13).toFixed(2));
-    vat = parseFloat((totalNum - amount).toFixed(2));
+  const expectedVat = parseFloat((totalNum * 0.13).toFixed(2));
+  if (docType === 'F' && totalNum > 0 && (Math.abs((parseFloat(vat) || 0) - expectedVat) > 0.02 || Math.abs((parseFloat(amount) || 0) + (parseFloat(vat) || 0) - totalNum) > 0.02)) {
+    vat = expectedVat;
+    amount = parseFloat((totalNum - vat).toFixed(2));
   }
   return {
     proveedor: parsedData.proveedor || 'No Especificado',
