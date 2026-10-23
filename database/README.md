@@ -43,7 +43,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Codigo_Verificacion | Codigos temporales de verificacion por correo |
 | Viaje | Viajes registrados (motivo de hasta 500 caracteres), con su flujo de estados, revisores asignados y monto asignado (Bs y USD) |
 | Solicitud_Autorizacion_Plazo | Solicitudes de extension de plazo para seguir registrando gastos; las puede pedir el titular o su reemplazo (`id_empleado` es quien la pidio) |
-| Categoria_Gasto | Categorias de gasto: el plan de cuentas de la empresa (112 cuentas de la planilla de Castro mas OTROS), con su cuenta contable de Oracle |
+| Categoria_Gasto | Categorias de gasto: el plan de cuentas de la empresa (112 cuentas de la planilla de Castro mas OTROS), con su cuenta contable de Oracle y, en `descripcion`, la nota de cuando usarla |
 | Proveedor | Proveedores/emisores de facturas |
 | Gasto | Gastos individuales de un viaje, con sus retenciones impositivas |
 | Gasto_Subitem | Desglose de un gasto en varios conceptos |
