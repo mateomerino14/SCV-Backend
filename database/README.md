@@ -5,7 +5,7 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 ## Orden de ejecucion
 
 1. `01_schema.sql` - crea las 24 tablas, relaciones e indices
-2. `02_functions.sql` - crea la funcion `incrementar_correlativo_recibo()`, usada por el backend para numerar recibos
+2. `02_functions.sql` - crea la funcion `incrementar_correlativo_recibo()`, usada por el backend para numerar recibos, y el trigger `viaje_numero_rendicion`, que al quedar un viaje en `APROBADO_FINAL` le asigna el siguiente numero de rendicion del mes de su ultimo comprobante (`Viaje.numero_rendicion` y `periodo_rendicion`). Para empezar desde un numero, por ejemplo si contabilidad ya va por la 40: `insert into "Correlativo_Rendicion" (periodo, numero) values ('2026-10', 40) on conflict (periodo) do update set numero = 40;`
 3. `03_seed.sql` - datos iniciales: roles, cargos, impuesto de IVA, categorias de gasto y la configuracion de recordatorios por defecto
 4. `04_rls_hardening.sql` - activa seguridad por fila (RLS) en todas las tablas
 
@@ -57,6 +57,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Comentario | Observaciones sobre un viaje o gasto especifico, y justificaciones (una por dia excedido) |
 | Auditoria | Registro de auditoria (ingreso, salida, cambio de clave) |
 | Correlativo_Recibo | Tabla contador para numerar recibos y documentos PDF generados |
+| Correlativo_Rendicion | Ultimo numero de rendicion de cada mes (AAAA-MM) para la descripcion de Oracle (10-40); lo usa el trigger `viaje_numero_rendicion` |
 | Recibo | Numero asignado a cada recibo emitido (individual o agrupado), para reutilizarlo al reenviarlo |
 | Revision_Viaje | Quien aprobo o rechazo cada viaje, en que etapa y cuando (historial de revision de cada revisor) |
 | Solicitud_Reemplazo | Solicitudes para que un tercero rinda los gastos de un viaje en nombre de otro empleado |
