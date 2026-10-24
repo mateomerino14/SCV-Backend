@@ -77,7 +77,6 @@ const createExpense = async (expenseData, file, userId) => {
   if (!access.allowed) {
     return {error: access.error, status: access.status};
   }
-  // Se acepta true o "true"; cualquier otro valor es un gasto en bolivianos
   const isInternational = expenseData.es_gasto_internacional === true || expenseData.es_gasto_internacional === 'true';
   const usesSegments = isInternational && Array.isArray(expenseData.tramos) && expenseData.tramos.length > 0;
   const usesSubItems = Array.isArray(expenseData.subitems) && expenseData.subitems.length > 0;
@@ -86,7 +85,6 @@ const createExpense = async (expenseData, file, userId) => {
     return {error: detailsError, status: 400};
   }
   let totalAmount = parseFloat(expenseData.monto_total);
-  // Los tramos son referencia: vale el monto ingresado o la suma de subgastos
   if (usesSubItems) {
     const subItemsAmount = calculateAmountFromSubitems(expenseData.subitems);
     if (subItemsAmount !== null) {
@@ -205,7 +203,6 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
   if (!deadlineValidation.valid) {
     return {error: deadlineValidation.error, status: 400, requiereAutorizacion: !!deadlineValidation.requiereAutorizacion};
   }
-  // Se acepta true o "true"; cualquier otro valor es un gasto en bolivianos
   const isInternational = expenseData.es_gasto_internacional === true || expenseData.es_gasto_internacional === 'true';
   const usesSegments = isInternational && Array.isArray(expenseData.tramos) && expenseData.tramos.length > 0;
   const usesSubItems = Array.isArray(expenseData.subitems) && expenseData.subitems.length > 0;
@@ -214,7 +211,6 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
     return {error: detailsError, status: 400};
   }
   let totalAmount = parseFloat(expenseData.monto_total);
-  // Los tramos son referencia: vale el monto ingresado o la suma de subgastos
   if (usesSubItems) {
     const subItemsAmount = calculateAmountFromSubitems(expenseData.subitems);
     if (subItemsAmount !== null) {

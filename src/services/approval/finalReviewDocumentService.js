@@ -38,7 +38,6 @@ const buildExpenseRow = (expense, isInternational) => {
 
 // Genera el HTML de la rendicion final para tesoreria
 const generateRenditionHtml = (rawTrip, rawReviewer, tripCode, rawExpenses) => {
-  // Datos escritos por usuarios: se escapan antes de armar el documento
   const trip = escapeDeep(rawTrip);
   const reviewer = escapeDeep(rawReviewer);
   const expenses = escapeDeep(rawExpenses);

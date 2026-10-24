@@ -140,7 +140,6 @@ const approveTrip = async (tripId, treasurerId, {selfStageSkip = false} = {}) =>
   if (error) {
     return {error: error.message, status: 500};
   }
-  // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
   if (!updatedRows?.length) {
     return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
   }
@@ -208,12 +207,10 @@ const rejectTrip = async (tripId, treasurerId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
     await reviewLogService.recordReview(tripId, treasurerId, reviewLogService.reviewStages.fundAssignment, 'RECHAZADO');
-    // Igual que en las demas etapas, el empleado recibe el aviso para corregir
     await emailService.sendRejectionNotice(trip.Usuario);
     return {message: 'Viaje rechazado correctamente'};
   }

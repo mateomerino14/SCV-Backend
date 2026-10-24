@@ -3,7 +3,6 @@ const {escapeDeep} = require('../../utils/htmlEscape');
 
 // Genera el HTML de confirmacion de fondo asignado
 const generateFundConfirmationHtml = (rawTrip, rawTreasurer, tripCode) => {
-  // Datos escritos por usuarios: se escapan antes de armar el documento
   const trip = escapeDeep(rawTrip);
   const treasurer = escapeDeep(rawTreasurer);
   const employee = trip.Usuario;

@@ -102,7 +102,6 @@ const takeAlcoholReview = async (tripId, approverId) => {
   if (trip.id_usuario === approverId) {
     return {error: 'No puedes revisar tu propio viaje', status: 403};
   }
-  // Si ya lo tiene asignado (por ejemplo, por jefatura directa) tomarlo no es un error
   if (trip.id_aprobador_asignado === approverId) {
     return {message: 'Ya tienes este viaje asignado'};
   }
@@ -114,7 +113,6 @@ const takeAlcoholReview = async (tripId, approverId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -139,7 +137,6 @@ const returnAlcoholReview = async (tripId, approverId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -210,7 +207,6 @@ const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} 
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -252,7 +248,6 @@ const rejectAlcoholReview = async (tripId, approverId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }

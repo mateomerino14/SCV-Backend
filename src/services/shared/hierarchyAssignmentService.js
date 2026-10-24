@@ -75,7 +75,6 @@ const assignNextReviewer = async (tripId, personId, roleName, assignedField) => 
   if (uniqueRoles.includes(roleName)) {
     const {data: trip} = await supabase.from('Viaje').select('id_usuario').eq('id_viaje', tripId).single();
     let holderId = await getUniqueRoleHolder(roleName);
-    // Nadie revisa su propio viaje
     if (holderId && trip?.id_usuario === holderId) {
       holderId = null;
     }

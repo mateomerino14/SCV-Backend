@@ -71,28 +71,45 @@ const grossUpSubItems = (subItems, paid, base) => {
   return amounts;
 };
 
+// Datos de cabecera de un recibo: fecha de emision, moneda y titulos segun el tipo de gasto
+const buildReceiptHeader = (type, isInternational) => {
+  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const today = new Date();
+  const header = {
+    day: today.getDate(), month: monthNames[today.getMonth()], year: today.getFullYear(),
+    currency: 'Bs', currencyWords: 'BOLIVIANOS', retentionLabel: 'RETENCIÓN IUE 5%', typeTitle: 'RECIBO DE COMPRAS',
+  };
+  if (isInternational) {
+    header.currency = 'USD';
+    header.currencyWords = 'DÓLARES AMERICANOS';
+  }
+  if (type === 'S') {
+    header.retentionLabel = 'RETENCIÓN RC-IVA 13%';
+    header.typeTitle = 'RECIBO PAGO DE SERVICIOS';
+  }
+  return header;
+};
+
+// Totales de un recibo: el importe es la base incrementada y al proveedor se le cancela lo pagado
+const summarizeReceipt = (expenses) => {
+  const retentionList = expenses.map((expense) => getExpenseRetentions(expense));
+  return {
+    retentionList,
+    totalAmount: retentionList.reduce((sum, item) => sum + item.base_imponible, 0),
+    totalRetention: retentionList.reduce((sum, item) => sum + item.retencion_rc_iva + item.retencion_iue, 0),
+    totalIt: retentionList.reduce((sum, item) => sum + item.retencion_it, 0),
+    totalToPay: parseFloat(expenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0).toFixed(2)),
+  };
+};
+
 // Genera el HTML de un recibo agrupado por tipo de gasto
 const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, type, isInternational, tripCode, rawMotivo, rawSupervisor) => {
   const expenses = escapeDeep(rawExpenses);
   const employee = escapeDeep(rawEmployee);
   const motivo = escapeDeep(rawMotivo);
   const supervisor = escapeDeep(rawSupervisor);
-  const today = new Date();
-  const day = today.getDate();
-  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  const month = monthNames[today.getMonth()];
-  const year = today.getFullYear();
-  const currency = isInternational ? 'USD' : 'Bs';
-  const currencyWords = isInternational ? 'DÓLARES AMERICANOS' : 'BOLIVIANOS';
-  const isService = type === 'S';
-  const retentionLabel = isService ? 'RETENCIÓN RC-IVA 13%' : 'RETENCIÓN IUE 5%';
-  const typeTitle = isService ? 'RECIBO PAGO DE SERVICIOS' : 'RECIBO DE COMPRAS';
-  // El importe de cada gasto es su base incrementada; al proveedor se le cancela lo pagado
-  const retentionList = expenses.map((expense) => getExpenseRetentions(expense));
-  const totalAmount = retentionList.reduce((sum, item) => sum + item.base_imponible, 0);
-  const totalRetention = retentionList.reduce((sum, item) => sum + item.retencion_rc_iva + item.retencion_iue, 0);
-  const totalIt = retentionList.reduce((sum, item) => sum + item.retencion_it, 0);
-  const totalToPay = parseFloat(expenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0).toFixed(2));
+  const {day, month, year, currency, currencyWords, retentionLabel, typeTitle} = buildReceiptHeader(type, isInternational);
+  const {retentionList, totalAmount, totalRetention, totalIt, totalToPay} = summarizeReceipt(expenses);
   const costCenter = employee?.Seccion?.nombre || '';
   const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords);
   const expenseRows = expenses.map((expense, index) => {
@@ -260,27 +277,13 @@ const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, t
   const employee = escapeDeep(rawEmployee);
   const motivo = escapeDeep(rawMotivo);
   const supervisor = escapeDeep(rawSupervisor);
-  const today = new Date();
-  const day = today.getDate();
-  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  const month = monthNames[today.getMonth()];
-  const year = today.getFullYear();
   const isInternational = !!expense.es_gasto_internacional;
-  const currency = isInternational ? 'USD' : 'Bs';
-  const currencyWords = isInternational ? 'DÓLARES AMERICANOS' : 'BOLIVIANOS';
-  const isService = expense.tipo === 'S';
-  const retentionLabel = isService ? 'RETENCIÓN RC-IVA 13%' : 'RETENCIÓN IUE 5%';
-  const typeTitle = isService ? 'RECIBO PAGO DE SERVICIOS' : 'RECIBO DE COMPRAS';
+  const {day, month, year, currency, currencyWords, retentionLabel, typeTitle} = buildReceiptHeader(expense.tipo, isInternational);
   const subItems = expense.Gasto_Subitem || [];
   const exchangeSegments = expense.Gasto_Tramo_Moneda || [];
   const hasSubItems = subItems.length > 0;
   const hasSegments = isInternational && exchangeSegments.length > 0;
-  // El importe es la base incrementada; al proveedor se le cancela lo pagado
-  const retentions = getExpenseRetentions(expense);
-  const totalAmount = retentions.base_imponible;
-  const totalRetention = retentions.retencion_rc_iva + retentions.retencion_iue;
-  const totalIt = retentions.retencion_it;
-  const totalToPay = parseFloat(expense.monto_total || 0);
+  const {totalAmount, totalRetention, totalIt, totalToPay} = summarizeReceipt([expense]);
   const costCenter = employee?.Seccion?.nombre || '';
   const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords);
   let expenseRows = '';

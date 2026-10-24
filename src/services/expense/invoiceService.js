@@ -243,7 +243,6 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   if (!existingExpense) {
     return {error: 'Gasto no encontrado', status: 404};
   }
-  // Solo se editan por aqui los gastos que son facturas
   const {data: existingInvoice} = await supabase.from('Factura').select('id_factura').eq('id_gasto', expenseId).maybeSingle();
   if (!existingInvoice) {
     return {error: 'Este gasto no es una factura', status: 400};

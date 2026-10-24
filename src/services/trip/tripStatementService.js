@@ -127,7 +127,6 @@ const latestJustificationPerDay = (comments) => {
 
 // Genera el HTML de la planilla de rendicion de cuentas
 const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
-  // Datos escritos por usuarios: se escapan antes de armar el documento
   const trip = escapeDeep(rawTrip);
   const expenses = escapeDeep(rawExpenses);
   const dayJustifications = escapeDeep(rawJustifications);
@@ -135,7 +134,6 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   const responsable = `${employee?.nombre || ''} ${employee?.apellido_paterno || ''}`.trim().toUpperCase();
   const cargo = employee?.Cargo?.nombre?.toUpperCase() || '';
   const costCenter = employee?.Seccion?.nombre || '';
-  // En viajes nacionales no hay tramos de cambio ni montos en USD
   const isInternationalTrip = trip.tipo === 'Internacional';
 
   let totalImporteFactura = 0;

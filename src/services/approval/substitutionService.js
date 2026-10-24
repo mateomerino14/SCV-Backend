@@ -244,7 +244,6 @@ const approveRequest = async (requestId, reviewerId) => {
   if (error) {
     return {error: error.message, status: 500};
   }
-  // Otra persona la resolvio entre la lectura y esta accion
   if (!updatedRequests?.length) {
     return processedRequestError(requestId);
   }
@@ -320,7 +319,6 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   if (error) {
     return {error: error.message, status: 500};
   }
-  // Otra persona la resolvio entre la lectura y esta accion
   if (!updatedRequests?.length) {
     return processedRequestError(requestId);
   }

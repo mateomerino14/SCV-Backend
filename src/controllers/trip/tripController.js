@@ -66,7 +66,6 @@ const createTrip = async (req, res) => {
   if (transporte === 'Vehículo de Empresa' && tipo === 'Internacional') {
     return res.status(400).json({error: 'El vehículo de empresa solo está disponible para viajes nacionales'});
   }
-  // La placa solo se guarda cuando el viaje es en vehiculo de la empresa
   let vehiclePlate = null;
   if (transporte === 'Vehículo de Empresa') {
     vehiclePlate = placa_vehiculo.trim();
