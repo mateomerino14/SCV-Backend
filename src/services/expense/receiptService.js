@@ -103,6 +103,14 @@ const summarizeReceipt = (expenses) => {
 };
 
 // Genera el HTML de un recibo agrupado por tipo de gasto
+// Referencia al recibo en papel del gasto, si el empleado anoto su numero
+const originalReceiptText = (expense) => {
+  if (!expense.numero_recibo) {
+    return '';
+  }
+  return `Recibo original Nº ${expense.numero_recibo}`;
+};
+
 const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, type, isInternational, tripCode, rawMotivo, rawSupervisor) => {
   const expenses = escapeDeep(rawExpenses);
   const employee = escapeDeep(rawEmployee);
@@ -111,7 +119,7 @@ const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, typ
   const {day, month, year, currency, currencyWords, retentionLabel, typeTitle} = buildReceiptHeader(type, isInternational);
   const {retentionList, totalAmount, totalRetention, totalIt, totalToPay} = summarizeReceipt(expenses);
   const costCenter = employee?.Seccion?.nombre || '';
-  const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords);
+  const amountInWords = numberToWords.convertNumberToWords(totalToPay, currencyWords);
   const expenseRows = expenses.map((expense, index) => {
     const subItems = expense.Gasto_Subitem || [];
     const exchangeSegments = expense.Gasto_Tramo_Moneda || [];
@@ -121,6 +129,9 @@ const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, typ
     }
     else {
       description = escapeHtml(expense.descripcion || expense.Categoria_Gasto?.nombre || '');
+    }
+    if (originalReceiptText(expense)) {
+      description = `${description}\n(${originalReceiptText(expense)})`;
     }
     let segmentsText = '—';
     if (exchangeSegments.length > 0) {
@@ -285,7 +296,11 @@ const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, t
   const hasSegments = isInternational && exchangeSegments.length > 0;
   const {totalAmount, totalRetention, totalIt, totalToPay} = summarizeReceipt([expense]);
   const costCenter = employee?.Seccion?.nombre || '';
-  const amountInWords = numberToWords.convertNumberToWords(totalAmount, currencyWords);
+  const amountInWords = numberToWords.convertNumberToWords(totalToPay, currencyWords);
+  let originalReceiptSpan = '';
+  if (originalReceiptText(expense)) {
+    originalReceiptSpan = `<span>${originalReceiptText(expense)}</span>`;
+  }
   let expenseRows = '';
   if (hasSubItems) {
     const subItemAmounts = grossUpSubItems(subItems, totalToPay, totalAmount);
@@ -388,6 +403,7 @@ const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, t
       <span>Nº de Viaje: ${tripCode}</span>
       <span>Concepto: ${escapeHtml(motivo || '')}</span>
       <span>Monto: ${totalAmount.toFixed(2)} ${currency}</span>
+      ${originalReceiptSpan}
     </div>
     ${segmentsHtml}
     <table class="principal">
