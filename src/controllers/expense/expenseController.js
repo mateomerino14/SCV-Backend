@@ -19,12 +19,14 @@ const getExpenseDetail = async (req, res) => {
           numero_factura,
           fecha_emision,
           monto_parcial,
+          cuf,
           Detalle_Factura(nombre_producto, cantidad, precio),
           Factura_Impuestos(
             Impuesto(porcentaje, nombre)
           )
         ),
         Imagen(url_archivo),
+        Imagen_Respaldo(id_respaldo, url_archivo),
         Gasto_Tramo_Moneda(id_tramo, moneda, monto_origen, tipo_cambio, monto_usd),
         Gasto_Subitem(id_subitem, descripcion, monto),
         Viaje(id_viaje, fecha_inicio, fecha_fin, estado)
@@ -90,6 +92,13 @@ const sendIndividualReceipt = async (req, res) => {
   }
 };
 
+// Separa el comprobante principal de los respaldos subidos con el gasto
+const getUploadedImages = (files) => {
+  const receipt = files?.imagen?.[0] || null;
+  const backups = files?.respaldos || [];
+  return {receipt, backups};
+};
+
 // Registra un nuevo gasto
 const registerExpense = async (req, res) => {
   try {
@@ -97,7 +106,7 @@ const registerExpense = async (req, res) => {
     if (!expenseData) {
       return res.status(400).json({error: 'Los datos enviados no son válidos'});
     }
-    const result = await expenseService.createExpense(expenseData, req.file, req.user.id_usuario);
+    const result = await expenseService.createExpense(expenseData, getUploadedImages(req.files), req.user.id_usuario);
     if (result.error) {
       return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion});
     }
@@ -116,7 +125,7 @@ const updateExpense = async (req, res) => {
       return res.status(400).json({error: 'Los datos enviados no son válidos'});
     }
     const {expenseId} = req.params;
-    const result = await expenseService.updateExpense(expenseId, expenseData, req.file, req.user.id_usuario);
+    const result = await expenseService.updateExpense(expenseId, expenseData, getUploadedImages(req.files), req.user.id_usuario);
     if (result.error) {
       return res.status(result.status || 500).json({error: result.error, requiereAutorizacion: result.requiereAutorizacion});
     }

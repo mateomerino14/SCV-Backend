@@ -19,13 +19,19 @@ const login = async (user) => {
   return response.body.token;
 };
 
+// PNG de 1x1 pixel para probar la subida de imagenes
+const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+
+// Adjunta una imagen por cada campo indicado (por ejemplo ['imagen', 'respaldos'])
+const attachImages = (pending, fields) => fields.reduce((current, field, index) => current.attach(field, tinyPng, {filename: `imagen${index}.png`, contentType: 'image/png'}), pending);
+
 // Cliente con el token ya puesto en la cabecera
 const api = (token) => ({
   get: (path) => request(app).get(path).set('authorization', `Bearer ${token}`),
   post: (path, body = {}) => request(app).post(path).set('authorization', `Bearer ${token}`).send(body),
   put: (path, body = {}) => request(app).put(path).set('authorization', `Bearer ${token}`).send(body),
-  postForm: (path, data) => request(app).post(path).set('authorization', `Bearer ${token}`).field('datos', JSON.stringify(data)),
-  putForm: (path, data) => request(app).put(path).set('authorization', `Bearer ${token}`).field('datos', JSON.stringify(data)),
+  postForm: (path, data, images = []) => attachImages(request(app).post(path).set('authorization', `Bearer ${token}`).field('datos', JSON.stringify(data)), images),
+  putForm: (path, data, images = []) => attachImages(request(app).put(path).set('authorization', `Bearer ${token}`).field('datos', JSON.stringify(data)), images),
 });
 
 module.exports = {app, request, login, api, boliviaDate};

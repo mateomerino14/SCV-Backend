@@ -5,6 +5,8 @@ const supplierService = require('./supplierService');
 const substitutionService = require('../approval/substitutionService');
 const {calculateRetentions} = require('../../utils/retentions');
 
+const maxBackupImages = 2;
+
 // Junta la descripcion y los subitems para buscar bebidas alcoholicas
 const buildAlcoholText = (expenseData, usesSubItems) => {
   const texts = [expenseData.descripcion];
@@ -68,8 +70,31 @@ const uploadReceiptImage = async (file) => {
   return {url: supabase.storage.from('facturas').getPublicUrl(fileName).data.publicUrl};
 };
 
-// Crea un gasto nuevo, con sus tramos de moneda, subitems e imagen asociada
-const createExpense = async (expenseData, file, userId) => {
+// Sube los respaldos extra (por ejemplo, el comprobante del cambio de moneda) y devuelve sus URLs
+const uploadBackupImages = async (files) => {
+  const urls = [];
+  for (const file of files) {
+    const upload = await uploadReceiptImage(file);
+    if (upload.error) {
+      return {error: upload.error};
+    }
+    urls.push(upload.url);
+  }
+  return {urls};
+};
+
+// Guarda las URLs de los respaldos de un gasto
+const insertBackupImages = async (expenseId, urls) => {
+  if (urls.length === 0) {
+    return {};
+  }
+  const {error} = await supabase.from('Imagen_Respaldo').insert(urls.map((url) => ({url_archivo: url, id_gasto: expenseId})));
+  return {error};
+};
+
+// Crea un gasto nuevo, con sus tramos de moneda, subitems, comprobante y respaldos
+const createExpense = async (expenseData, images, userId) => {
+  const {receipt: file, backups} = images;
   if (!expenseData.id_viaje) {
     return {error: 'El viaje es requerido', status: 400};
   }
@@ -107,6 +132,13 @@ const createExpense = async (expenseData, file, userId) => {
       return {error: upload.error, status: 500};
     }
     imageUrl = upload.url;
+  }
+  if (backups.length > maxBackupImages) {
+    return {error: `Puedes adjuntar como máximo ${maxBackupImages} respaldos por gasto`, status: 400};
+  }
+  const backupUpload = await uploadBackupImages(backups);
+  if (backupUpload.error) {
+    return {error: backupUpload.error, status: 500};
   }
   const supplierId = await supplierService.findOrCreateSupplier(expenseData.proveedor);
   const type = expenseData.tipo || 'S';
@@ -183,13 +215,19 @@ const createExpense = async (expenseData, file, userId) => {
       return {error: imageError.message, status: 500};
     }
   }
+  const {error: backupsError} = await insertBackupImages(expense.id_gasto, backupUpload.urls);
+  if (backupsError) {
+    await supabase.from('Gasto').delete().eq('id_gasto', expense.id_gasto);
+    return {error: backupsError.message, status: 500};
+  }
   // Se espera para que el viaje ya tenga tiene_alcohol actualizado si se finaliza enseguida
   await alcoholDetectionService.updateAlcoholInTrip(expenseData.id_viaje).catch((error) => console.warn('Error alcohol:', error.message));
   return {expense};
 };
 
-// Actualiza un gasto existente, reemplazando sus tramos de moneda, subitems e imagen
-const updateExpense = async (expenseId, expenseData, file, userId) => {
+// Actualiza un gasto existente, reemplazando sus tramos de moneda, subitems, comprobante y respaldos
+const updateExpense = async (expenseId, expenseData, images, userId) => {
+  const {receipt: file, backups} = images;
   const {data: existingExpense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single();
   if (!existingExpense) {
     return {error: 'Gasto no encontrado', status: 404};
@@ -227,6 +265,17 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
       return {error: upload.error, status: 500};
     }
     newImageUrl = upload.url;
+  }
+  const {data: existingBackups} = await supabase.from('Imagen_Respaldo').select('id_respaldo, url_archivo').eq('id_gasto', expenseId);
+  const keptUrls = Array.isArray(expenseData.respaldos_conservados) ? expenseData.respaldos_conservados : [];
+  const removedBackupIds = (existingBackups || []).filter((backup) => !keptUrls.includes(backup.url_archivo)).map((backup) => backup.id_respaldo);
+  const keptCount = (existingBackups || []).length - removedBackupIds.length;
+  if (keptCount + backups.length > maxBackupImages) {
+    return {error: `Puedes adjuntar como máximo ${maxBackupImages} respaldos por gasto`, status: 400};
+  }
+  const backupUpload = await uploadBackupImages(backups);
+  if (backupUpload.error) {
+    return {error: backupUpload.error, status: 500};
   }
   const supplierId = await supplierService.findOrCreateSupplier(expenseData.proveedor);
   const type = expenseData.tipo || 'S';
@@ -304,6 +353,13 @@ const updateExpense = async (expenseId, expenseData, file, userId) => {
       }
     }
   }
+  if (removedBackupIds.length > 0) {
+    await supabase.from('Imagen_Respaldo').delete().in('id_respaldo', removedBackupIds);
+  }
+  const {error: backupsError} = await insertBackupImages(parseInt(expenseId), backupUpload.urls);
+  if (backupsError) {
+    return {error: childError, status: 500};
+  }
   const {data: updatedExpense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single();
   if (updatedExpense?.id_viaje) {
     await alcoholDetectionService.updateAlcoholInTrip(updatedExpense.id_viaje).catch((error) => console.warn('Error alcohol:', error.message));
@@ -330,6 +386,7 @@ const deleteExpense = async (expenseId, userId) => {
     await supabase.from('Factura').delete().in('id_factura', invoiceIds);
   }
   await supabase.from('Imagen').delete().eq('id_gasto', expenseId);
+  await supabase.from('Imagen_Respaldo').delete().eq('id_gasto', expenseId);
   const {error: deleteError} = await supabase.from('Gasto').delete().eq('id_gasto', expenseId);
   if (deleteError) {
     return {error: deleteError.message, status: 500};

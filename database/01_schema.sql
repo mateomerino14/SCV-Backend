@@ -182,6 +182,13 @@ create table if not exists "Imagen" (
   id_gasto integer not null references "Gasto"(id_gasto) unique
 );
 
+-- Respaldos extra de un gasto sin factura (por ejemplo, el comprobante del cambio de moneda); hasta 2 por gasto
+create table if not exists "Imagen_Respaldo" (
+  id_respaldo serial primary key,
+  url_archivo text not null,
+  id_gasto integer not null references "Gasto"(id_gasto) on delete cascade
+);
+
 -- ------------------------------------------------------------
 -- Facturas
 -- ------------------------------------------------------------
@@ -191,6 +198,7 @@ create table if not exists "Factura" (
   numero_factura varchar(50) not null,
   fecha_emision date not null,
   monto_parcial decimal(10, 2) not null,
+  cuf varchar(100), -- codigo de autorizacion (CUF) que pide Oracle
   id_gasto integer not null references "Gasto"(id_gasto) unique,
   id_proveedor integer references "Proveedor"(id_proveedor),
   constraint factura_numero_proveedor_fecha_unique unique (numero_factura, fecha_emision, id_proveedor)

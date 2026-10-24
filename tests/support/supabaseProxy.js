@@ -4,6 +4,15 @@ const http = require('http');
 const startSupabaseProxy = (port, postgrestUrl) => {
   const target = new URL(postgrestUrl);
   const server = http.createServer((req, res) => {
+    // Las subidas a Storage se aceptan sin guardar nada: a las pruebas solo les importa la URL publica
+    if (req.url.startsWith('/storage/v1/object/')) {
+      req.resume();
+      req.on('end', () => {
+        res.writeHead(200, {'content-type': 'application/json'});
+        res.end(JSON.stringify({Key: req.url.replace('/storage/v1/object/', '')}));
+      });
+      return;
+    }
     const headers = {...req.headers, host: target.host};
     delete headers.authorization;
     delete headers.apikey;

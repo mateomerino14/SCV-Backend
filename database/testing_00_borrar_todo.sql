@@ -12,6 +12,7 @@ drop table if exists
   "Factura_Impuestos",
   "Detalle_Factura",
   "Factura",
+  "Imagen_Respaldo",
   "Imagen",
   "Gasto_Tramo_Moneda",
   "Gasto_Subitem",

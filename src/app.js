@@ -83,8 +83,8 @@ app.use((error, req, res, next) => {
   if (error?.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({error: 'La imagen supera el tamaño máximo permitido de 8 MB'});
   }
-  if (error?.code === 'LIMIT_FILE_COUNT') {
-    return res.status(400).json({error: 'Solo se permite un archivo por solicitud'});
+  if (error?.code === 'LIMIT_FILE_COUNT' || error?.code === 'LIMIT_UNEXPECTED_FILE') {
+    return res.status(400).json({error: 'Se adjuntaron más archivos de los permitidos: un comprobante y hasta 2 respaldos'});
   }
   if (error) {
     console.log('Error no controlado:', error.message);
