@@ -258,6 +258,9 @@ create table if not exists "Correlativo_Rendicion" (
   numero integer not null default 0
 );
 
+-- Seguro extra: dos rendiciones nunca comparten numero en el mismo mes
+create unique index if not exists viaje_numero_rendicion_unique on "Viaje"(periodo_rendicion, numero_rendicion) where numero_rendicion is not null;
+
 -- Numero de cada recibo emitido (por gasto o agrupado por viaje), para conservarlo al reenviar
 create table if not exists "Recibo" (
   id_recibo serial primary key,
