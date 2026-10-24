@@ -1,4 +1,5 @@
 const geminiService = require('../shared/geminiService');
+const {normalizeCuf} = require('../../utils/cuf');
 
 // Construye la instruccion enviada al modelo para interpretar el comprobante
 const buildPrompt = () => {
@@ -7,6 +8,7 @@ const buildPrompt = () => {
   "proveedor": "nombre del proveedor o empresa emisora",
   "numero_factura": "número de factura; si es un recibo o boleto sin número, su código (puede tener letras y símbolos)",
   "nit": "NIT o CI del proveedor (solo números, máximo 10 dígitos)",
+  "cuf": "CUF o Código de Autorización de la factura (letras y números, sin espacios); null si no aparece",
   "fecha_emision": "fecha en formato YYYY-MM-DD",
   "iva": monto_numerico_del_impuesto_en_dinero_NO_el_porcentaje,
   "monto": monto_numerico_sin_impuestos,
@@ -69,10 +71,15 @@ const normalizeResult = (parsedData) => {
     vat = expectedVat;
     amount = parseFloat((totalNum - vat).toFixed(2));
   }
+  let cuf = null;
+  if (docType === 'F') {
+    cuf = normalizeCuf(parsedData.cuf);
+  }
   return {
     proveedor: parsedData.proveedor || 'No Especificado',
     numero_factura: parsedData.numero_factura || 'No Especificado',
     nit: parsedData.nit || null,
+    cuf,
     fecha_emision: parsedData.fecha_emision || '',
     fecha_emision_valida: isValidEmissionDate(parsedData.fecha_emision),
     iva: vat,

@@ -67,6 +67,18 @@ test('guarda un recibo sin IVA con código y cantidad decimal', async () => {
   expect(parseFloat(expense.Factura.Detalle_Factura[0].cantidad)).toBe(53.345);
 });
 
+// La factura guarda el CUF limpio para el Excel de Oracle
+test('guarda el CUF de la factura', async () => {
+  const response = await employee.postForm('/invoice/save', {
+    id_viaje: tripId, proveedor: 'Estacion de prueba', numero_factura: `F-${Date.now() % 100000}`, nit: '1020305', fecha_emision: boliviaDate(), tipo_doc: 'F',
+    monto: 87, iva: 13, monto_total: 100, cuf: 'dd5f 2336-313f', id_categoria_gasto: 1, detalle: [{nombre_producto: 'Gasolina', cantidad: 26.738, precio: 3.74}],
+  });
+  expect(response.status).toBe(200);
+  const expenseId = response.body.gasto?.id_gasto || response.body.id_gasto;
+  const detail = await employee.get(`/expense/${expenseId}/detail`);
+  expect(detail.body.Factura.cuf).toBe('DD5F2336313F');
+});
+
 // Una cantidad con mas de 3 decimales se rechaza
 test('rechaza una cantidad con más de 3 decimales', async () => {
   const response = await employee.postForm('/invoice/save', {

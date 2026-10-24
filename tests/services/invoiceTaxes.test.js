@@ -46,3 +46,10 @@ test('la planilla suma las retenciones a lo pagado en un gasto sin factura', () 
   const service = {tipo: 'S', monto_total: '40.00'};
   expect(getExpenseTaxValues(service)).toEqual({vat: 0, rcIva: 6.19, iue: 0, it: 1.43, cost: 47.62});
 });
+
+// El CUF se guarda solo con letras y numeros en mayusculas; el recibo no lleva CUF
+test('normaliza el CUF de la factura y lo omite en el recibo', () => {
+  expect(normalizeResult({tipo_doc: 'F', monto_total: 100, cuf: 'dd5f 2336-313f'}).cuf).toBe('DD5F2336313F');
+  expect(normalizeResult({tipo_doc: 'F', monto_total: 100, cuf: 'No Especificado'}).cuf).toBeNull();
+  expect(normalizeResult({tipo_doc: 'R', monto_total: 100, cuf: 'ABC123'}).cuf).toBeNull();
+});

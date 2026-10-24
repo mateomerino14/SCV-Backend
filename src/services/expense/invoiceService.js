@@ -4,8 +4,17 @@ const alcoholDetectionService = require('../shared/alcoholDetectionService');
 const supplierService = require('./supplierService');
 const substitutionService = require('../approval/substitutionService');
 const {calculateRetentions} = require('../../utils/retentions');
+const {normalizeCuf} = require('../../utils/cuf');
 
 const ivaPercentageBolivia = 13;
+
+// El CUF solo aplica a facturas; el recibo no lo lleva
+const getInvoiceCuf = (invoiceData) => {
+  if (invoiceData.tipo_doc !== 'F') {
+    return null;
+  }
+  return normalizeCuf(invoiceData.cuf);
+};
 
 // Asocia o crea el registro de impuesto IVA para una factura
 const attachIvaTax = async (invoiceId, ivaAmount) => {
@@ -174,6 +183,7 @@ const saveInvoice = async (invoiceData, file, userId) => {
       numero_factura: invoiceData.numero_factura,
       fecha_emision: invoiceData.fecha_emision,
       monto_parcial: invoiceData.monto,
+      cuf: getInvoiceCuf(invoiceData),
       id_gasto: expense.id_gasto,
       id_proveedor: supplierId,
     })
@@ -329,6 +339,7 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
       numero_factura: invoiceData.numero_factura,
       fecha_emision: invoiceData.fecha_emision,
       monto_parcial: invoiceData.monto,
+      cuf: getInvoiceCuf(invoiceData),
       id_proveedor: supplierId,
     })
     .eq('id_factura', existingInvoice.id_factura);
