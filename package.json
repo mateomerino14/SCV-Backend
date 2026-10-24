@@ -35,12 +35,15 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "node-cron": "^4.6.0",
-    "puppeteer": "^10.4.0",
+    "puppeteer": "^25.16.0",
     "sib-api-v3-sdk": "^8.5.0"
   },
   "devDependencies": {
     "jest": "^30.4.2",
     "nodemon": "^3.1.14",
     "supertest": "^7.2.2"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }
