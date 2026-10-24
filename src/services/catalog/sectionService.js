@@ -29,4 +29,32 @@ const validateSectionNotDuplicated = async (name, excludeId) => {
   }
 };
 
-module.exports = {validateSectionNotDuplicated};
+// Valida los codigos de Oracle de la seccion: vacios o de 3 digitos
+const validateOracleCodes = (body) => {
+  const codes = [['codigo_dependencia', 'dependencia'], ['codigo_seccion', 'sección']];
+  for (const [field, label] of codes) {
+    const value = body[field];
+    if (value !== undefined && value !== null && value !== '' && !/^\d{3}$/.test(String(value))) {
+      return `El código de ${label} de Oracle debe tener 3 dígitos`;
+    }
+  }
+  return null;
+};
+
+// Deja solo los campos editables de una seccion, con los codigos vacios como null
+const pickSectionFields = (body) => {
+  const fields = {};
+  ['nombre', 'activo', 'codigo_dependencia', 'codigo_seccion'].forEach((field) => {
+    if (body[field] !== undefined) {
+      fields[field] = body[field];
+    }
+  });
+  ['codigo_dependencia', 'codigo_seccion'].forEach((field) => {
+    if (fields[field] === '') {
+      fields[field] = null;
+    }
+  });
+  return fields;
+};
+
+module.exports = {validateSectionNotDuplicated, validateOracleCodes, pickSectionFields};

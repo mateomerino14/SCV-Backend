@@ -18,6 +18,8 @@ create table if not exists "Cargo" (
 create table if not exists "Seccion" (
   id_seccion serial primary key,
   nombre varchar(100) not null unique,
+  codigo_dependencia varchar(3), -- dependencia (centro de costo) en la cuenta de Oracle, por ejemplo 421
+  codigo_seccion varchar(3), -- seccion en la cuenta de Oracle, por ejemplo 200
   activo boolean not null default true
 );
 
