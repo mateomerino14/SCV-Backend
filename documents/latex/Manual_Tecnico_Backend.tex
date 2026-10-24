@@ -126,8 +126,8 @@
 Autor: & Mateo Alejandro Merino Vidal \\
 Empresa: & MAXAM FANEXA \\
 Componente: & API REST (Node.js, Express y Supabase) \\
-Versión: & 2.0 \\
-Fecha: & 23 de octubre de 2026 \\
+Versión: & 2.1 \\
+Fecha: & 24 de octubre de 2026 \\
 \end{tabular}
 \vspace{1.8cm}
 \end{titlepage}
@@ -338,7 +338,8 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \code{Gasto_Subitem} & Desglose de un gasto en varios conceptos \\
 \rowcolor{maxamFondo} \code{Gasto_Tramo_Moneda} & Tramos en otra moneda de gastos internacionales, con el tipo de cambio que escribe el empleado \\
 \code{Imagen} & Comprobante asociado a un gasto \\
-\rowcolor{maxamFondo} \code{Factura} & Datos de la factura de un gasto \\
+\rowcolor{maxamFondo} \code{Imagen_Respaldo} & Hasta 2 respaldos extra de un gasto sin factura, por ejemplo el comprobante del cambio de moneda; se borran junto con el gasto \\
+\code{Factura} & Datos de la factura de un gasto, con el CUF (código de autorización) que pide Oracle \\
 \code{Detalle_Factura} & Productos de cada factura; la cantidad admite hasta 3 decimales \\
 \rowcolor{maxamFondo} \code{Impuesto} y \code{Factura_Impuestos} & Catálogo de impuestos y su relación con facturas \\
 \code{Comentario} & Observaciones de revisión y justificaciones de exceso \\
@@ -571,8 +572,8 @@ Todas las rutas, salvo las de \code{/auth} y \code{/user/check-email}, requieren
 \ep{PUT}{/trip/:id/confirm-completion}{Dueño o reemplazo}{Finaliza y envía la rendición}
 \epf{GET}{/trip/export/statements}{Revisor, tesorero, administrador}{Datos de las planillas de varios viajes para Excel}
 \ep{GET}{/expense/:expenseId/detail}{Acceso al viaje}{Detalle de un gasto}
-\epf{POST}{/expense/register}{Dueño o reemplazo}{Registra un gasto con imagen}
-\ep{PUT}{/expense/:expenseId/update}{Dueño o reemplazo}{Edita un gasto}
+\epf{POST}{/expense/register}{Dueño o reemplazo}{Registra un gasto con su comprobante (\code{imagen}) y hasta 2 respaldos (\code{respaldos})}
+\ep{PUT}{/expense/:expenseId/update}{Dueño o reemplazo}{Edita un gasto; conserva los respaldos indicados en \code{respaldos_conservados} y agrega los nuevos, sin pasar de 2}
 \epf{DELETE}{/expense/:expenseId}{Dueño o reemplazo}{Elimina un gasto}
 \ep{POST}{/expense/:expenseId/receipt}{Recibos}{Envía el recibo individual}
 \epf{POST}{/expense/trip/:tripId/receipt/:type}{Recibos}{Envía el recibo agrupado}
@@ -708,16 +709,16 @@ npm run resumen               # envía los correos en el momento
 \end{lstlisting}
 
 \section{Extracción de datos de comprobantes}
-La imagen del comprobante se envía al modelo de visión de Gemini (\code{invoiceExtractionService}) con una instrucción que fija el contexto tributario boliviano: el ``Importe'' es el total con IVA incluido, el IVA es del 13\% y debe devolverse como monto en dinero. El modelo responde con un JSON que contiene proveedor, NIT, número de factura, fecha de emisión, monto sin impuestos, IVA, total, tipo de documento (\code{F} o \code{R}) y detalle de productos.
+La imagen del comprobante se envía al modelo de visión de Gemini (\code{invoiceExtractionService}) con una instrucción que fija el contexto tributario boliviano: el ``Importe'' es el total con IVA incluido, el IVA es del 13\% y debe devolverse como monto en dinero. El modelo responde con un JSON que contiene proveedor, NIT, CUF (código de autorización), número de factura, fecha de emisión, monto sin impuestos, IVA, total, tipo de documento (\code{F} o \code{R}) y detalle de productos.
 
 \begin{itemize}
   \item \code{geminiService} reintenta ante errores temporales y, si el modelo principal falla o agotó su cuota, usa un modelo de respaldo.
-  \item La respuesta se normaliza: los datos que faltan quedan como ``No Especificado'', la fecha se valida (\code{fecha_emision_valida}) y la cantidad de cada producto se redondea a 3 decimales (por ejemplo 53.345 litros de combustible). En un recibo el monto es el total pagado y el IVA es 0. En una factura, el IVA es el 13\% del total y se resta de él (subtotal = total $-$ IVA); si la IA devuelve otros valores, se recalculan así sin cambiar el total. Si un recibo o boleto no tiene número, se usa su código, que puede tener símbolos como \code{@} o \code{\$}.
+  \item La respuesta se normaliza: los datos que faltan quedan como ``No Especificado'', la fecha se valida (\code{fecha_emision_valida}) y la cantidad de cada producto se redondea a 3 decimales (por ejemplo 53.345 litros de combustible). En un recibo el monto es el total pagado y el IVA es 0. En una factura, el IVA es el 13\% del total y se resta de él (subtotal = total $-$ IVA); si la IA devuelve otros valores, se recalculan así sin cambiar el total. Si un recibo o boleto no tiene número, se usa su código, que puede tener símbolos como \code{@} o \code{\$}. El CUF se guarda solo con letras y números en mayúsculas (\code{utils/cuf.js}) y solo en facturas; el recibo no lo lleva.
   \item Al registrar, el empleado revisa y puede corregir todos los datos antes de guardar, incluida la fecha de emisión por si la IA la leyó mal; al modificar una factura ya guardada, la fecha queda bloqueada. El gasto se marca como \code{modificado} cuando hubo correcciones.
   \item Al guardar, cada producto debe tener nombre, precio válido y una cantidad mayor a cero con hasta 3 decimales, igual que la columna \code{Detalle_Factura.cantidad numeric(12, 3)}.
 \end{itemize}
 
-Las imágenes se suben al almacenamiento antes de escribir el gasto o la factura; si la subida falla no queda nada a medio guardar. Una factura repetida (número, fecha y proveedor) se rechaza antes de modificar datos.
+Las imágenes (el comprobante y, en gastos sin factura, hasta 2 respaldos) se suben al almacenamiento antes de escribir el gasto o la factura; más archivos de los permitidos se rechazan con un mensaje claro; si la subida falla no queda nada a medio guardar. Una factura repetida (número, fecha y proveedor) se rechaza antes de modificar datos.
 
 \section{Seguridad}
 \begin{xltabular}{\textwidth}{L{4.2cm} Y}
@@ -770,10 +771,10 @@ Una prueba automática es código que usa el sistema como lo haría una persona 
 \cabecera \tth{Tipo} & \tth{Qué prueba} & \tth{Comando} \\
 \endhead
 \rowcolor{maxamFondo} Unitarias & Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, cantidades con decimales, control diario por moneda, exportación, recordatorios, jerarquía, moderación (\code{tests/services/}) & \code{npm test} \\
-De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, exportación (\code{tests/api/}) & \code{npm run test:api} \\
+De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos de gastos sin factura, presupuesto con lo pagado, exportación (\code{tests/api/}) & \code{npm run test:api} \\
 \end{xltabular}
 
-Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase; nunca se ejecutan contra la base real. En el estado actual pasan 59 pruebas unitarias y 20 de la API.
+Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase y acepta las subidas a Storage sin guardarlas; nunca se ejecutan contra la base real. En el estado actual pasan 60 pruebas unitarias y 24 de la API.
 
 \subsection{Integración continua}
 El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio.

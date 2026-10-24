@@ -49,7 +49,8 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Gasto_Subitem | Desglose de un gasto en varios conceptos |
 | Gasto_Tramo_Moneda | Tramos de conversion de moneda para gastos internacionales, con el tipo de cambio que registra el empleado |
 | Imagen | Imagenes/comprobantes asociados a un gasto (una por gasto) |
-| Factura | Facturas o recibos asociados a un gasto (una por gasto); el numero puede ser un codigo con simbolos |
+| Imagen_Respaldo | Respaldos extra de un gasto sin factura, hasta 2 (por ejemplo, el comprobante del cambio de moneda); se borran con el gasto |
+| Factura | Facturas o recibos asociados a un gasto (una por gasto); el numero puede ser un codigo con simbolos; `cuf` guarda el codigo de autorizacion que pide Oracle |
 | Detalle_Factura | Lineas de detalle (productos) de una factura; la cantidad admite hasta 3 decimales (litros, kilos o unidades) |
 | Impuesto | Catalogo de impuestos (IVA, etc) |
 | Factura_Impuestos | Relacion muchos a muchos entre facturas e impuestos |
