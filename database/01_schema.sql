@@ -107,6 +107,9 @@ create table if not exists "Viaje" (
   fue_iniciado boolean default false,
   ciclo_revision integer not null default 1,
   tiene_alcohol boolean,
+  -- numero de rendicion del mes para Oracle (10-40): lo asigna un trigger al quedar APROBADO_FINAL
+  numero_rendicion integer,
+  periodo_rendicion char(7),
   id_usuario integer not null,
   id_supervisor_asignado integer,
   id_aprobador_asignado integer,
@@ -248,6 +251,12 @@ create table if not exists "Correlativo_Recibo" (
 insert into "Correlativo_Recibo" (numero)
 select 0
 where not exists (select 1 from "Correlativo_Recibo" where id = 1);
+
+-- Ultimo numero de rendicion asignado en cada mes (AAAA-MM), para la descripcion de Oracle
+create table if not exists "Correlativo_Rendicion" (
+  periodo char(7) primary key,
+  numero integer not null default 0
+);
 
 -- Numero de cada recibo emitido (por gasto o agrupado por viaje), para conservarlo al reenviar
 create table if not exists "Recibo" (

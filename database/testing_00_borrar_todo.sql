@@ -28,6 +28,7 @@ drop table if exists
   "Cargo",
   "Rol",
   "Recibo",
+  "Correlativo_Rendicion",
   "Revision_Viaje",
   "Correlativo_Recibo"
 cascade;

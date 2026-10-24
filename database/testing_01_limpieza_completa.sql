@@ -7,6 +7,7 @@
 
 truncate table
   "Recibo",
+  "Correlativo_Rendicion",
   "Revision_Viaje",
   "Comentario",
   "Solicitud_Reemplazo",
