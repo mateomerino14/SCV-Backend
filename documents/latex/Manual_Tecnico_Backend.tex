@@ -126,7 +126,7 @@
 Autor: & Mateo Alejandro Merino Vidal \\
 Empresa: & MAXAM FANEXA \\
 Componente: & API REST (Node.js, Express y Supabase) \\
-Versión: & 1.9 \\
+Versión: & 2.0 \\
 Fecha: & 23 de octubre de 2026 \\
 \end{tabular}
 \vspace{1.8cm}
@@ -153,7 +153,7 @@ El backend expone una API REST consumida exclusivamente por el cliente web del s
 \endfirsthead
 \cabecera \tth{Tecnología} & \tth{Propósito} \\
 \endhead
-\rowcolor{maxamFondo} Node.js 22 y Express 5 & Servidor HTTP y enrutamiento de la API \\
+\rowcolor{maxamFondo} Node.js 22.12+ y Express 5 & Servidor HTTP y enrutamiento de la API \\
 Supabase (PostgreSQL) & Base de datos relacional, almacenamiento de imágenes y cliente JavaScript \\
 \rowcolor{maxamFondo} jsonwebtoken & Emisión y verificación del token de acceso y del token de renovación \\
 bcrypt & Cifrado de contraseñas \\
@@ -161,7 +161,7 @@ bcrypt & Cifrado de contraseñas \\
 helmet y cors & Cabeceras de seguridad y control de orígenes permitidos \\
 \rowcolor{maxamFondo} express-rate-limit & Límite de intentos de ingreso, recuperación de contraseña y extracción de facturas \\
 multer & Recepción de imágenes de comprobantes y fotos de perfil \\
-\rowcolor{maxamFondo} Puppeteer & Conversión de HTML a PDF (memorándum, recibos, rendiciones) \\
+\rowcolor{maxamFondo} Puppeteer 25 & Conversión de HTML a PDF (memorándum, recibos, rendiciones); se carga con \code{import()} al generar el primer PDF \\
 @google/generative-ai & Modelo Gemini para extracción de comprobantes y detección de alcohol \\
 \rowcolor{maxamFondo} sib-api-v3-sdk (Brevo) & Envío de correo transaccional \\
 node-cron & Resumen de pendientes por correo en los días y horas que configura el administrador \\
@@ -249,10 +249,10 @@ tests/                       Pruebas: services/ (unitarias), api/ (de la API)
 
 \subsection{Requisitos}
 \begin{itemize}
-  \item Node.js 22 o superior y npm.
+  \item Node.js 22.12 o superior y npm.
   \item Un proyecto de Supabase con el esquema aplicado (sección \ref{sec:bd}).
   \item Cuentas y claves de Brevo (correo), Google Gemini (lectura de comprobantes) y AbstractAPI (validación de correos).
-  \item Chromium o las librerías del sistema que requiere Puppeteer para generar PDF.
+  \item Las librerías del sistema que requiere el Chrome de Puppeteer. \code{npm ci} lo descarga en \code{.cache/puppeteer} dentro del proyecto (\code{.puppeteerrc.cjs}), para que Render lo conserve.
 \end{itemize}
 
 \subsection{Instalación}
@@ -757,6 +757,9 @@ pm2 start src/index.js --name scv-backend -i 1
 pm2 save && pm2 startup
 sudo certbot --nginx -d api.tuempresa.com
 \end{lstlisting}
+
+\section{Dependencias y seguridad}
+\code{npm audit} no reporta vulnerabilidades. Puppeteer se actualizó de la versión 10 a la 25, que ya no arrastra dependencias vulnerables; los ocho documentos PDF se generaron antes y después con los mismos datos y salen iguales (el tamaño A4 ahora es exacto). No hace falta \code{npm audit fix --force}.
 
 \section{Pruebas automáticas}
 Una prueba automática es código que usa el sistema como lo haría una persona y verifica que el resultado sea el correcto. Se ejecutan con un comando y, si un cambio rompe algo, fallan antes de que llegue a producción.

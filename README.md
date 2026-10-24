@@ -4,7 +4,7 @@ API REST del sistema de gestión de viajes corporativos y rendición de gastos d
 
 ## Requisitos
 
-- Node.js 22 o superior
+- Node.js 22.12 o superior (lo exige Puppeteer 25; `package.json` lo declara en `engines`)
 - Un proyecto de Supabase con el esquema aplicado (ver `database/README.md`)
 
 ## Instalación
@@ -82,7 +82,7 @@ npm ci
 
 ### 2. Librerías para generar los PDF
 
-Los recibos, memorándums y documentos se generan con Chromium sin pantalla (`puppeteer`). `npm ci` lo descarga, pero necesita estas librerías del sistema:
+Los recibos, memorándums y documentos se generan con Chrome sin pantalla (**Puppeteer 25**). `npm ci` descarga Chrome dentro del proyecto, en `.cache/puppeteer` (lo fija `.puppeteerrc.cjs`, para que Render lo conserve entre la compilación y la ejecución; la carpeta está en `.gitignore`), pero necesita estas librerías del sistema:
 
 ```bash
 sudo apt-get install -y ca-certificates fonts-liberation libatk-bridge2.0-0 libatk1.0-0 \
@@ -185,7 +185,7 @@ Si la versión trae cambios de base de datos, aplicarlos antes en Supabase (ver 
 | Multer | Procesamiento de archivos multiparte |
 | Axios | Verificación de correos con AbstractAPI |
 | Google Generative AI | Extracción de datos de comprobantes y detección de alcohol |
-| Puppeteer | Generación de PDF (memorándum, confirmación de fondos, rendición, planilla y recibos) |
+| Puppeteer 25 | Generación de PDF (memorándum, confirmación de fondos, rendición, planilla y recibos). Es un módulo ES: `pdfService` lo carga con `import()` al generar el primer PDF |
 | node-cron | Resumen de pendientes por correo en los días y horas que configura el administrador |
 | Brevo | Correo transaccional |
 | Helmet + CORS | Cabeceras de seguridad y control de orígenes |
@@ -452,6 +452,10 @@ En GitHub las pruebas se ejecutan solas en cada `push` y pull request (`.github/
 Sobre PostgreSQL. Los scripts de reconstrucción están en `database/` (cuatro archivos: esquema, funciones, semillas y RLS); ver su `README.md` para el orden de ejecución y las decisiones de diseño.
 
 Todas las marcas temporales usan `timestamptz`: el tipo sin zona horaria descartaba el huso al persistir, produciendo un desplazamiento de cuatro horas respecto de Bolivia.
+
+## Dependencias y seguridad
+
+`npm audit` no reporta vulnerabilidades. Puppeteer se actualizó de la versión 10 a la 25 (la 10 arrastraba dependencias vulnerables); los PDF se compararon antes y después con los mismos datos y salen iguales (el A4 ahora es exacto: 841.92 en lugar de 842.88 puntos). No hace falta `npm audit fix --force`.
 
 ## Convenciones
 
