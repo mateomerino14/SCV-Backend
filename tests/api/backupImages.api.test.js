@@ -58,6 +58,14 @@ test('guarda hasta 2 respaldos y permite conservarlos o cambiarlos al editar', a
   expect(detail.Imagen.url_archivo).toBeTruthy();
 });
 
+// El numero impreso del recibo en papel se guarda para el Excel de Oracle
+test('guarda el número del recibo en papel', async () => {
+  const registered = await employee.postForm('/expense/register', {...expenseData(), numero_recibo: ' 0003431 '}, ['imagen']);
+  expect(registered.status).toBe(200);
+  const detail = (await employee.get(`/expense/${registered.body.gasto.id_gasto}/detail`)).body;
+  expect(detail.numero_recibo).toBe('0003431');
+});
+
 // Mas de 2 respaldos al registrar se rechaza antes de guardar nada
 test('rechaza un gasto con más de 2 respaldos', async () => {
   const response = await employee.postForm('/expense/register', expenseData(), ['imagen', 'respaldos', 'respaldos', 'respaldos']);

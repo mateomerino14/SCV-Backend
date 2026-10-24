@@ -6,6 +6,10 @@ const substitutionService = require('../approval/substitutionService');
 const {calculateRetentions} = require('../../utils/retentions');
 
 const maxBackupImages = 2;
+const maxReceiptNumber = 50;
+
+// Numero impreso del recibo en papel, o null si el empleado no lo escribio
+const getReceiptNumber = (expenseData) => String(expenseData.numero_recibo || '').trim() || null;
 
 // Junta la descripcion y los subitems para buscar bebidas alcoholicas
 const buildAlcoholText = (expenseData, usesSubItems) => {
@@ -48,6 +52,9 @@ const validateExpenseDetails = (expenseData, isInternational) => {
         return 'Cada conversión de moneda debe tener un monto y un tipo de cambio mayores a cero';
       }
     }
+  }
+  if (String(expenseData.numero_recibo || '').trim().length > maxReceiptNumber) {
+    return `El número de recibo admite como máximo ${maxReceiptNumber} caracteres`;
   }
   if (Array.isArray(expenseData.subitems)) {
     for (const item of expenseData.subitems) {
@@ -172,6 +179,7 @@ const createExpense = async (expenseData, images, userId) => {
       retencion_it: retentions.retencion_it,
       importe_costo: retentions.importe_costo,
       tiene_alcohol: hasAlcohol,
+      numero_recibo: getReceiptNumber(expenseData),
     })
     .select()
     .single();
@@ -308,6 +316,7 @@ const updateExpense = async (expenseId, expenseData, images, userId) => {
       retencion_it: retentions.retencion_it,
       importe_costo: retentions.importe_costo,
       tiene_alcohol: hasAlcohol,
+      numero_recibo: getReceiptNumber(expenseData),
     })
     .eq('id_gasto', expenseId);
   if (expenseError) {
