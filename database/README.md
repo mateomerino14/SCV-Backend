@@ -45,7 +45,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Solicitud_Autorizacion_Plazo | Solicitudes de extension de plazo para seguir registrando gastos; las puede pedir el titular o su reemplazo (`id_empleado` es quien la pidio) |
 | Categoria_Gasto | Categorias de gasto: el plan de cuentas de la empresa (112 cuentas de la planilla de Castro mas OTROS), con su cuenta contable de Oracle y, en `descripcion`, la nota de cuando usarla |
 | Proveedor | Proveedores/emisores de facturas |
-| Gasto | Gastos individuales de un viaje, con sus retenciones impositivas |
+| Gasto | Gastos individuales de un viaje, con sus retenciones impositivas y, en los sin factura, el numero impreso del recibo en papel (`numero_recibo`, opcional) |
 | Gasto_Subitem | Desglose de un gasto en varios conceptos |
 | Gasto_Tramo_Moneda | Tramos de conversion de moneda para gastos internacionales, con el tipo de cambio que registra el empleado |
 | Imagen | Imagenes/comprobantes asociados a un gasto (una por gasto) |
