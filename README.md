@@ -430,6 +430,13 @@ Se conceden cuatro días de tolerancia tras la finalización del viaje. Vencido 
 
 La extensión amplía el margen para **cargar** los gastos, no el rango de fechas admisibles: la fecha del gasto debe seguir perteneciendo al período del viaje.
 
+### Recibos y datos para Oracle
+
+- **N° de recibo en papel:** un gasto sin factura puede guardar el número impreso de su recibo (`Gasto.numero_recibo`, opcional). El recibo que genera el sistema lo menciona («Recibo original Nº …») y en «Son:» escribe en letras el importe a cancelar, como el recibo en papel.
+- **Número de rendición del mes:** el trigger `viaje_numero_rendicion` le da a cada viaje, al quedar `APROBADO_FINAL`, el siguiente número del mes de su último comprobante (`Viaje.numero_rendicion`, `periodo_rendicion`). El contador (`Correlativo_Rendicion`) avanza en un solo paso y un índice único impide repetir números aunque se aprueben varias rendiciones a la vez.
+- **Códigos de la cuenta del gasto:** cada sección guarda su código de Oracle (`Seccion.codigo_seccion`) y cada usuario su dependencia (`Usuario.codigo_dependencia`); el Excel toma la dependencia del jefe directo del que viaja, o la suya si no tiene jefe. Ambos se validan como 3 dígitos.
+- Las consultas de las planillas para Excel envían, además, el CUF de la factura, los recibos emitidos, los respaldos, el apellido materno y estos códigos.
+
 ## Extracción de datos de comprobantes
 
 La imagen del comprobante se envía al modelo de visión de Gemini (`invoiceExtractionService`) con una instrucción que fija el contexto tributario boliviano: el «Importe» es el total con IVA incluido, el IVA es del 13 % y debe devolverse como monto en dinero, y el resultado es un JSON con proveedor, NIT, CUF (código de autorización; se guarda solo con letras y números en mayúsculas y solo en facturas, `utils/cuf.js`), número de factura, fecha de emisión, monto sin impuestos, IVA, total, tipo de documento (`F` o `R`) y detalle de productos.
@@ -440,8 +447,8 @@ La invocación (`geminiService`) reintenta ante errores temporales y, si el mode
 
 | Tipo | Qué prueba | Comando | Carpeta |
 |---|---|---|---|
-| Unitarias | Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, cantidades con decimales, control diario por moneda, recordatorios, jerarquía | `npm test` | `tests/services/` |
-| De la API | Endpoints completos contra una base de prueba: permisos, viajes, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos de gastos sin factura, presupuesto con lo pagado, cambio de un gasto a Hoteles, exportación | `npm run test:api` | `tests/api/` |
+| Unitarias | Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, cantidades con decimales, CUF, HTML del recibo, control diario por moneda, recordatorios, jerarquía | `npm test` | `tests/services/` |
+| De la API | Endpoints completos contra una base de prueba: permisos, viajes, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos y N° de recibo de gastos sin factura, presupuesto con lo pagado, número de rendición del mes, códigos de Oracle de secciones y usuarios, cambio de un gasto a Hoteles, exportación | `npm run test:api` | `tests/api/` |
 
 Las pruebas de la API necesitan una base PostgreSQL de prueba con los scripts de `database/` (`01` a `04` y `testing_02_organizacion_prueba.sql`), servida por PostgREST y el proxy `tests/support/supabaseProxy.js`, que imita la ruta `/rest/v1` de Supabase y acepta las subidas a Storage sin guardarlas. **No se corren contra Supabase real.**
 
