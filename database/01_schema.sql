@@ -18,7 +18,6 @@ create table if not exists "Cargo" (
 create table if not exists "Seccion" (
   id_seccion serial primary key,
   nombre varchar(100) not null unique,
-  codigo_dependencia varchar(3), -- dependencia (centro de costo) en la cuenta de Oracle, por ejemplo 421
   codigo_seccion varchar(3), -- seccion en la cuenta de Oracle, por ejemplo 200
   activo boolean not null default true
 );
@@ -60,6 +59,8 @@ create table if not exists "Usuario" (
   id_jefe_directo integer references "Usuario"(id_usuario),
   id_seccion integer references "Seccion"(id_seccion),
   carnet_identidad varchar(15),
+  -- dependencia de Oracle de quienes tienen a este usuario como jefe directo (por ejemplo 421); sin jefe, tambien la suya
+  codigo_dependencia varchar(3),
   ultima_cambio_contrasenia timestamptz default now(),
   refresh_token_invalido_desde timestamptz,
   -- true mientras tenga una contrasena temporal (recien creado, puesta por el administrador

@@ -106,7 +106,7 @@ const getMyReviews = async (reviewerId, filters) => {
 const getReviewDetail = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, Seccion(nombre, codigo_dependencia, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {

@@ -326,7 +326,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \endhead
 \rowcolor{maxamFondo} \code{Rol} & Roles del sistema (identificadores fijos) \\
 \code{Cargo} & Cargos con su viático diario en bolivianos y dólares \\
-\rowcolor{maxamFondo} \code{Seccion} & Secciones de la empresa; respaldo en la jerarquía de revisión. Guarda sus códigos de Oracle (\code{codigo_dependencia}, \code{codigo_seccion}, 3 dígitos) para la cuenta del gasto; el backend los valida y solo acepta los campos editables \\
+\rowcolor{maxamFondo} \code{Seccion} & Secciones de la empresa; respaldo en la jerarquía de revisión. Guarda su código de Oracle (\code{codigo_seccion}, 3 dígitos) para la cuenta del gasto; la dependencia va en el usuario (\code{Usuario.codigo_dependencia}) y se toma del jefe directo del que viaja, o la suya si no tiene jefe; el backend los valida y solo acepta los campos editables \\
 \code{Usuario} & Usuarios, jefe directo, estado de contraseña y sesión \\
 \rowcolor{maxamFondo} \code{Codigo_Verificacion} & Códigos de recuperación de contraseña (5 minutos) \\
 \code{Viaje} & Viajes, estado, revisores asignados, monto asignado en Bs y USD (calculado con las tarifas del cargo) y ciclo de revisión \\

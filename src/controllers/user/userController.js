@@ -19,10 +19,11 @@ const generateTemporaryPassword = () => {
 };
 
 // Columnas que se devuelven al administrar usuarios (sin hash ni datos de sesion)
-const userPublicColumns = 'id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, id_rol, id_cargo, id_seccion, id_jefe_directo, carnet_identidad, foto_perfil';
+const userPublicColumns = 'id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, id_rol, id_cargo, id_seccion, id_jefe_directo, carnet_identidad, codigo_dependencia, foto_perfil';
 
 // Campos que el administrador puede enviar al crear o editar un usuario
-const editableUserFields = ['nombre', 'apellido_paterno', 'apellido_materno', 'email_corporativo', 'telefono', 'id_cargo', 'id_rol', 'id_jefe_directo', 'id_seccion', 'carnet_identidad', 'activo'];
+const dependencyCodeError = 'La dependencia de Oracle debe tener 3 dígitos';
+const editableUserFields = ['nombre', 'apellido_paterno', 'apellido_materno', 'email_corporativo', 'telefono', 'id_cargo', 'id_rol', 'id_jefe_directo', 'id_seccion', 'carnet_identidad', 'codigo_dependencia', 'activo'];
 
 // Deja solo los campos que el administrador puede enviar
 const pickEditableFields = (body, extraFields = []) => {
@@ -163,7 +164,7 @@ const changeMyPassword = async (req, res) => {
 const getAllUsers = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_cargo, id_seccion, Seccion(nombre), carnet_identidad');
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_cargo, id_seccion, Seccion(nombre), carnet_identidad, codigo_dependencia');
   if (error) {
     return res.status(500).json({error: error.message});
   }
@@ -189,6 +190,12 @@ const updateUser = async (req, res) => {
   }
   if (payload.carnet_identidad !== undefined) {
     payload.carnet_identidad = payload.carnet_identidad?.trim() || null;
+  }
+  if (payload.codigo_dependencia !== undefined) {
+    payload.codigo_dependencia = String(payload.codigo_dependencia || '').trim() || null;
+    if (payload.codigo_dependencia && !/^\d{3}$/.test(payload.codigo_dependencia)) {
+      return res.status(400).json({error: dependencyCodeError});
+    }
   }
   if (payload.contrasenia) {
     // Una contrasena puesta por el administrador es temporal: el usuario debe cambiarla al entrar
@@ -249,6 +256,12 @@ const createUser = async (req, res) => {
   }
   if (body.carnet_identidad !== undefined) {
     body.carnet_identidad = body.carnet_identidad?.trim() || null;
+  }
+  if (body.codigo_dependencia !== undefined) {
+    body.codigo_dependencia = String(body.codigo_dependencia || '').trim() || null;
+    if (body.codigo_dependencia && !/^\d{3}$/.test(body.codigo_dependencia)) {
+      return res.status(400).json({error: dependencyCodeError});
+    }
   }
   body.contrasenia = bcrypt.hashSync(temporaryPassword, saltRounds);
   body.debe_cambiar_contrasenia = true;
