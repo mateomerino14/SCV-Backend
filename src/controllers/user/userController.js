@@ -1,23 +1,11 @@
 const supabase = require('../../config/supabase');
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const userService = require('../../services/user/userService');
-const emailService = require('../../services/shared/emailService');
+const userImportService = require('../../services/user/userImportService');
 const auditLogService = require('../../services/shared/auditLogService');
 const tokenService = require('../../services/user/tokenService');
-const {escapeHtml} = require('../../utils/htmlEscape');
 const storageService = require('../../services/shared/storageService');
 const saltRounds = 10;
-
-// Genera una contrasenia temporal legible, sin caracteres ambiguos (0/O, 1/l/I)
-const generateTemporaryPassword = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-  let password = '';
-  for (let i = 0; i < 10; i++) {
-    password += chars[crypto.randomInt(0, chars.length)];
-  }
-  return password;
-};
 
 // Columnas que se devuelven al administrar usuarios (sin hash ni datos de sesion)
 const userPublicColumns = 'id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, id_rol, id_cargo, id_seccion, id_jefe_directo, carnet_identidad, codigo_dependencia, foto_perfil';
@@ -254,7 +242,7 @@ const updateUser = async (req, res) => {
 // Crea un nuevo usuario, validando rol y cargo unicos
 const createUser = async (req, res) => {
   const body = pickEditableFields(req.body);
-  const temporaryPassword = generateTemporaryPassword();
+  const temporaryPassword = userService.generateTemporaryPassword();
   if (body.telefono !== undefined) {
     body.telefono = body.telefono?.trim() || null;
   }
@@ -286,24 +274,30 @@ const createUser = async (req, res) => {
     return res.status(500).json({error: error.message});
   }
   else {
-    const newUser = data[0];
-    try {
-      const loginUrl = process.env.FRONTEND_URL || 'https://scv-frontend.vercel.app';
-      const emailBody = `
-        ${emailService.emailParagraph(`Hola <strong>${escapeHtml(newUser.nombre)}</strong>,`)}
-        ${emailService.emailParagraph('Se creó tu cuenta en el Sistema de Control de Viáticos. Estas son tus credenciales de acceso:')}
-        ${emailService.emailInfoBox([{label: 'Correo', value: newUser.email_corporativo}])}
-        ${emailService.emailHighlightBox('Contraseña temporal', temporaryPassword)}
-        ${emailService.emailNote('Es una contraseña temporal: al ingresar por primera vez, el sistema te pedirá crear una propia.')}
-        ${emailService.emailButton('Ingresar al sistema', loginUrl)}
-      `;
-      const emailHtml = emailService.buildEmailLayout('Bienvenido al sistema', emailBody);
-      await emailService.sendEmail([{email: newUser.email_corporativo, name: `${newUser.nombre} ${newUser.apellido_paterno}`}], 'Tu cuenta fue creada', emailHtml);
-    }
-    catch (emailError) {
-      console.warn('Error al enviar correo de bienvenida:', emailError.message);
-    }
+    await userService.sendWelcomeEmail(data[0], temporaryPassword);
     return res.json(data);
+  }
+};
+
+// Valida las filas del Excel de usuarios y devuelve lo que se crearia, sin guardar nada
+const previewUserImport = async (req, res) => {
+  const result = await userImportService.previewImport(req.body?.filas);
+  if (result.error) {
+    return res.status(result.status).json({error: result.error});
+  }
+  else {
+    return res.json(result);
+  }
+};
+
+// Crea los usuarios validos del Excel y devuelve cuantos se crearon y que filas se omitieron
+const importUsers = async (req, res) => {
+  const result = await userImportService.importUsers(req.body?.filas);
+  if (result.error) {
+    return res.status(result.status).json({error: result.error});
+  }
+  else {
+    return res.json(result);
   }
 };
 
@@ -414,4 +408,4 @@ const getMyPosition = async (req, res) => {
   }
 };
 
-module.exports = {getMe, updateMe, updateMyPhoto, changeMyPassword, getAllUsers, updateUser, createUser, deleteUser, checkEmail, getEmployees, getAllUsersDetailed, activateUser, suspendUser, getMyPosition};
+module.exports = {getMe, updateMe, updateMyPhoto, changeMyPassword, getAllUsers, updateUser, createUser, deleteUser, checkEmail, getEmployees, getAllUsersDetailed, activateUser, suspendUser, getMyPosition, previewUserImport, importUsers};
