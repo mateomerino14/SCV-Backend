@@ -4,7 +4,7 @@ const tripAccessService = require('./tripAccessService');
 const maxTripsPerExport = 50;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const exportRoles = ['ADMINISTRADOR', 'REVISOR'];
-const tripColumns = '*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, apellido_materno, Seccion(nombre, codigo_dependencia, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)';
+const tripColumns = '*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, apellido_materno, nombre_proveedor_oracle, Seccion(nombre, codigo_dependencia, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)';
 const expenseColumns = '*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)';
 
 // Convierte la lista de ids recibida ("1,2,3") en numeros validos y sin repetir

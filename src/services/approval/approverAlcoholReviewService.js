@@ -148,7 +148,7 @@ const returnAlcoholReview = async (tripId, approverId) => {
 const getAlcoholReviewDetail = async (tripId, approverId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, Seccion(nombre, codigo_dependencia, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, nombre_proveedor_oracle, foto_perfil, id_seccion, Seccion(nombre, codigo_dependencia, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {

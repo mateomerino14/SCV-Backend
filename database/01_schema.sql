@@ -60,6 +60,7 @@ create table if not exists "Usuario" (
   id_jefe_directo integer references "Usuario"(id_usuario),
   id_seccion integer references "Seccion"(id_seccion),
   carnet_identidad varchar(15),
+  nombre_proveedor_oracle varchar(150), -- nombre exacto del empleado como proveedor en Oracle, si difiere del generado
   ultima_cambio_contrasenia timestamptz default now(),
   refresh_token_invalido_desde timestamptz,
   -- true mientras tenga una contrasena temporal (recien creado, puesta por el administrador
