@@ -39,7 +39,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Rol | Roles del sistema |
 | Cargo | Cargos/puestos de trabajo, con su monto de viatico diario en ambas monedas |
 | Seccion | Secciones/departamentos de la empresa; se usa como respaldo intermedio en la jerarquia de revision cuando falta el jefe directo. `codigo_dependencia` y `codigo_seccion` (3 digitos, opcionales) son sus codigos de Oracle para la cuenta del gasto: 76.8.dependencia.cuenta.000000.seccion.000.000 |
-| Usuario | Usuarios del sistema; `nombre_proveedor_oracle` (opcional) es el nombre exacto del empleado como proveedor en Oracle, si difiere de "APELLIDOS, NOMBRES (BOL)" |
+| Usuario | Usuarios del sistema |
 | Codigo_Verificacion | Codigos temporales de verificacion por correo |
 | Viaje | Viajes registrados (motivo de hasta 500 caracteres), con su flujo de estados, revisores asignados y monto asignado (Bs y USD) |
 | Solicitud_Autorizacion_Plazo | Solicitudes de extension de plazo para seguir registrando gastos; las puede pedir el titular o su reemplazo (`id_empleado` es quien la pidio) |
