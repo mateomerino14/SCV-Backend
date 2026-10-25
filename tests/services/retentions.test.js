@@ -1,5 +1,5 @@
 jest.mock('../../src/config/supabase', () => ({}));
-const {roundCents, calculateRetentions, getExpenseRetentions} = require('../../src/utils/retentions');
+const {roundCents, calculateRetentions, getExpenseRetentions, getExpenseLineBases} = require('../../src/utils/retentions');
 
 // Servicio sin factura: lo pagado se incrementa (/ 0.84) y de esa base salen el RC-IVA 13% y el IT 3%
 test('calcula las retenciones de un servicio con base incrementada', () => {
@@ -53,4 +53,12 @@ test('recalcula las retenciones de un gasto registrado desde lo pagado', () => {
 test('redondea los medios centavos hacia arriba', () => {
   expect(roundCents(1.005)).toBe(1.01);
   expect(roundCents(2.675)).toBe(2.68);
+});
+
+// Con subgastos cada uno se calcula aparte y se suman, como el recibo de papel de 4 taxis por 240 Bs
+test('calcula las retenciones por subgasto y las suma', () => {
+  const expense = {tipo: 'S', monto_total: '240.00', Gasto_Subitem: [{monto: '50'}, {monto: '80'}, {monto: '60'}, {monto: '50'}]};
+  expect(getExpenseRetentions(expense)).toEqual({base_imponible: 285.73, retencion_rc_iva: 37.15, retencion_iue: 0, retencion_it: 8.58, importe_costo: 285.73});
+  expect(getExpenseLineBases(expense)).toEqual([59.53, 95.24, 71.43, 59.53]);
+  expect(calculateRetentions(240, 'S', false, false)).toMatchObject({base_imponible: 285.71, retencion_rc_iva: 37.14, retencion_it: 8.57});
 });

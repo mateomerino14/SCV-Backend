@@ -4,7 +4,7 @@ const emailService = require('../shared/emailService');
 const pdfService = require('../shared/pdfService');
 const {buildTripCode} = require('../../utils/tripCode');
 const {escapeDeep, escapeHtml: escapeText} = require('../../utils/htmlEscape');
-const {getExpenseRetentions} = require('../../utils/retentions');
+const {getExpenseRetentions, getExpenseLineBases} = require('../../utils/retentions');
 
 // Los datos se escapan al entrar a cada plantilla (escapeDeep); aqui solo se normaliza el vacio
 const escapeHtml = (text) => text || '';
@@ -57,18 +57,6 @@ const getReceiptNumber = async ({tripId, expenseId = null, type, isInternational
     return {error: 'Error al registrar el número de recibo'};
   }
   return {receiptNumber: formatReceiptNumber(correlativeData), reissued: false};
-};
-
-// Lleva cada subgasto a la base incrementada en la misma proporcion; el ultimo cierra la suma exacta
-const grossUpSubItems = (subItems, paid, base) => {
-  let ratio = 1;
-  if (paid > 0) {
-    ratio = base / paid;
-  }
-  const amounts = subItems.map((item) => parseFloat((parseFloat(item.monto || 0) * ratio).toFixed(2)));
-  const others = amounts.slice(0, -1).reduce((sum, value) => sum + value, 0);
-  amounts[amounts.length - 1] = parseFloat((base - others).toFixed(2));
-  return amounts;
 };
 
 // Datos de cabecera de un recibo: fecha de emision, moneda y titulos segun el tipo de gasto
@@ -311,7 +299,7 @@ const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, t
   }
   let expenseRows = '';
   if (hasSubItems) {
-    const subItemAmounts = grossUpSubItems(subItems, totalToPay, totalAmount);
+    const subItemAmounts = getExpenseLineBases(expense);
     expenseRows = subItems.map((item, index) => `
     <tr>
       <td class="col-n">${index + 1}</td>

@@ -4,22 +4,43 @@ const centsFactor = 100;
 // Redondea a centavos sin el error de coma flotante de toFixed en los medios centavos (1.005 -> 1.01)
 const roundCents = (value) => Math.round((value + Number.EPSILON) * centsFactor) / centsFactor;
 
-// La empresa asume los impuestos: lo pagado se incrementa a una base de la que salen las retenciones (base incrementada)
-const calculateRetentions = (amount, type, isInternational, hasAlcohol) => {
-  const paid = roundCents(parseFloat(amount) || 0);
-  const noRetentions = {base_imponible: paid, retencion_rc_iva: 0, retencion_iue: 0, retencion_it: 0, importe_costo: paid};
-  if (hasAlcohol || isInternational || !['C', 'S'].includes(type) || paid <= 0) {
-    return noRetentions;
-  }
-  // Compra sin factura: IUE 5% e IT 3% (pagado / 0.92); servicio sin factura: RC-IVA 13% e IT 3% (pagado / 0.84)
-  let mainRate = 0.13;
+// Tasa principal: RC-IVA 13% en servicios sin factura, IUE 5% en compras sin factura
+const mainRateOf = (type) => {
   if (type === 'C') {
-    mainRate = 0.05;
+    return 0.05;
   }
-  // Cada retención sale de la base sin redondear, como lo calcula contabilidad, y la base es lo pagado más las retenciones
+  return 0.13;
+};
+
+// Retenciones de un solo monto: cada una sale con su porcentaje de la base sin redondear y la base es pagado + retenciones
+const retentionsOfLine = (paid, mainRate) => {
   const grossBase = paid / (1 - mainRate - itRate);
-  const mainRetention = roundCents(grossBase * mainRate);
+  const main = roundCents(grossBase * mainRate);
   const it = roundCents(grossBase * itRate);
+  return {paid, main, it, base: roundCents(paid + main + it)};
+};
+
+// Montos de cada línea del gasto: sus subgastos si suman lo pagado, o lo pagado como una sola línea
+const resolveLines = (paid, lineAmounts) => {
+  const lines = (lineAmounts || []).map((value) => roundCents(parseFloat(value) || 0)).filter((value) => value > 0);
+  const linesTotal = roundCents(lines.reduce((sum, value) => sum + value, 0));
+  if (lines.length === 0 || linesTotal !== paid) {
+    return [paid];
+  }
+  return lines;
+};
+
+const hasRetentions = (paid, type, isInternational, hasAlcohol) => !hasAlcohol && !isInternational && ['C', 'S'].includes(type) && paid > 0;
+
+// La empresa asume los impuestos (base incrementada); con subgastos, cada uno se calcula aparte y se suman, como en el recibo de papel
+const calculateRetentions = (amount, type, isInternational, hasAlcohol, lineAmounts = []) => {
+  const paid = roundCents(parseFloat(amount) || 0);
+  if (!hasRetentions(paid, type, isInternational, hasAlcohol)) {
+    return {base_imponible: paid, retencion_rc_iva: 0, retencion_iue: 0, retencion_it: 0, importe_costo: paid};
+  }
+  const lines = resolveLines(paid, lineAmounts).map((line) => retentionsOfLine(line, mainRateOf(type)));
+  const mainRetention = roundCents(lines.reduce((sum, line) => sum + line.main, 0));
+  const it = roundCents(lines.reduce((sum, line) => sum + line.it, 0));
   const base = roundCents(paid + mainRetention + it);
   if (type === 'C') {
     return {base_imponible: base, retencion_rc_iva: 0, retencion_iue: mainRetention, retencion_it: it, importe_costo: base};
@@ -27,9 +48,26 @@ const calculateRetentions = (amount, type, isInternational, hasAlcohol) => {
   return {base_imponible: base, retencion_rc_iva: mainRetention, retencion_iue: 0, retencion_it: it, importe_costo: base};
 };
 
-// Retenciones de un gasto ya registrado, calculadas siempre desde lo pagado para no arrastrar calculos antiguos
-const getExpenseRetentions = (expense) => {
-  return calculateRetentions(expense.monto_total, expense.tipo, !!expense.es_gasto_internacional, !!expense.tiene_alcohol);
+// Importe con retenciones de cada subgasto, para las líneas del recibo; su suma es el total del recibo
+const calculateLineBases = (amount, type, isInternational, hasAlcohol, lineAmounts = []) => {
+  const paid = roundCents(parseFloat(amount) || 0);
+  const lines = resolveLines(paid, lineAmounts);
+  if (!hasRetentions(paid, type, isInternational, hasAlcohol)) {
+    return lines;
+  }
+  return lines.map((line) => retentionsOfLine(line, mainRateOf(type)).base);
 };
 
-module.exports = {roundCents, calculateRetentions, getExpenseRetentions};
+const subItemAmounts = (expense) => (expense.Gasto_Subitem || []).map((item) => item.monto);
+
+// Retenciones de un gasto ya registrado, calculadas siempre desde lo pagado para no arrastrar calculos antiguos
+const getExpenseRetentions = (expense) => {
+  return calculateRetentions(expense.monto_total, expense.tipo, !!expense.es_gasto_internacional, !!expense.tiene_alcohol, subItemAmounts(expense));
+};
+
+// Importes de las líneas de un gasto ya registrado
+const getExpenseLineBases = (expense) => {
+  return calculateLineBases(expense.monto_total, expense.tipo, !!expense.es_gasto_internacional, !!expense.tiene_alcohol, subItemAmounts(expense));
+};
+
+module.exports = {roundCents, calculateRetentions, getExpenseRetentions, getExpenseLineBases};

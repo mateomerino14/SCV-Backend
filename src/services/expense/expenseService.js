@@ -157,7 +157,11 @@ const createExpense = async (expenseData, images, userId) => {
   const type = expenseData.tipo || 'S';
   const alcoholText = buildAlcoholText(expenseData, usesSubItems);
   const hasAlcohol = await alcoholDetectionService.analyzeAlcoholText(alcoholText);
-  const retentions = calculateRetentions(totalAmount, type, isInternational, hasAlcohol);
+  let subItemAmounts = [];
+  if (usesSubItems) {
+    subItemAmounts = expenseData.subitems.map((item) => item.monto);
+  }
+  const retentions = calculateRetentions(totalAmount, type, isInternational, hasAlcohol, subItemAmounts);
   let firstSegment = null;
   if (usesSegments) {
     firstSegment = expenseData.tramos[0];
@@ -301,7 +305,11 @@ const updateExpense = async (expenseId, expenseData, images, userId) => {
   const type = expenseData.tipo || 'S';
   const alcoholText = buildAlcoholText(expenseData, usesSubItems);
   const hasAlcohol = await alcoholDetectionService.analyzeAlcoholText(alcoholText);
-  const retentions = calculateRetentions(totalAmount, type, isInternational, hasAlcohol);
+  let subItemAmounts = [];
+  if (usesSubItems) {
+    subItemAmounts = expenseData.subitems.map((item) => item.monto);
+  }
+  const retentions = calculateRetentions(totalAmount, type, isInternational, hasAlcohol, subItemAmounts);
   let firstSegment = null;
   if (usesSegments) {
     firstSegment = expenseData.tramos[0];
