@@ -20,7 +20,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
+      - run: npm test -- --reporters=default --reporters=github-actions
 
   api:
     name: Pruebas de la API
@@ -64,4 +64,4 @@ jobs:
           ./postgrest postgrest.conf > postgrest.log 2>&1 &
           node tests/support/supabaseProxy.js > proxy.log 2>&1 &
           sleep 3
-      - run: npm run test:api
+      - run: npm run test:api -- --reporters=default --reporters=github-actions
