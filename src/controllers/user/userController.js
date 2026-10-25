@@ -6,6 +6,7 @@ const emailService = require('../../services/shared/emailService');
 const auditLogService = require('../../services/shared/auditLogService');
 const tokenService = require('../../services/user/tokenService');
 const {escapeHtml} = require('../../utils/htmlEscape');
+const storageService = require('../../services/shared/storageService');
 const saltRounds = 10;
 
 // Genera una contrasenia temporal legible, sin caracteres ambiguos (0/O, 1/l/I)
@@ -46,6 +47,12 @@ const getMe = async (req, res) => {
   }
 };
 
+// Foto de perfil actual del usuario, para borrarla del almacenamiento cuando se reemplaza o se quita
+const getCurrentPhoto = async (userId) => {
+  const {data} = await supabase.from('Usuario').select('foto_perfil').eq('id_usuario', userId).maybeSingle();
+  return data?.foto_perfil || null;
+};
+
 // Actualiza los datos basicos del usuario autenticado
 const updateMe = async (req, res) => {
   const userId = req.user.id_usuario;
@@ -66,8 +73,10 @@ const updateMe = async (req, res) => {
     fieldsToUpdate.email_corporativo = email;
   }
   // La foto se sube por /me/photo; aqui solo se permite quitarla (no poner una URL cualquiera)
+  let removedPhoto = null;
   if (foto_perfil === null || foto_perfil === '') {
     fieldsToUpdate.foto_perfil = null;
+    removedPhoto = await getCurrentPhoto(userId);
   }
   const {data, error} = await supabase
     .from('Usuario')
@@ -78,9 +87,8 @@ const updateMe = async (req, res) => {
   if (error) {
     return res.status(500).json({error: error.message});
   }
-  else {
-    return res.json(data);
-  }
+  await storageService.removeFiles([removedPhoto]);
+  return res.json(data);
 };
 
 // Actualiza la foto de perfil del usuario autenticado
@@ -89,27 +97,23 @@ const updateMyPhoto = async (req, res) => {
   if (!req.file) {
     return res.status(400).json({error: 'No se recibió ninguna imagen'});
   }
-  const fileExtension = req.file.originalname.split('.').pop();
-  const fileName = `perfiles/${userId}_${Date.now()}.${fileExtension}`;
-  const {error: storageError} = await supabase.storage
-    .from('facturas')
-    .upload(fileName, req.file.buffer, {contentType: req.file.mimetype});
-  if (storageError) {
-    return res.status(500).json({error: storageError.message});
+  const upload = await storageService.uploadFile('perfiles', req.file, `${userId}_`);
+  if (upload.error) {
+    return res.status(500).json({error: upload.error});
   }
-  const {data: urlData} = supabase.storage.from('facturas').getPublicUrl(fileName);
+  const previousPhoto = await getCurrentPhoto(userId);
   const {data, error} = await supabase
     .from('Usuario')
-    .update({foto_perfil: urlData.publicUrl})
+    .update({foto_perfil: upload.url})
     .eq('id_usuario', userId)
     .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)')
     .single();
   if (error) {
+    await storageService.removeFiles([upload.url]);
     return res.status(500).json({error: error.message});
   }
-  else {
-    return res.json(data);
-  }
+  await storageService.removeFiles([previousPhoto]);
+  return res.json(data);
 };
 
 // Cambia la contrasena del usuario; con una temporal no se pide la actual
@@ -305,14 +309,14 @@ const createUser = async (req, res) => {
 
 // Elimina un usuario existente
 const deleteUser = async (req, res) => {
+  const previousPhoto = await getCurrentPhoto(req.params.id);
   const {data, error} = await supabase
     .from('Usuario').delete().eq('id_usuario', req.params.id).select(userPublicColumns);
   if (error) {
     return res.status(500).json({error: error.message});
   }
-  else {
-    return res.json(data);
-  }
+  await storageService.removeFiles([previousPhoto]);
+  return res.json(data);
 };
 
 // Verifica si un correo corporativo ya esta registrado
