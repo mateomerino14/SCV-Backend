@@ -103,6 +103,14 @@ const summarizeReceipt = (expenses) => {
 };
 
 // Genera el HTML de un recibo agrupado por tipo de gasto
+// Mensaje de respuesta segun si el recibo ya se habia emitido
+const receiptMessage = (reissued) => {
+  if (reissued) {
+    return 'Recibo reenviado correctamente';
+  }
+  return 'Recibo generado y enviado correctamente';
+};
+
 // Referencia al recibo en papel del gasto, si el empleado anoto su numero
 const originalReceiptText = (expense) => {
   if (!expense.numero_recibo) {
@@ -535,7 +543,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
     emailHtml,
     attachments
   );
-  return {message: reissued ? 'Recibo reenviado correctamente' : 'Recibo generado y enviado correctamente', expenseCount: expenses.length, numeroRecibo: receiptNumber, reenvio: reissued};
+  return {message: receiptMessage(reissued), expenseCount: expenses.length, numeroRecibo: receiptNumber, reenvio: reissued};
 };
 
 // Genera y envia un recibo individual por un solo gasto
@@ -594,7 +602,7 @@ const sendIndividualReceipt = async (expenseId) => {
     emailHtml,
     attachments
   );
-  return {message: reissued ? 'Recibo reenviado correctamente' : 'Recibo generado y enviado correctamente', numeroRecibo: receiptNumber, reenvio: reissued};
+  return {message: receiptMessage(reissued), numeroRecibo: receiptNumber, reenvio: reissued};
 };
 
 module.exports = {sendGroupedReceipt, sendIndividualReceipt, generateIndividualReceiptHtml};

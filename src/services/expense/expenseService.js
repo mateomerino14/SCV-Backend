@@ -275,7 +275,10 @@ const updateExpense = async (expenseId, expenseData, images, userId) => {
     newImageUrl = upload.url;
   }
   const {data: existingBackups} = await supabase.from('Imagen_Respaldo').select('id_respaldo, url_archivo').eq('id_gasto', expenseId);
-  const keptUrls = Array.isArray(expenseData.respaldos_conservados) ? expenseData.respaldos_conservados : [];
+  let keptUrls = [];
+  if (Array.isArray(expenseData.respaldos_conservados)) {
+    keptUrls = expenseData.respaldos_conservados;
+  }
   const removedBackupIds = (existingBackups || []).filter((backup) => !keptUrls.includes(backup.url_archivo)).map((backup) => backup.id_respaldo);
   const keptCount = (existingBackups || []).length - removedBackupIds.length;
   if (keptCount + backups.length > maxBackupImages) {
