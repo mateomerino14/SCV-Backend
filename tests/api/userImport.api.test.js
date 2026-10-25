@@ -1,6 +1,17 @@
+// Los correos de bienvenida no salen de verdad: se anotan para revisar a quien se enviaron
+jest.mock('../../src/services/shared/emailService', () => ({...jest.requireActual('../../src/services/shared/emailService'), sendEmail: jest.fn().mockResolvedValue()}));
+const emailService = require('../../src/services/shared/emailService');
 const {login, api} = require('./helpers');
 
 jest.setTimeout(60000);
+
+// Espera a que terminen los correos que se mandan en segundo plano
+const waitForEmails = async (count) => {
+  for (let attempt = 0; attempt < 50 && emailService.sendEmail.mock.calls.length < count; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return emailService.sendEmail.mock.calls.map(([to]) => to[0].email);
+};
 
 const boss = {fila: 2, nombre: 'Rosa', apellido_paterno: 'Importada', email_corporativo: 'rosa.importada@maxam.com', cargo: 'Jefe de Area de Prueba', seccion: 'Ventas', rol: 'SUPERVISOR', codigo_dependencia: '421'};
 const employee = {fila: 3, nombre: 'Luis', apellido_paterno: 'Importado', email_corporativo: 'luis.importado@maxam.com', carnet_identidad: '9988776', cargo: 'analista de prueba', seccion: 'VENTAS', correo_jefe: 'rosa.importada@maxam.com'};
@@ -42,6 +53,7 @@ test('crea las filas validas con su jefe del mismo archivo y omite las demas', a
     expect(createdBoss).toMatchObject({codigo_dependencia: '421', activo: true});
     const detailed = (await admin.get('/user/all')).body.find((user) => user.id_usuario === createdEmployee.id_usuario);
     expect(detailed).toMatchObject({id_jefe_directo: createdBoss.id_usuario, carnet_identidad: '9988776'});
+    expect((await waitForEmails(2)).sort()).toEqual([employee.email_corporativo, boss.email_corporativo]);
     const again = await admin.post('/user/import/preview', {filas: [employee]});
     expect(again.body.filas[0].errores).toContain('Ya existe un usuario con ese correo en el sistema');
   }
