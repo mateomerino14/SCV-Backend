@@ -158,5 +158,4 @@ module.exports = {
   analyzeAlcoholText,
   updateAlcoholInTrip,
   containsAlcoholKeyword,
-  isInnocuousProduct,
 };

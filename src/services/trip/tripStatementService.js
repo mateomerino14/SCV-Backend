@@ -7,7 +7,12 @@ const {getExpenseRetentions} = require('../../utils/retentions');
 const vatRate = 0.13;
 
 // Blanquea el placeholder que usa la IA cuando no logra extraer un dato
-const cleanValue = (value) => (value === 'No Especificado' ? '' : (value || ''));
+const cleanValue = (value) => {
+  if (value === 'No Especificado') {
+    return '';
+  }
+  return value || '';
+};
 
 const symbologyRows = [
   ['F', 'Compra Bien/Servicio c/factura'],
@@ -155,8 +160,11 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
     const oracleType = toOracleExpenseType(expense.tipo);
     const detailText = getExpenseDescription(expense);
     const tramosText = buildTramosText(expense);
-    const currency = isInternational ? 'USD' : 'Bs';
+    let currency = 'Bs';
+    let rowClass = 'fila-nacional';
     if (isInternational) {
+      currency = 'USD';
+      rowClass = 'fila-internacional';
       totalImporteUsd += amount;
       totalCostUsd += cost;
     }
@@ -171,7 +179,6 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
     totalRcIva += rcIva;
     totalIue += iue;
     totalIt += it;
-    const rowClass = isInternational ? 'fila-internacional' : 'fila-nacional';
     return `
     <tr class="${rowClass}">
       <td class="col-n">${index + 1}</td>
@@ -199,8 +206,8 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   const balanceRows = [
     ['Fondo Recibido', assignedAmount, assignedAmountUsd],
     ['Saldo en mi poder', remaining, remainingUsd],
-    ['Importe a Devolver', remaining > 0 ? remaining : 0, remainingUsd > 0 ? remainingUsd : 0],
-    ['Importe a Reembolsar', remaining < 0 ? Math.abs(remaining) : 0, remainingUsd < 0 ? Math.abs(remainingUsd) : 0],
+    ['Importe a Devolver', Math.max(remaining, 0), Math.max(remainingUsd, 0)],
+    ['Importe a Reembolsar', Math.max(-remaining, 0), Math.max(-remainingUsd, 0)],
   ];
 
   return `<!DOCTYPE html>
