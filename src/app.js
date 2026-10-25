@@ -31,7 +31,8 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true
 }));
-app.use(express.json());
+// El limite alcanza para importar hasta 500 usuarios desde Excel
+app.use(express.json({limit: '1mb'}));
 app.use(cookieParser());
 
 app.get('/', (req, res) => {
