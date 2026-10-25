@@ -263,7 +263,7 @@ src/
 │   ├── trip/                  tripService, tripAccessService,
 │   │                          tripCommentService, tripStatementService,
 │   │                          tripExportService
-│   ├── user/                  tokenService, userService, userDirectoryService
+│   ├── user/                  tokenService, userService, userImportService, userDirectoryService
 │   └── shared/                alcoholDetectionService, auditLogService,
 │                              commentModerationService, dailyDigestService,
 │                              deadlineService, emailService, geminiService,
@@ -344,7 +344,8 @@ El perfil de **Tesorero** no es un rol del sistema sino un cargo (`asistente de 
 - **Ingreso**: mismo mensaje si el correo no existe o la clave es incorrecta. Límite de 10 intentos fallidos cada 15 minutos **por cuenta** (IP + correo), de modo que los errores de un usuario no bloquean a los demás de la misma red; además, un tope de 100 fallos por IP frena a quien prueba muchas cuentas. Los ingresos correctos no cuentan. El envío y la verificación de códigos de recuperación siguen la misma regla (10 por cuenta y 50 por IP). Detrás de un proxy (Nginx) hay que poner `TRUST_PROXY=true` para que se vea la IP real de cada usuario. Cada código de recuperación se anula tras 5 intentos fallidos.
 - **Concurrencia**: aprobar, rechazar, tomar, devolver, enviar y resolver solicitudes exigen el estado esperado al escribir. Si otra persona se adelantó, se responde 409 y no se duplican correos ni registros.
 - **Documentos**: todo texto escrito por usuarios se escapa antes de insertarse en correos y PDF (`htmlEscape`); los PDF se generan con JavaScript desactivado y el navegador se cierra siempre.
-- **Administración de usuarios**: solo se aceptan los campos del formulario y nunca se devuelve el hash de la contraseña.
+- **Administración de usuarios**: solo se aceptan los campos del formulario y nunca se devuelve el hash de la contraseña. La importación desde Excel es solo para el administrador, admite hasta 500 filas y vuelve a validar todo en el servidor aunque el navegador ya haya mostrado la vista previa.
+- **Tamaño de las peticiones**: el cuerpo JSON admite hasta 1 MB (`express.json`), suficiente para importar 500 usuarios; las imágenes van aparte, con su propio límite de `multer`.
 - **Imágenes de comprobantes**: se suben al almacenamiento antes de escribir el gasto o la factura; si la subida falla no queda nada a medio guardar, y al editar la imagen anterior solo se reemplaza cuando la nueva ya se subió.
 
 ## Flujos de aprobación
@@ -408,6 +409,7 @@ Controles de cada fila: nombre, apellido paterno, correo y cargo obligatorios; l
 | `pdfService` | Conversión de HTML a PDF con Puppeteer |
 | `expenseSummaryService` | Control de gasto diario por moneda, exceso en hoteles y alertas; usado por empleado y revisores por igual |
 | `tripExportService` | Reúne los datos de las planillas de varios viajes para exportarlas juntas a Excel |
+| `userImportService` | Revisa las filas del Excel de usuarios (formato, repetidos en el archivo y en el sistema, cargos, secciones, roles únicos y jefes) y crea las válidas por niveles, primero los jefes |
 
 ### Retenciones impositivas
 
@@ -419,6 +421,20 @@ Controles de cada fila: nombre, apellido paterno, correo y cargo obligatorios; l
 | `S` | Servicio o alquiler sin factura | RC-IVA 13% e IT 3% sobre la base incrementada (pagado ÷ 0.84) |
 
 En la factura (`F`) el IVA es el **13 % del total** y se resta de él: subtotal = total − IVA. Al empleado se le reconoce el total, y en la planilla (PDF y Excel) el IVA va en su columna como crédito fiscal y el **importe costo/gasto es el total menos el IVA** (por ejemplo, 305.00 − 39.65 = 265.35). Con alcohol se pierde el crédito fiscal y el costo es el total. El recibo (`R`) no lleva IVA: el monto es el total pagado, sin descontar nada, y la planilla (PDF y Excel) muestra IVA 0. Al cambiar entre factura y recibo, el formulario conserva el total pagado. En los gastos sin factura la empresa asume los impuestos (**base incrementada**): el empleado registra lo que pagó; el RC-IVA 13 % (o IUE 5 %) y el IT 3 % se calculan cada uno con su porcentaje sobre lo pagado ÷ 0.84 en servicios (÷ 0.92 en compras), sin redondear esa división, y cada retención se redondea a centavos; la base es pagado + retenciones, como lo calcula contabilidad. Ejemplos de servicio: pagado 40.00 → RC-IVA 6.19, IT 1.43 y base 47.62; pagado 50.00 → RC-IVA 7.74, IT 1.79 y base 59.53. Si el gasto tiene subgastos (por ejemplo, cuatro taxis en un recibo), cada uno se calcula aparte y se suman, como en el recibo de papel: 50 + 80 + 60 + 50 dan 59.53 + 95.24 + 71.43 + 59.53 = 285.73, con RC-IVA 37.15 e IT 8.58; el recibo muestra esos importes por línea. Los redondeos usan `roundCents` (`utils/retentions.js`), que redondea bien los medios centavos (1.005 → 1.01). Lo pagado cuenta para el presupuesto; la base es el importe costo/gasto de la planilla; el recibo muestra TOTAL IMPORTE (la base), las retenciones e IMPORTE A CANCELAR (lo pagado). Las pantallas lo explican con una nota (`WithholdingFormulaNote`). Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal: se imputan íntegros como costo, sin importar el tipo de comprobante. Los valores se guardan al registrar como referencia, pero las pantallas, la planilla y los recibos los calculan siempre desde lo pagado (`utils/retentions.js`), así un gasto guardado con otro cálculo se muestra con el actual. Las consultas del detalle del viaje, las revisiones y las planillas devuelven los gastos ordenados por fecha y, dentro del mismo día, por orden de registro.
+
+**Redondeo.** Todos los importes se redondean a centavos con `roundCents` (`utils/retentions.js`), que suma un épsilon antes de redondear para que los medios centavos suban (1.005 → 1.01); `toFixed` falla en esos casos por la coma flotante.
+
+**Recibo con varios subgastos.** El recibo que emite el sistema muestra cada subgasto con su importe con retenciones, calculado por separado, y el total es la suma de las líneas:
+
+| Subgasto | Pagado | Importe | RC-IVA 13 % | IT 3 % |
+|---|---|---|---|---|
+| Taxi domicilio – aeropuerto | 50.00 | 59.53 | 7.74 | 1.79 |
+| Taxi aeropuerto – centro | 80.00 | 95.24 | 12.38 | 2.86 |
+| Taxi centro – aeropuerto | 60.00 | 71.43 | 9.29 | 2.14 |
+| Taxi aeropuerto – domicilio | 50.00 | 59.53 | 7.74 | 1.79 |
+| **Total** | **240.00** | **285.73** | **37.15** | **8.58** |
+
+Calcular sobre el total de 240 de una vez daría 285.71: por eso se calcula por línea, igual que el recibo en papel que corrige contabilidad.
 
 ### Monto del viaje
 
@@ -462,7 +478,7 @@ La invocación (`geminiService`) reintenta ante errores temporales y, si el mode
 
 Las pruebas de la API necesitan una base PostgreSQL de prueba con los scripts de `database/` (`01` a `04` y `testing_02_organizacion_prueba.sql`), servida por PostgREST y el proxy `tests/support/supabaseProxy.js`, que imita la ruta `/rest/v1` de Supabase, acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar. **No se corren contra Supabase real.**
 
-En GitHub las pruebas se ejecutan solas en cada `push` y pull request (`.github/workflows/pruebas.yml`): una base temporal se crea y se borra en cada corrida. El resultado aparece como ✅ o ❌ junto a cada commit, en la pestaña **Actions** del repositorio.
+En GitHub las pruebas se ejecutan solas en cada `push` y pull request (`.github/workflows/pruebas.yml`): una base temporal se crea y se borra en cada corrida. El resultado aparece como ✅ o ❌ junto a cada commit, en la pestaña **Actions** del repositorio. Si una prueba falla, GitHub la marca junto a la línea de código que falló (reportero `github-actions` de Jest). En las pruebas los correos no salen de verdad: se simulan y se revisa a quién se habrían mandado.
 
 ## Base de datos
 

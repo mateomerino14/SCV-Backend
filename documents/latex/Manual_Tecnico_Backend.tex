@@ -233,13 +233,14 @@ src/
 │   ├── catalog/               cargos y secciones
 │   ├── expense/               gastos, facturas, recibos, extracción
 │   ├── trip/                  viajes, acceso, observaciones, planilla, exportación
-│   ├── user/                  tokens, usuarios, directorio
+│   ├── user/                  tokens, usuarios, importación, directorio
 │   └── shared/                correo, PDF, plazos, jerarquía, IA, resumen diario
 ├── middlewares/             auth, roleAuth, treasurerPosition, límites de intentos
 ├── utils/                   escape HTML, importes en letras, código de viaje, retenciones
 ├── app.js                   Configuración de Express (seguridad, CORS, rutas)
 └── index.js                 Arranque del servidor y del cron de resúmenes
 scripts/sendDigest.js        Envío manual del resumen de pendientes
+scripts/cleanStorage.js      Borra los archivos que ya no usa nadie
 database/                    Scripts SQL del esquema
 tests/                       Pruebas: services/ (unitarias), api/ (de la API)
 .github/workflows/           Pruebas automáticas en GitHub Actions
@@ -262,7 +263,9 @@ npm install
 cp .env.example .env      # completar las variables
 npm run dev               # desarrollo con recarga automática
 npm start                 # producción
-npm test                  # pruebas automáticas
+npm test                  # pruebas unitarias
+npm run test:api          # pruebas de la API (base de prueba)
+npm run limpiar-archivos -- --prueba   # lista los archivos sueltos
 npm run resumen -- --prueba   # simula el resumen de pendientes
 \end{lstlisting}
 
@@ -523,7 +526,7 @@ En los gastos internacionales pagados en otra moneda (EUR, PEN, ARS, BRL, CLP, C
 \code{S} & Servicio o alquiler sin factura & RC-IVA 13\% e IT 3\% sobre la base incrementada (pagado $\div$ 0.84) \\
 \end{xltabular}
 
-En la factura (\code{F}) el IVA es el 13\% del total y se resta de él, igual que las retenciones: subtotal = total $-$ IVA. Al empleado se le reconoce el total; en la planilla, en PDF y en Excel, el IVA va en su columna como crédito fiscal y el importe costo/gasto es el total menos el IVA (por ejemplo, 305.00 $-$ 39.65 = 265.35). El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. En los gastos sin factura la empresa asume los impuestos (base incrementada): el empleado registra lo que pagó; el RC-IVA o IUE y el IT se calculan cada uno con su porcentaje sobre lo pagado $\div$ 0.84 en servicios ($\div$ 0.92 en compras), sin redondear esa división, y cada retención se redondea a centavos; la base es pagado + retenciones, como lo calcula contabilidad. Por ejemplo, con 50.00 pagados en un servicio el RC-IVA es 7.74, el IT 1.79 y la base 59.53. Si el gasto tiene subgastos, cada uno se calcula aparte y se suman, como en el recibo de papel: cuatro taxis de 50, 80, 60 y 50 dan 285.73, con RC-IVA 37.15 e IT 8.58. Lo pagado cuenta para el presupuesto y la base es el importe costo/gasto de la planilla. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
+En la factura (\code{F}) el IVA es el 13\% del total y se resta de él, igual que las retenciones: subtotal = total $-$ IVA. Al empleado se le reconoce el total; en la planilla, en PDF y en Excel, el IVA va en su columna como crédito fiscal y el importe costo/gasto es el total menos el IVA (por ejemplo, 305.00 $-$ 39.65 = 265.35). El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. En los gastos sin factura la empresa asume los impuestos (base incrementada): el empleado registra lo que pagó; el RC-IVA o IUE y el IT se calculan cada uno con su porcentaje sobre lo pagado $\div$ 0.84 en servicios ($\div$ 0.92 en compras), sin redondear esa división, y cada retención se redondea a centavos; la base es pagado + retenciones, como lo calcula contabilidad. Por ejemplo, con 50.00 pagados en un servicio el RC-IVA es 7.74, el IT 1.79 y la base 59.53. Si el gasto tiene subgastos, cada uno se calcula aparte y se suman, como en el recibo de papel: cuatro taxis de 50, 80, 60 y 50 dan 285.73, con RC-IVA 37.15 e IT 8.58. Calcular sobre el total de 240 de una vez daría 285.71, que no coincide con la suma de las líneas del recibo. Todos los importes se redondean a centavos con \code{roundCents}, que redondea bien los medios centavos (1.005 $\rightarrow$ 1.01), algo en lo que \code{toFixed} falla por la coma flotante. Lo pagado cuenta para el presupuesto y la base es el importe costo/gasto de la planilla. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
 
 \subsection{Plazos de registro}
 Tras el fin del viaje hay cuatro días de tolerancia para cargar gastos. Vencido el margen, se debe pedir una ampliación al revisor, que otorga cuatro días desde su respuesta. El plazo es del viaje: la ampliación vale para el titular y para su reemplazo aprobado, cualquiera de los dos puede pedirla y la respuesta se avisa a ambos. El plazo no corre mientras el viaje está rechazado. La ampliación extiende el margen de carga, no el rango de fechas: la fecha del gasto debe pertenecer al periodo del viaje.
@@ -657,6 +660,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \rowcolor{maxamFondo} \code{dailyDigestService} & Resumen de pendientes por rol; en modo prueba solo indica a quién le llegaría \\
 \code{reminderScheduleService} & Guarda los días y horas del resumen y lo reprograma sin reiniciar \\
 \rowcolor{maxamFondo} \code{tripExportService} & Reúne las planillas de varios viajes para exportarlas a Excel \\
+\code{userImportService} & Revisa el Excel de usuarios y crea las filas válidas por niveles, primero los jefes \\
 \end{xltabular}
 
 \section{Documentos y notificaciones}
@@ -669,7 +673,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \endhead
 \rowcolor{maxamFondo} Memorándum de aprobación & Aprobación del aprobador & Empleado \\
 Confirmación de fondo & Aprobación de tesorería & Empleado (incluye origen y destino) \\
-\rowcolor{maxamFondo} Recibos de compra y servicio & A pedido & Empleado; muestran la base incrementada como total, las retenciones y lo pagado como importe a cancelar; el número se reutiliza al reenviar \\
+\rowcolor{maxamFondo} Recibos de compra y servicio & A pedido & Empleado; muestran la base incrementada como total, las retenciones y lo pagado como importe a cancelar; con subgastos, cada línea lleva su importe calculado por separado y el total es su suma; el número se reutiliza al reenviar \\
 Rendición final & Aprobación final & Revisor y empleado, con saldo por moneda \\
 \rowcolor{maxamFondo} Planilla de rendición & A pedido & Descarga del empleado \\
 \end{xltabular}
@@ -739,6 +743,8 @@ Orígenes & CORS restringido a los dominios del cliente \\
 Datos de usuarios & Escapados en correos y PDF; nunca se devuelve el hash de la contraseña \\
 \rowcolor{maxamFondo} Concurrencia & Escrituras condicionadas al estado leído; 409 si otra persona se adelantó \\
 Base de datos & RLS activo; la clave de servicio solo existe en el servidor \\
+\rowcolor{maxamFondo} Importación de usuarios & Solo el administrador; hasta 500 filas; el servidor vuelve a validar todo aunque el navegador ya mostró la vista previa \\
+Peticiones & Cuerpo JSON de hasta 1 MB; las imágenes van aparte, con su propio límite \\
 \end{xltabular}
 
 \section{Despliegue}
@@ -748,7 +754,7 @@ El backend se publica como servicio web de Node con \code{npm start}. Render se 
 
 \subsection{Servidor VPS}
 \begin{enumerate}
-  \item Instalar Node.js 20, clonar el repositorio y ejecutar \code{npm ci}.
+  \item Instalar Node.js 22.12 o superior, clonar el repositorio y ejecutar \code{npm ci}.
   \item Instalar las librerías del sistema que necesita Chromium para generar los PDF.
   \item Crear el \code{.env} con \code{NODE_ENV=production} y \code{TRUST_PROXY=true}.
   \item Mantener el proceso con \code{pm2} en una sola instancia, para que el resumen no se envíe duplicado.
@@ -775,14 +781,14 @@ Una prueba automática es código que usa el sistema como lo haría una persona 
 \endfirsthead
 \cabecera \tth{Tipo} & \tth{Qué prueba} & \tth{Comando} \\
 \endhead
-\rowcolor{maxamFondo} Unitarias & Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, cantidades con decimales, control diario por moneda, exportación, recordatorios, jerarquía, moderación (\code{tests/services/}) & \code{npm test} \\
-De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos de gastos sin factura, presupuesto con lo pagado, exportación (\code{tests/api/}) & \code{npm run test:api} \\
+\rowcolor{maxamFondo} Unitarias & Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, cantidades con decimales, control diario por moneda, exportación, recordatorios, jerarquía, moderación, retenciones por subgasto y validación de la importación de usuarios (\code{tests/services/}) & \code{npm test} \\
+De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos de gastos sin factura, presupuesto con lo pagado, número de rendición, códigos de Oracle, exportación e importación de usuarios desde Excel (\code{tests/api/}) & \code{npm run test:api} \\
 \end{xltabular}
 
 Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase y acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar; nunca se ejecutan contra la base real. En el estado actual pasan 73 pruebas unitarias y 33 de la API.
 
 \subsection{Integración continua}
-El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio.
+El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio; si una prueba falla, GitHub la marca junto a la línea de código que falló. En las pruebas, los correos no se envían de verdad: se simulan y se revisa a quién se habrían mandado.
 
 \section{Convenciones}
 \begin{itemize}
