@@ -3,12 +3,29 @@ const http = require('http');
 // Recibe las consultas del cliente de Supabase (/rest/v1/...) y las pasa a PostgREST sin las claves
 const startSupabaseProxy = (port, postgrestUrl) => {
   const target = new URL(postgrestUrl);
+  const removedFiles = [];
   const server = http.createServer((req, res) => {
-    // Las subidas a Storage se aceptan sin guardar nada: a las pruebas solo les importa la URL publica
+    // Las pruebas consultan aqui que archivos se pidieron borrar
+    if (req.url === '/__storage/removed') {
+      res.writeHead(200, {'content-type': 'application/json'});
+      res.end(JSON.stringify(removedFiles));
+      return;
+    }
+    // Las subidas a Storage se aceptan sin guardar nada; de los borrados se anotan las rutas
     if (req.url.startsWith('/storage/v1/object/')) {
-      req.resume();
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk;
+      });
       req.on('end', () => {
+        if (req.method === 'DELETE') {
+          removedFiles.push(...(JSON.parse(body || '{}').prefixes || []));
+        }
         res.writeHead(200, {'content-type': 'application/json'});
+        if (req.url.startsWith('/storage/v1/object/list/')) {
+          res.end('[]');
+          return;
+        }
         res.end(JSON.stringify({Key: req.url.replace('/storage/v1/object/', '')}));
       });
       return;

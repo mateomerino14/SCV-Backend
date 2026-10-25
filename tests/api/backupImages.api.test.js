@@ -1,4 +1,8 @@
 const {login, api, boliviaDate} = require('./helpers');
+const {getStoragePath} = require('../../src/services/shared/storageService');
+
+// Rutas que el backend pidio borrar del almacenamiento (las anota el proxy de pruebas)
+const removedFiles = async () => (await fetch(`${process.env.SUPABASE_URL}/__storage/removed`)).json();
 
 jest.setTimeout(60000);
 
@@ -41,11 +45,13 @@ test('guarda hasta 2 respaldos y permite conservarlos o cambiarlos al editar', a
   expect(detail.Imagen_Respaldo).toHaveLength(2);
 
   const kept = detail.Imagen_Respaldo[0].url_archivo;
+  const dropped = detail.Imagen_Respaldo[1].url_archivo;
   const updated = await employee.putForm(`/expense/${expenseId}/update`, {...expenseData(), mantener_imagen: true, respaldos_conservados: [kept]}, ['respaldos']);
   expect(updated.status).toBe(200);
   detail = (await employee.get(`/expense/${expenseId}/detail`)).body;
   expect(detail.Imagen_Respaldo).toHaveLength(2);
   expect(detail.Imagen_Respaldo.map((backup) => backup.url_archivo)).toContain(kept);
+  expect(await removedFiles()).toContain(getStoragePath(dropped));
 
   const tooMany = await employee.putForm(`/expense/${expenseId}/update`, {...expenseData(), mantener_imagen: true, respaldos_conservados: detail.Imagen_Respaldo.map((backup) => backup.url_archivo)}, ['respaldos']);
   expect(tooMany.status).toBe(400);
@@ -70,4 +76,14 @@ test('guarda el número del recibo en papel', async () => {
 test('rechaza un gasto con más de 2 respaldos', async () => {
   const response = await employee.postForm('/expense/register', expenseData(), ['imagen', 'respaldos', 'respaldos', 'respaldos']);
   expect(response.status).toBe(400);
+});
+
+// Al eliminar un gasto se borran del almacenamiento su comprobante y sus respaldos
+test('borra los archivos del gasto al eliminarlo', async () => {
+  const registered = await employee.postForm('/expense/register', expenseData(), ['imagen', 'respaldos']);
+  const expenseId = registered.body.gasto.id_gasto;
+  const detail = (await employee.get(`/expense/${expenseId}/detail`)).body;
+  const files = [detail.Imagen.url_archivo, detail.Imagen_Respaldo[0].url_archivo].map(getStoragePath);
+  expect((await employee.del(`/expense/${expenseId}`)).status).toBe(200);
+  expect(await removedFiles()).toEqual(expect.arrayContaining(files));
 });
