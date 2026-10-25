@@ -130,6 +130,20 @@ const latestJustificationPerDay = (comments) => {
   });
 };
 
+// Filas de la tabla de justificaciones de excesos; sin justificaciones, una fila que lo indica
+const buildJustificationRows = (dayJustifications) => {
+  if (dayJustifications.length === 0) {
+    return '<tr><td colspan="2" style="text-align:center">Sin excesos que justificar</td></tr>';
+  }
+  return dayJustifications.map((item) => {
+    let label = 'Hoteles';
+    if (item.fecha_justificada) {
+      label = formatDate(item.fecha_justificada);
+    }
+    return `<tr><td class="justificaciones-fecha"><strong>${label}</strong></td><td>${escapeHtml(item.descripcion)}</td></tr>`;
+  }).join('');
+};
+
 // Genera el HTML de la planilla de rendicion de cuentas
 const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   const trip = escapeDeep(rawTrip);
@@ -325,12 +339,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
           <tr><th class="justificaciones-fecha">FECHA</th><th>JUSTIFICACIÓN</th></tr>
         </thead>
         <tbody>
-          ${dayJustifications.length === 0
-            ? '<tr><td colspan="2" style="text-align:center">Sin excesos que justificar</td></tr>'
-            : dayJustifications.map((item) => {
-              const label = item.fecha_justificada ? formatDate(item.fecha_justificada) : 'Hoteles';
-              return `<tr><td class="justificaciones-fecha"><strong>${label}</strong></td><td>${escapeHtml(item.descripcion)}</td></tr>`;
-            }).join('')}
+          ${buildJustificationRows(dayJustifications)}
         </tbody>
       </table>
     </div>

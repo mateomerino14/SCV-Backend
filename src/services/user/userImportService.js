@@ -16,7 +16,9 @@ const phonePattern = /^[0-9]{7,8}$/;
 const dependencyPattern = /^\d{3}$/;
 const importedColumns = 'id_usuario, nombre, apellido_paterno, email_corporativo';
 
+// Texto de una celda sin espacios de mas; vacio si no tiene nada
 const textOf = (value) => String(value ?? '').trim();
+// Clave para comparar textos sin importar mayusculas, tildes ni signos
 const keyOf = (value) => textNormalizer.normalizeText(textOf(value));
 
 // Limpia una fila del Excel: textos sin espacios de mas y correos en minusculas
@@ -85,6 +87,7 @@ const countBy = (rows, field) => {
   return counts;
 };
 
+// Las demas filas donde aparece el mismo valor, para el mensaje de repetido
 const otherRows = (rowsList, ownRow) => rowsList.filter((fila) => fila !== ownRow).join(', ');
 
 // Revisa correo y CI contra el sistema y contra las demas filas del archivo
@@ -293,7 +296,16 @@ const loadContext = async () => {
 };
 
 // Resumen de la validacion que ve el administrador, sin los datos internos
-const toPreview = (results) => results.map(({payload, jefeEnArchivo, ...visible}) => ({...visible, valido: visible.errores.length === 0}));
+const toPreview = (results) => results.map((result) => ({
+  fila: result.fila,
+  nombre: result.nombre,
+  email_corporativo: result.email_corporativo,
+  cargo: result.cargo,
+  rol: result.rol,
+  correo_jefe: result.correo_jefe,
+  errores: result.errores,
+  valido: result.errores.length === 0,
+}));
 
 // Revisa que el archivo traiga filas y no pase del maximo
 const checkRowsInput = (rows) => {
@@ -417,4 +429,4 @@ const importUsers = async (rows) => {
   return {creados: deliveries.length, omitidos: [...skipped, ...failed].sort((first, second) => first.fila - second.fila)};
 };
 
-module.exports = {validateImportRows, previewImport, importUsers, maxRows};
+module.exports = {validateImportRows, previewImport, importUsers};

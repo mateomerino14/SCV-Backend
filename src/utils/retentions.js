@@ -30,6 +30,7 @@ const resolveLines = (paid, lineAmounts) => {
   return lines;
 };
 
+// Solo los servicios y compras sin factura, nacionales y sin alcohol llevan retenciones
 const hasRetentions = (paid, type, isInternational, hasAlcohol) => !hasAlcohol && !isInternational && ['C', 'S'].includes(type) && paid > 0;
 
 // La empresa asume los impuestos (base incrementada); con subgastos, cada uno se calcula aparte y se suman, como en el recibo de papel
@@ -58,6 +59,7 @@ const calculateLineBases = (amount, type, isInternational, hasAlcohol, lineAmoun
   return lines.map((line) => retentionsOfLine(line, mainRateOf(type)).base);
 };
 
+// Montos pagados de los subgastos de un gasto registrado
 const subItemAmounts = (expense) => (expense.Gasto_Subitem || []).map((item) => item.monto);
 
 // Retenciones de un gasto ya registrado, calculadas siempre desde lo pagado para no arrastrar calculos antiguos

@@ -90,7 +90,6 @@ const summarizeReceipt = (expenses) => {
   };
 };
 
-// Genera el HTML de un recibo agrupado por tipo de gasto
 // Mensaje de respuesta segun si el recibo ya se habia emitido
 const receiptMessage = (reissued) => {
   if (reissued) {
@@ -107,6 +106,7 @@ const originalReceiptText = (expense) => {
   return `Recibo original Nº ${expense.numero_recibo}`;
 };
 
+// Genera el HTML de un recibo agrupado por tipo de gasto
 const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, type, isInternational, tripCode, rawMotivo, rawSupervisor) => {
   const expenses = escapeDeep(rawExpenses);
   const employee = escapeDeep(rawEmployee);
