@@ -8,7 +8,8 @@
     "test:api": "jest tests/api --runInBand",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "resumen": "node scripts/sendDigest.js"
+    "resumen": "node scripts/sendDigest.js",
+    "limpiar-archivos": "node scripts/cleanStorage.js"
   },
   "repository": {
     "type": "git",
