@@ -289,6 +289,7 @@ src/
 └── index.js                  Arranque del servidor y programación del resumen de pendientes
 
 scripts/sendDigest.js         Envío manual del resumen de pendientes (npm run resumen)
+scripts/cleanStorage.js       Borra los archivos que ya no usa nadie (npm run limpiar-archivos)
 database/                     Scripts SQL del esquema (ver su README.md)
 tests/                        Pruebas: services/ (unitarias), api/ (de la API), support/ (ayudas)
 .github/workflows/pruebas.yml Ejecución automática de las pruebas en GitHub Actions
@@ -450,7 +451,7 @@ La invocación (`geminiService`) reintenta ante errores temporales y, si el mode
 | Unitarias | Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, cantidades con decimales, CUF, HTML del recibo, control diario por moneda, recordatorios, jerarquía | `npm test` | `tests/services/` |
 | De la API | Endpoints completos contra una base de prueba: permisos, viajes, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos y N° de recibo de gastos sin factura, presupuesto con lo pagado, número de rendición del mes, códigos de Oracle de secciones y usuarios, cambio de un gasto a Hoteles, exportación | `npm run test:api` | `tests/api/` |
 
-Las pruebas de la API necesitan una base PostgreSQL de prueba con los scripts de `database/` (`01` a `04` y `testing_02_organizacion_prueba.sql`), servida por PostgREST y el proxy `tests/support/supabaseProxy.js`, que imita la ruta `/rest/v1` de Supabase y acepta las subidas a Storage sin guardarlas. **No se corren contra Supabase real.**
+Las pruebas de la API necesitan una base PostgreSQL de prueba con los scripts de `database/` (`01` a `04` y `testing_02_organizacion_prueba.sql`), servida por PostgREST y el proxy `tests/support/supabaseProxy.js`, que imita la ruta `/rest/v1` de Supabase, acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar. **No se corren contra Supabase real.**
 
 En GitHub las pruebas se ejecutan solas en cada `push` y pull request (`.github/workflows/pruebas.yml`): una base temporal se crea y se borra en cada corrida. El resultado aparece como ✅ o ❌ junto a cada commit, en la pestaña **Actions** del repositorio.
 
@@ -459,6 +460,24 @@ En GitHub las pruebas se ejecutan solas en cada `push` y pull request (`.github/
 Sobre PostgreSQL. Los scripts de reconstrucción están en `database/` (cuatro archivos: esquema, funciones, semillas y RLS); ver su `README.md` para el orden de ejecución y las decisiones de diseño.
 
 Todas las marcas temporales usan `timestamptz`: el tipo sin zona horaria descartaba el huso al persistir, produciendo un desplazamiento de cuatro horas respecto de Bolivia.
+
+### Archivos en el almacenamiento
+
+Los comprobantes, respaldos y fotos de perfil van al bucket público `facturas` de Supabase Storage (carpetas `gastos/`, `facturas/` y `perfiles/`). Todo pasa por `storageService`, que sube con `service_role` y borra los archivos que dejan de usarse:
+
+- al **eliminar un gasto**, su comprobante y sus respaldos;
+- al **editar** un gasto o una factura, el comprobante reemplazado o quitado y los respaldos quitados;
+- al cambiar o quitar la **foto de perfil**, la anterior, y al eliminar un usuario, la suya;
+- si al **guardar** algo falla después de subir los archivos, los recién subidos.
+
+Si falla el borrado de un archivo solo se avisa en el registro, sin cortar la operación. Para limpiar los archivos que quedaron sueltos de antes:
+
+```bash
+npm run limpiar-archivos -- --prueba   # lista los archivos que ningún gasto ni usuario usa
+npm run limpiar-archivos               # los borra (deja los de menos de un día)
+```
+
+El bucket es público, así que las imágenes se ven por su URL sin políticas sobre `storage.objects`; el backend usa `service_role` y tampoco las necesita. Si Supabase avisa «Clients can list all files in this bucket», hay que borrar las políticas de ese bucket (en *Storage > Policies* o con SQL).
 
 ## Dependencias y seguridad
 
