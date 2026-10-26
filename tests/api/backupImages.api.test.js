@@ -10,15 +10,15 @@ let employee;
 let tripId;
 let categoryId;
 
-// Viaje nacional aprobado con fondos para registrar gastos sin factura con respaldos
+// Viaje internacional aprobado con fondos para registrar gastos sin factura con respaldos
 beforeAll(async () => {
   employee = api(await login('juan.empleado'));
   const supervisor = api(await login('maria.supervisora'));
   const approver = api(await login('pedro.aprobador'));
   const treasurer = api(await login('tesoro.prueba'));
   const created = await employee.post('/trip', {
-    motivo: 'Viaje para respaldos de gastos', origen: 'La Paz', destino: 'Sucre', fecha_inicio: boliviaDate(-1), fecha_fin: boliviaDate(1),
-    tipo: 'Nacional', transporte: 'Terrestre', monto_asignado: 900,
+    motivo: 'Viaje para respaldos de gastos', origen: 'La Paz', destino: 'Lima', fecha_inicio: boliviaDate(-1), fecha_fin: boliviaDate(1),
+    tipo: 'Internacional', transporte: 'Aéreo', monto_asignado: 900, monto_asignado_usd: 200,
   });
   tripId = created.body.id_viaje;
   await employee.put(`/trip/${tripId}/submit-review`);
@@ -86,4 +86,26 @@ test('borra los archivos del gasto al eliminarlo', async () => {
   const files = [detail.Imagen.url_archivo, detail.Imagen_Respaldo[0].url_archivo].map(getStoragePath);
   expect((await employee.del(`/expense/${expenseId}`)).status).toBe(200);
   expect(await removedFiles()).toEqual(expect.arrayContaining(files));
+});
+
+// En un viaje nacional no se adjuntan respaldos: son para el comprobante del cambio de moneda
+test('rechaza respaldos en un viaje nacional', async () => {
+  const created = await employee.post('/trip', {
+    motivo: 'Viaje nacional sin respaldos', origen: 'La Paz', destino: 'Sucre', fecha_inicio: boliviaDate(-1), fecha_fin: boliviaDate(1),
+    tipo: 'Nacional', transporte: 'Terrestre', monto_asignado: 900,
+  });
+  const nationalTrip = created.body.id_viaje;
+  const supervisor = api(await login('maria.supervisora'));
+  await employee.put(`/trip/${nationalTrip}/submit-review`);
+  await supervisor.post(`/review/trip-review/${nationalTrip}/take`);
+  await supervisor.post(`/review/trip-review/${nationalTrip}/approve`);
+  await api(await login('pedro.aprobador')).post(`/approver/trip/${nationalTrip}/approve`);
+  await api(await login('tesoro.prueba')).post(`/treasurer/${nationalTrip}/approve`);
+  const rejected = await employee.postForm('/expense/register', {...expenseData(), id_viaje: nationalTrip}, ['imagen', 'respaldos']);
+  expect(rejected.status).toBe(400);
+  expect(rejected.body.error).toMatch(/viajes internacionales/);
+  const accepted = await employee.postForm('/expense/register', {...expenseData(), id_viaje: nationalTrip}, ['imagen']);
+  expect(accepted.status).toBe(200);
+  const edited = await employee.putForm(`/expense/${accepted.body.gasto.id_gasto}/update`, {...expenseData(), id_viaje: nationalTrip, mantener_imagen: true}, ['respaldos']);
+  expect(edited.status).toBe(400);
 });

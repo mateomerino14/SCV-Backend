@@ -7,6 +7,7 @@ const {calculateRetentions} = require('../../utils/retentions');
 const storageService = require('../shared/storageService');
 
 const maxBackupImages = 2;
+const internationalTripType = 'Internacional';
 const maxReceiptNumber = 50;
 
 // Numero impreso del recibo en papel, o null si el empleado no lo escribio
@@ -99,6 +100,18 @@ const insertBackupImages = async (expenseId, urls) => {
   return {error};
 };
 
+// Los respaldos son para el comprobante del cambio de moneda: solo se adjuntan nuevos en viajes internacionales
+const validateBackupsAllowed = async (tripId, newBackupCount) => {
+  if (newBackupCount === 0) {
+    return null;
+  }
+  const {data: trip} = await supabase.from('Viaje').select('tipo').eq('id_viaje', tripId).maybeSingle();
+  if (trip?.tipo !== internationalTripType) {
+    return 'Los respaldos solo se adjuntan en viajes internacionales, para el comprobante del cambio de moneda';
+  }
+  return null;
+};
+
 // Crea un gasto nuevo, con sus tramos de moneda, subitems, comprobante y respaldos
 const createExpense = async (expenseData, images, userId) => {
   const {receipt: file, backups} = images;
@@ -134,6 +147,10 @@ const createExpense = async (expenseData, images, userId) => {
   }
   if (backups.length > maxBackupImages) {
     return {error: `Puedes adjuntar como máximo ${maxBackupImages} respaldos por gasto`, status: 400};
+  }
+  const backupsNotAllowed = await validateBackupsAllowed(expenseData.id_viaje, backups.length);
+  if (backupsNotAllowed) {
+    return {error: backupsNotAllowed, status: 400};
   }
   let imageUrl = null;
   if (file) {
@@ -286,6 +303,10 @@ const updateExpense = async (expenseId, expenseData, images, userId) => {
   const keptCount = (existingBackups || []).length - removedBackupIds.length;
   if (keptCount + backups.length > maxBackupImages) {
     return {error: `Puedes adjuntar como máximo ${maxBackupImages} respaldos por gasto`, status: 400};
+  }
+  const backupsNotAllowed = await validateBackupsAllowed(existingExpense.id_viaje, backups.length);
+  if (backupsNotAllowed) {
+    return {error: backupsNotAllowed, status: 400};
   }
   const {data: currentImage} = await supabase.from('Imagen').select('url_archivo').eq('id_gasto', expenseId).maybeSingle();
   let newImageUrl = null;
