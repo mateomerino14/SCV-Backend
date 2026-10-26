@@ -302,7 +302,7 @@ tests/                        Pruebas: services/ (unitarias), api/ (de la API), 
 | `/auth` | `user/auth.js` | Inicio y cierre de sesión, renovación, recuperación por código |
 | `/user` | `user/user.js` | Perfil, cambio de contraseña y gestión de usuarios; `/user/import/preview` y `/user/import` (administrador) revisan y crean usuarios desde Excel |
 | `/trip` | `trip/trip.js` | Ciclo de vida del viaje, planilla en PDF y datos de planillas de varios viajes para Excel (`/trip/export/statements`: revisor, tesorero y administrador) |
-| `/expense` | `expense/expense.js` | Gastos y recibos; al registrar o editar un gasto sin factura se envía el comprobante (`imagen`) y hasta 2 respaldos (`respaldos`, por ejemplo el comprobante del cambio de moneda); al editar, `respaldos_conservados` indica cuáles se mantienen |
+| `/expense` | `expense/expense.js` | Gastos y recibos; al registrar o editar un gasto sin factura se envía el comprobante (`imagen`) y, solo en viajes internacionales, hasta 2 respaldos (`respaldos`, para el comprobante del cambio de moneda; en un viaje nacional se responde 400); al editar, `respaldos_conservados` indica cuáles se mantienen |
 | `/invoice` | `expense/invoice.js` | Extracción y registro de facturas |
 | `/supplier` | `expense/supplier.js` | Proveedores (solo administrador) |
 | `/review` | `approval/review.js` | Revisión previa y de gastos del supervisor |
@@ -474,7 +474,7 @@ La invocación (`geminiService`) reintenta ante errores temporales y, si el mode
 | Tipo | Qué prueba | Comando | Carpeta |
 |---|---|---|---|
 | Unitarias | Funciones sueltas: retenciones (también por subgasto), validación de la importación de usuarios, IVA de factura y recibo en la planilla, cantidades con decimales, CUF, HTML del recibo, control diario por moneda, recordatorios, jerarquía | `npm test` | `tests/services/` |
-| De la API | Endpoints completos contra una base de prueba: permisos, viajes, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos y N° de recibo de gastos sin factura, presupuesto con lo pagado, número de rendición del mes, códigos de Oracle de secciones y usuarios, cambio de un gasto a Hoteles, exportación, importación de usuarios desde Excel | `npm run test:api` | `tests/api/` |
+| De la API | Endpoints completos contra una base de prueba: permisos, viajes, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos (solo en viajes internacionales) y N° de recibo de gastos sin factura, presupuesto con lo pagado, número de rendición del mes, códigos de Oracle de secciones y usuarios, cambio de un gasto a Hoteles, exportación, importación de usuarios desde Excel | `npm run test:api` | `tests/api/` |
 
 Las pruebas de la API necesitan una base PostgreSQL de prueba con los scripts de `database/` (`01` a `04` y `testing_02_organizacion_prueba.sql`), servida por PostgREST y el proxy `tests/support/supabaseProxy.js`, que imita la ruta `/rest/v1` de Supabase, acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar. **No se corren contra Supabase real.**
 

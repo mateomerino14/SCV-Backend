@@ -341,7 +341,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \code{Gasto_Subitem} & Desglose de un gasto en varios conceptos \\
 \rowcolor{maxamFondo} \code{Gasto_Tramo_Moneda} & Tramos en otra moneda de gastos internacionales, con el tipo de cambio que escribe el empleado \\
 \code{Imagen} & Comprobante asociado a un gasto \\
-\rowcolor{maxamFondo} \code{Imagen_Respaldo} & Hasta 2 respaldos extra de un gasto sin factura, por ejemplo el comprobante del cambio de moneda; se borran junto con el gasto \\
+\rowcolor{maxamFondo} \code{Imagen_Respaldo} & Hasta 2 respaldos extra de un gasto sin factura de un viaje internacional, para el comprobante del cambio de moneda; se borran junto con el gasto \\
 \code{Factura} & Datos de la factura de un gasto, con el CUF (código de autorización) que pide Oracle \\
 \code{Detalle_Factura} & Productos de cada factura; la cantidad admite hasta 3 decimales \\
 \rowcolor{maxamFondo} \code{Impuesto} y \code{Factura_Impuestos} & Catálogo de impuestos y su relación con facturas \\
@@ -580,8 +580,8 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \ep{PUT}{/trip/:id/confirm-completion}{Dueño o reemplazo}{Finaliza y envía la rendición}
 \epf{GET}{/trip/export/statements}{Revisor, tesorero, administrador}{Datos de las planillas de varios viajes para Excel}
 \ep{GET}{/expense/:expenseId/detail}{Acceso al viaje}{Detalle de un gasto}
-\epf{POST}{/expense/register}{Dueño o reemplazo}{Registra un gasto con su comprobante (\code{imagen}) y hasta 2 respaldos (\code{respaldos})}
-\ep{PUT}{/expense/:expenseId/update}{Dueño o reemplazo}{Edita un gasto; conserva los respaldos indicados en \code{respaldos_conservados} y agrega los nuevos, sin pasar de 2}
+\epf{POST}{/expense/register}{Dueño o reemplazo}{Registra un gasto con su comprobante (\code{imagen}) y, solo en viajes internacionales, hasta 2 respaldos (\code{respaldos})}
+\ep{PUT}{/expense/:expenseId/update}{Dueño o reemplazo}{Edita un gasto; conserva los respaldos indicados en \code{respaldos_conservados} y agrega los nuevos, sin pasar de 2 y solo en viajes internacionales}
 \epf{DELETE}{/expense/:expenseId}{Dueño o reemplazo}{Elimina un gasto}
 \ep{POST}{/expense/:expenseId/receipt}{Recibos}{Envía el recibo individual}
 \epf{POST}{/expense/trip/:tripId/receipt/:type}{Recibos}{Envía el recibo agrupado}
@@ -727,7 +727,7 @@ La imagen del comprobante se envía al modelo de visión de Gemini (\code{invoic
   \item Al guardar, cada producto debe tener nombre, precio válido y una cantidad mayor a cero con hasta 3 decimales, igual que la columna \code{Detalle_Factura.cantidad numeric(12, 3)}.
 \end{itemize}
 
-Las imágenes (el comprobante y, en gastos sin factura, hasta 2 respaldos) se suben al almacenamiento (\code{storageService}) antes de escribir el gasto o la factura. Los archivos que dejan de usarse se borran: al eliminar un gasto, al reemplazar o quitar un comprobante, respaldo o foto de perfil, y los recién subidos si falla el guardado; \code{npm run limpiar-archivos} borra los que hayan quedado sueltos (con \code{-- --prueba} solo los lista). El bucket es público y el backend usa \code{service_role}, así que no hacen falta políticas sobre \code{storage.objects}; más archivos de los permitidos se rechazan con un mensaje claro; si la subida falla no queda nada a medio guardar. Una factura repetida (número, fecha y proveedor) se rechaza antes de modificar datos.
+Las imágenes (el comprobante y, en gastos sin factura de viajes internacionales, hasta 2 respaldos; en un viaje nacional se rechazan con 400) se suben al almacenamiento (\code{storageService}) antes de escribir el gasto o la factura. Los archivos que dejan de usarse se borran: al eliminar un gasto, al reemplazar o quitar un comprobante, respaldo o foto de perfil, y los recién subidos si falla el guardado; \code{npm run limpiar-archivos} borra los que hayan quedado sueltos (con \code{-- --prueba} solo los lista). El bucket es público y el backend usa \code{service_role}, así que no hacen falta políticas sobre \code{storage.objects}; más archivos de los permitidos se rechazan con un mensaje claro; si la subida falla no queda nada a medio guardar. Una factura repetida (número, fecha y proveedor) se rechaza antes de modificar datos.
 
 \section{Seguridad}
 \begin{xltabular}{\textwidth}{L{4.2cm} Y}
@@ -782,10 +782,10 @@ Una prueba automática es código que usa el sistema como lo haría una persona 
 \cabecera \tth{Tipo} & \tth{Qué prueba} & \tth{Comando} \\
 \endhead
 \rowcolor{maxamFondo} Unitarias & Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, cantidades con decimales, control diario por moneda, exportación, recordatorios, jerarquía, moderación, retenciones por subgasto y validación de la importación de usuarios (\code{tests/services/}) & \code{npm test} \\
-De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos de gastos sin factura, presupuesto con lo pagado, número de rendición, códigos de Oracle, exportación e importación de usuarios desde Excel (\code{tests/api/}) & \code{npm run test:api} \\
+De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos de gastos sin factura solo en viajes internacionales, presupuesto con lo pagado, número de rendición, códigos de Oracle, exportación e importación de usuarios desde Excel (\code{tests/api/}) & \code{npm run test:api} \\
 \end{xltabular}
 
-Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase y acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar; nunca se ejecutan contra la base real. En el estado actual pasan 73 pruebas unitarias y 33 de la API.
+Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase y acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar; nunca se ejecutan contra la base real. En el estado actual pasan 73 pruebas unitarias y 34 de la API.
 
 \subsection{Integración continua}
 El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio; si una prueba falla, GitHub la marca junto a la línea de código que falló. En las pruebas, los correos no se envían de verdad: se simulan y se revisa a quién se habrían mandado.
