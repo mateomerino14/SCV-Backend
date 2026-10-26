@@ -2,8 +2,9 @@ const supabase = require('../../config/supabase');
 const pdfService = require('../shared/pdfService');
 const tripCodeUtil = require('../../utils/tripCode');
 const {escapeDeep} = require('../../utils/htmlEscape');
-const {getExpenseRetentions} = require('../../utils/retentions');
+const {getExpenseRetentions, hasOriginCurrencyLines} = require('../../utils/retentions');
 const {formatReceiptNumber} = require('../expense/receiptNumberService');
+const {amountInBsOf, originalAmountLinesOf, summarizeStatement} = require('../../utils/expenseCurrency');
 
 const vatRate = 0.13;
 
@@ -80,19 +81,17 @@ const getExpenseDescription = (expense) => {
   }
   const subitems = expense.Gasto_Subitem || [];
   if (subitems.length > 0) {
-    return escapeHtml(subitems.map((subitem) => `${subitem.descripcion}: ${parseFloat(subitem.monto).toFixed(2)}`).join(', ').toUpperCase());
+    let lineCurrency = '';
+    if (hasOriginCurrencyLines(expense)) {
+      lineCurrency = ` ${expense.moneda}`;
+    }
+    return escapeHtml(subitems.map((subitem) => `${subitem.descripcion}: ${parseFloat(subitem.monto).toFixed(2)}${lineCurrency}`).join(', ').toUpperCase());
   }
   return escapeHtml((expense.descripcion || expense.Categoria_Gasto?.nombre || '').toUpperCase());
 };
 
-// Arma el texto de los tramos de cambio de moneda de un gasto internacional
-const buildTramosText = (expense) => {
-  const installments = expense.Gasto_Tramo_Moneda || [];
-  if (installments.length === 0) {
-    return '';
-  }
-  return escapeHtml(installments.map((installment) => `${parseFloat(installment.monto_origen).toFixed(2)} ${installment.moneda} → ${parseFloat(installment.monto_usd).toFixed(2)} USD`).join(' | '));
-};
+// Texto del monto original de un gasto internacional, una linea por dato
+const buildOriginalAmountText = (expense) => originalAmountLinesOf(expense).join('<br>');
 
 // Formatea una fecha a dia/mes/anio
 const formatDate = (dateInput) => {
@@ -170,34 +169,39 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
 
   let totalImporteFactura = 0;
   let totalImporteBs = 0;
-  let totalImporteUsd = 0;
   let totalVat = 0;
   let totalRcIva = 0;
   let totalIue = 0;
   let totalIt = 0;
   let totalCostBs = 0;
-  let totalCostUsd = 0;
 
   const rows = expenses.map((expense, index) => {
     const amount = parseFloat(expense.monto_total) || 0;
-    const isInternational = isInternationalTrip && !!expense.es_gasto_internacional;
+    const isInternational = !!expense.es_gasto_internacional;
     const hasInvoice = !!expense.Factura;
     const {vat, rcIva, iue, it, cost} = getExpenseTaxValues(expense);
     const oracleValue = escapeHtml(extractOracleAccount(expense.Categoria_Gasto?.nombre));
     const oracleType = toOracleExpenseType(expense.tipo);
     const detailText = getExpenseDescription(expense);
-    const tramosText = buildTramosText(expense);
-    let currency = 'Bs';
+    const amountBs = amountInBsOf(expense);
     let rowClass = 'fila-nacional';
     if (isInternational) {
-      currency = 'USD';
       rowClass = 'fila-internacional';
-      totalImporteUsd += amount;
-      totalCostUsd += cost;
     }
-    else {
-      totalImporteBs += amount;
-      totalCostBs += cost;
+    // Un gasto internacional antiguo sin tipo de cambio a Bs se muestra en USD y no entra en las sumas en Bs
+    let amountText = `${amount.toFixed(2)} USD`;
+    let costText = amountText;
+    if (amountBs !== null) {
+      amountText = amountBs.toFixed(2);
+      costText = cost.toFixed(2);
+      if (isInternational) {
+        costText = amountBs.toFixed(2);
+        totalCostBs += amountBs;
+      }
+      else {
+        totalCostBs += cost;
+      }
+      totalImporteBs += amountBs;
     }
     if (hasInvoice) {
       totalImporteFactura += amount;
@@ -216,26 +220,17 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
       <td class="col-doc">${escapeHtml(documentNumberOf(expense))}</td>
       <td class="col-nit">${escapeHtml(cleanValue(expense.Proveedor?.numero_doc_fiscal))}</td>
       <td class="col-importe-fact">${hasInvoice ? amount.toFixed(2) : ''}</td>
-      ${isInternationalTrip ? `<td class="col-tramos">${tramosText}</td>` : ''}
-      <td class="col-importe">${amount.toFixed(2)} ${currency}</td>
+      ${isInternationalTrip ? `<td class="col-original">${buildOriginalAmountText(expense)}</td>` : ''}
+      <td class="col-importe">${amountText}</td>
       <td class="col-num">${vat.toFixed(2)}</td>
       <td class="col-num">${rcIva.toFixed(2)}</td>
       <td class="col-num">${iue.toFixed(2)}</td>
       <td class="col-num">${it.toFixed(2)}</td>
-      <td class="col-num">${cost.toFixed(2)}</td>
+      <td class="col-num">${costText}</td>
     </tr>`;
   }).join('');
 
-  const assignedAmount = parseFloat(trip.monto_asignado) || 0;
-  const assignedAmountUsd = parseFloat(trip.monto_asignado_usd || 0);
-  const remaining = assignedAmount - totalImporteBs;
-  const remainingUsd = assignedAmountUsd - totalImporteUsd;
-  const balanceRows = [
-    ['Fondo Recibido', assignedAmount, assignedAmountUsd],
-    ['Saldo en mi poder', remaining, remainingUsd],
-    ['Importe a Devolver', Math.max(remaining, 0), Math.max(remainingUsd, 0)],
-    ['Importe a Reembolsar', Math.max(-remaining, 0), Math.max(-remainingUsd, 0)],
-  ];
+  const {internationalUsd, balanceRows} = summarizeStatement(trip, expenses);
 
   return `<!DOCTYPE html>
 <html>
@@ -269,7 +264,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   .col-doc { text-align: center; width: 8%; }
   .col-nit { text-align: center; width: 6%; }
   .col-importe-fact { text-align: right; width: 6%; }
-  .col-tramos { width: 10%; font-size: 6.5pt; }
+  .col-original { width: 12%; font-size: 6.5pt; }
   .col-importe { text-align: right; width: 8%; }
   .col-num { text-align: right; width: 5%; }
   .totales-fila td { background: #bfe0f5; font-weight: bold; text-align: right; }
@@ -313,7 +308,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
         <tr>
           <th>N°</th><th>FECHA</th><th>CUENTA/ORACLE</th><th>DETALLE</th><th>TIPO GASTO</th>
           <th>N° DOCUMENTO</th><th>NIT</th><th>IMPORTE FACT./REC.</th>
-          ${isInternationalTrip ? '<th>TRAMOS DE CAMBIO</th><th>IMPORTE Bs./USD</th>' : '<th>IMPORTE Bs.</th>'}<th>I.V.A.</th><th>RC-IVA</th><th>IUE</th><th>IT</th><th>IMPORTE COSTO/GASTO</th>
+          ${isInternationalTrip ? '<th>MONTO ORIGINAL</th>' : ''}<th>IMPORTE Bs.</th><th>I.V.A.</th><th>RC-IVA</th><th>IUE</th><th>IT</th><th>IMPORTE COSTO/GASTO</th>
         </tr>
       </thead>
       <tbody>
@@ -331,10 +326,9 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
         </tr>
         ${isInternationalTrip ? `
         <tr class="totales-fila">
-          <td colspan="9">Sumas Totales (USD)</td>
-          <td>${totalImporteUsd.toFixed(2)}</td>
-          <td></td><td></td><td></td><td></td>
-          <td>${totalCostUsd.toFixed(2)}</td>
+          <td colspan="9">Gastos internacionales en USD, para Oracle</td>
+          <td>${internationalUsd.toFixed(2)} USD</td>
+          <td colspan="5"></td>
         </tr>` : ''}
       </tbody>
     </table>
@@ -408,4 +402,4 @@ const generateStatementPdf = async (tripId) => {
   return {buffer: pdfBuffer, fileName: `Rendicion_${tripId}_${safeReason}.pdf`};
 };
 
-module.exports = {generateStatementPdf, getExpenseTaxValues};
+module.exports = {generateStatementPdf, generateStatementHtml, getExpenseTaxValues};

@@ -62,3 +62,12 @@ test('calcula las retenciones por subgasto y las suma', () => {
   expect(getExpenseLineBases(expense)).toEqual([59.53, 95.24, 71.43, 59.53]);
   expect(calculateRetentions(240, 'S', false, false)).toMatchObject({base_imponible: 285.71, retencion_rc_iva: 37.14, retencion_it: 8.57});
 });
+
+// Los subgastos en soles de un gasto internacional salen en USD y suman exactamente el total
+test('pasa a USD los subgastos de un gasto internacional en otra moneda', () => {
+  const expense = {tipo: 'C', es_gasto_internacional: true, moneda: 'PEN', tipo_cambio: '3.8000', tipo_cambio_bs: '6.9600', monto_total: '7.89', Gasto_Subitem: [{monto: '10'}, {monto: '20'}]};
+  expect(getExpenseLineBases(expense)).toEqual([2.63, 5.26]);
+  expect(getExpenseRetentions(expense).retencion_it).toBe(0);
+  const oldExpense = {...expense, tipo_cambio_bs: null, monto_total: '30.00'};
+  expect(getExpenseLineBases(oldExpense)).toEqual([10, 20]);
+});
