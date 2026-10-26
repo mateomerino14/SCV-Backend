@@ -32,7 +32,7 @@ beforeAll(async () => {
 
 // Datos de un gasto sin factura de prueba
 const expenseData = () => ({
-  id_viaje: tripId, monto_total: 50, fecha_gasto: boliviaDate(), tipo: 'C', descripcion: 'Compra con cambio de moneda', id_categoria_gasto: categoryId, es_gasto_internacional: true,
+  id_viaje: tripId, monto_total: 50, fecha_gasto: boliviaDate(), tipo: 'C', descripcion: 'Compra con cambio de moneda', id_categoria_gasto: categoryId, es_gasto_internacional: true, tipo_cambio_bs: 6.96,
 });
 
 // El gasto sin factura guarda el comprobante y hasta 2 respaldos, y los conserva o reemplaza al editar

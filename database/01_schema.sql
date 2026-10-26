@@ -153,8 +153,9 @@ create table if not exists "Gasto" (
   modificado boolean not null default false,
   es_gasto_internacional boolean default false,
   moneda varchar(10) default 'BOB',
-  tipo_cambio numeric(10, 4) default 1,
+  tipo_cambio numeric(10, 4) default 1, -- unidades de la moneda del gasto por 1 USD
   monto_moneda_origen numeric(10, 2) default 0,
+  tipo_cambio_bs numeric(10, 4), -- bolivianos por 1 USD de un gasto internacional, para la planilla en Bs
   base_imponible numeric(10, 2) default 0,
   retencion_rc_iva numeric(10, 2) default 0,
   retencion_iue numeric(10, 2) default 0,

@@ -4,7 +4,7 @@ const emailService = require('../shared/emailService');
 const pdfService = require('../shared/pdfService');
 const {buildTripCode} = require('../../utils/tripCode');
 const {escapeDeep, escapeHtml: escapeText} = require('../../utils/htmlEscape');
-const {getExpenseRetentions, getExpenseLineBases} = require('../../utils/retentions');
+const {getExpenseRetentions, getExpenseLineBases, hasOriginCurrencyLines} = require('../../utils/retentions');
 const {formatReceiptNumber, getReceiptNumber} = require('./receiptNumberService');
 
 // Los datos se escapan al entrar a cada plantilla (escapeDeep); aqui solo se normaliza el vacio
@@ -87,7 +87,11 @@ const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, typ
     const exchangeSegments = expense.Gasto_Tramo_Moneda || [];
     let description = '';
     if (subItems.length > 0) {
-      description = escapeHtml(subItems.map((item) => `${item.descripcion}: ${parseFloat(item.monto).toFixed(2)}`).join('\n'));
+      let lineCurrency = '';
+      if (hasOriginCurrencyLines(expense)) {
+        lineCurrency = ` ${expense.moneda}`;
+      }
+      description = escapeHtml(subItems.map((item) => `${item.descripcion}: ${parseFloat(item.monto).toFixed(2)}${lineCurrency}`).join('\n'));
     }
     else {
       description = escapeHtml(expense.descripcion || expense.Categoria_Gasto?.nombre || '');
@@ -136,7 +140,7 @@ const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, typ
   }
   let segmentsHeader = '';
   if (isInternational) {
-    segmentsHeader = '<th class="col-tramos">TRAMOS DE CAMBIO</th>';
+    segmentsHeader = '<th class="col-tramos">CAMBIO DE MONEDA</th>';
   }
   let descWidth = '52';
   let segmentsWidth = '0';
@@ -305,7 +309,7 @@ const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, t
   if (hasSegments) {
     segmentsHtml = `
     <div class="tramos-box">
-      <p class="tramos-titulo">TRAMOS DE CAMBIO</p>
+      <p class="tramos-titulo">CAMBIO DE MONEDA</p>
       ${exchangeSegments.map((segment) => `<p class="tramos-linea">${parseFloat(segment.monto_origen).toFixed(2)} ${segment.moneda} → ${parseFloat(segment.monto_usd).toFixed(2)} USD (T/C: ${parseFloat(segment.tipo_cambio).toFixed(4)})</p>`).join('')}
     </div>`;
   }

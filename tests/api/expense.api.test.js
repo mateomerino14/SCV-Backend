@@ -37,17 +37,45 @@ test('acepta un gasto en bolivianos en un dia intermedio', async () => {
   expect(response.status).toBe(200);
 });
 
-// El tipo de cambio de cada tramo es el que escribe el empleado
-test('guarda el tipo de cambio escrito por el empleado', async () => {
+// El gasto internacional se escribe en la moneda de la factura y se pasa a USD con el tipo de cambio del empleado
+test('pasa a USD un gasto escrito en soles con su tipo de cambio', async () => {
   const response = await employee.postForm('/expense/register', {
-    id_viaje: tripId, monto_total: 40, fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi en Lima', id_categoria_gasto: 1, es_gasto_internacional: true,
-    tramos: [{moneda: 'PEN', monto_origen: 150, tipo_cambio: 3.75}],
+    id_viaje: tripId, monto_moneda_origen: 150, moneda: 'PEN', tipo_cambio: 3.75, tipo_cambio_bs: 6.96, fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi en Lima', id_categoria_gasto: 1, es_gasto_internacional: true,
   });
   expect(response.status).toBe(200);
   const detail = await employee.get(`/expense/${response.body.gasto.id_gasto}/detail`);
-  const segment = detail.body.Gasto_Tramo_Moneda?.[0] || detail.body.gasto?.Gasto_Tramo_Moneda?.[0];
+  expect(detail.body.moneda).toBe('PEN');
+  expect(parseFloat(detail.body.monto_moneda_origen)).toBe(150);
+  expect(parseFloat(detail.body.monto_total)).toBe(40);
+  expect(parseFloat(detail.body.tipo_cambio_bs)).toBe(6.96);
+  expect(parseFloat(detail.body.retencion_it)).toBe(0);
+  const segment = detail.body.Gasto_Tramo_Moneda[0];
   expect(parseFloat(segment.tipo_cambio)).toBe(3.75);
   expect(parseFloat(segment.monto_usd)).toBe(40);
+});
+
+// Los subgastos van en la moneda de la factura y su suma se pasa a USD
+test('suma los subgastos en soles y guarda el total en USD', async () => {
+  const response = await employee.postForm('/expense/register', {
+    id_viaje: tripId, moneda: 'PEN', tipo_cambio: 3.8, tipo_cambio_bs: 6.96, fecha_gasto: boliviaDate(), tipo: 'C', descripcion: 'Compras en Lima', id_categoria_gasto: 1, es_gasto_internacional: true,
+    subitems: [{descripcion: 'Agua', monto: 10}, {descripcion: 'Pilas', monto: 20}],
+  });
+  expect(response.status).toBe(200);
+  const detail = await employee.get(`/expense/${response.body.gasto.id_gasto}/detail`);
+  expect(parseFloat(detail.body.monto_moneda_origen)).toBe(30);
+  expect(parseFloat(detail.body.monto_total)).toBe(7.89);
+});
+
+// Sin tipo de cambio a bolivianos no se puede armar la planilla en Bs
+test('rechaza un gasto internacional sin tipo de cambio a bolivianos', async () => {
+  const withoutBs = await employee.postForm('/expense/register', {
+    id_viaje: tripId, monto_moneda_origen: 20, moneda: 'USD', fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi', id_categoria_gasto: 1, es_gasto_internacional: true,
+  });
+  expect(withoutBs.status).toBe(400);
+  const withoutRate = await employee.postForm('/expense/register', {
+    id_viaje: tripId, monto_moneda_origen: 20, moneda: 'PEN', tipo_cambio_bs: 6.96, fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi', id_categoria_gasto: 1, es_gasto_internacional: true,
+  });
+  expect(withoutRate.status).toBe(400);
 });
 
 // El recibo se guarda sin IVA, con un codigo con simbolos como numero y una cantidad con 3 decimales

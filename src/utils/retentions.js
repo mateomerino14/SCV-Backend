@@ -59,8 +59,23 @@ const calculateLineBases = (amount, type, isInternational, hasAlcohol, lineAmoun
   return lines.map((line) => retentionsOfLine(line, mainRateOf(type)).base);
 };
 
-// Montos pagados de los subgastos de un gasto registrado
-const subItemAmounts = (expense) => (expense.Gasto_Subitem || []).map((item) => item.monto);
+const usdCurrency = 'USD';
+
+// Un gasto internacional nuevo guarda sus subgastos en la moneda de la factura; los antiguos, sin tipo de cambio a Bs, los guardaban en USD
+const hasOriginCurrencyLines = (expense) => !!expense.es_gasto_internacional && parseFloat(expense.tipo_cambio_bs) > 0 && expense.moneda !== usdCurrency;
+
+// Montos pagados de los subgastos; en moneda extranjera se pasan a USD y el ultimo absorbe el redondeo para que sumen el total
+const subItemAmounts = (expense) => {
+  const amounts = (expense.Gasto_Subitem || []).map((item) => parseFloat(item.monto) || 0);
+  if (!hasOriginCurrencyLines(expense) || amounts.length === 0) {
+    return amounts;
+  }
+  const exchangeRate = parseFloat(expense.tipo_cambio) || 1;
+  const converted = amounts.map((amount) => roundCents(amount / exchangeRate));
+  const difference = roundCents(parseFloat(expense.monto_total) - converted.reduce((sum, value) => sum + value, 0));
+  converted[converted.length - 1] = roundCents(converted[converted.length - 1] + difference);
+  return converted;
+};
 
 // Retenciones de un gasto ya registrado, calculadas siempre desde lo pagado para no arrastrar calculos antiguos
 const getExpenseRetentions = (expense) => {
@@ -72,4 +87,4 @@ const getExpenseLineBases = (expense) => {
   return calculateLineBases(expense.monto_total, expense.tipo, !!expense.es_gasto_internacional, !!expense.tiene_alcohol, subItemAmounts(expense));
 };
 
-module.exports = {roundCents, calculateRetentions, getExpenseRetentions, getExpenseLineBases};
+module.exports = {roundCents, calculateRetentions, getExpenseRetentions, getExpenseLineBases, hasOriginCurrencyLines};
