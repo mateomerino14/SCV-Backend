@@ -32,7 +32,7 @@ beforeAll(async () => {
 
 // Datos de un gasto sin factura de prueba
 const expenseData = () => ({
-  id_viaje: tripId, monto_total: 50, fecha_gasto: boliviaDate(), tipo: 'C', descripcion: 'Compra con cambio de moneda', id_categoria_gasto: categoryId, es_gasto_internacional: false,
+  id_viaje: tripId, monto_total: 50, fecha_gasto: boliviaDate(), tipo: 'C', descripcion: 'Compra con cambio de moneda', id_categoria_gasto: categoryId, es_gasto_internacional: true,
 });
 
 // El gasto sin factura guarda el comprobante y hasta 2 respaldos, y los conserva o reemplaza al editar
@@ -88,6 +88,18 @@ test('borra los archivos del gasto al eliminarlo', async () => {
   expect(await removedFiles()).toEqual(expect.arrayContaining(files));
 });
 
+// Un gasto en bolivianos no lleva respaldos, ni en un viaje internacional ni en uno nacional
+test('rechaza respaldos en los gastos en bolivianos', async () => {
+  const nationalExpense = {...expenseData(), es_gasto_internacional: false};
+  const rejected = await employee.postForm('/expense/register', nationalExpense, ['imagen', 'respaldos']);
+  expect(rejected.status).toBe(400);
+  expect(rejected.body.error).toMatch(/gastos internacionales/);
+  const accepted = await employee.postForm('/expense/register', nationalExpense, ['imagen']);
+  expect(accepted.status).toBe(200);
+  const edited = await employee.putForm(`/expense/${accepted.body.gasto.id_gasto}/update`, {...nationalExpense, mantener_imagen: true}, ['respaldos']);
+  expect(edited.status).toBe(400);
+});
+
 // En un viaje nacional no se adjuntan respaldos: son para el comprobante del cambio de moneda
 test('rechaza respaldos en un viaje nacional', async () => {
   const created = await employee.post('/trip', {
@@ -101,11 +113,11 @@ test('rechaza respaldos en un viaje nacional', async () => {
   await supervisor.post(`/review/trip-review/${nationalTrip}/approve`);
   await api(await login('pedro.aprobador')).post(`/approver/trip/${nationalTrip}/approve`);
   await api(await login('tesoro.prueba')).post(`/treasurer/${nationalTrip}/approve`);
-  const rejected = await employee.postForm('/expense/register', {...expenseData(), id_viaje: nationalTrip}, ['imagen', 'respaldos']);
+  const rejected = await employee.postForm('/expense/register', {...expenseData(), id_viaje: nationalTrip, es_gasto_internacional: false}, ['imagen', 'respaldos']);
   expect(rejected.status).toBe(400);
-  expect(rejected.body.error).toMatch(/viajes internacionales/);
-  const accepted = await employee.postForm('/expense/register', {...expenseData(), id_viaje: nationalTrip}, ['imagen']);
+  expect(rejected.body.error).toMatch(/gastos internacionales/);
+  const accepted = await employee.postForm('/expense/register', {...expenseData(), id_viaje: nationalTrip, es_gasto_internacional: false}, ['imagen']);
   expect(accepted.status).toBe(200);
-  const edited = await employee.putForm(`/expense/${accepted.body.gasto.id_gasto}/update`, {...expenseData(), id_viaje: nationalTrip, mantener_imagen: true}, ['respaldos']);
+  const edited = await employee.putForm(`/expense/${accepted.body.gasto.id_gasto}/update`, {...expenseData(), id_viaje: nationalTrip, es_gasto_internacional: false, mantener_imagen: true}, ['respaldos']);
   expect(edited.status).toBe(400);
 });

@@ -100,14 +100,18 @@ const insertBackupImages = async (expenseId, urls) => {
   return {error};
 };
 
-// Los respaldos son para el comprobante del cambio de moneda: solo se adjuntan nuevos en viajes internacionales
-const validateBackupsAllowed = async (tripId, newBackupCount) => {
+// Los respaldos son para el comprobante del cambio de moneda: solo se adjuntan nuevos en gastos internacionales de viajes internacionales
+const validateBackupsAllowed = async (tripId, isInternationalExpense, newBackupCount) => {
   if (newBackupCount === 0) {
     return null;
   }
+  const notAllowed = 'Los respaldos solo se adjuntan en los gastos internacionales, para el comprobante del cambio de moneda';
+  if (!isInternationalExpense) {
+    return notAllowed;
+  }
   const {data: trip} = await supabase.from('Viaje').select('tipo').eq('id_viaje', tripId).maybeSingle();
   if (trip?.tipo !== internationalTripType) {
-    return 'Los respaldos solo se adjuntan en viajes internacionales, para el comprobante del cambio de moneda';
+    return notAllowed;
   }
   return null;
 };
@@ -148,7 +152,7 @@ const createExpense = async (expenseData, images, userId) => {
   if (backups.length > maxBackupImages) {
     return {error: `Puedes adjuntar como máximo ${maxBackupImages} respaldos por gasto`, status: 400};
   }
-  const backupsNotAllowed = await validateBackupsAllowed(expenseData.id_viaje, backups.length);
+  const backupsNotAllowed = await validateBackupsAllowed(expenseData.id_viaje, isInternational, backups.length);
   if (backupsNotAllowed) {
     return {error: backupsNotAllowed, status: 400};
   }
@@ -304,7 +308,7 @@ const updateExpense = async (expenseId, expenseData, images, userId) => {
   if (keptCount + backups.length > maxBackupImages) {
     return {error: `Puedes adjuntar como máximo ${maxBackupImages} respaldos por gasto`, status: 400};
   }
-  const backupsNotAllowed = await validateBackupsAllowed(existingExpense.id_viaje, backups.length);
+  const backupsNotAllowed = await validateBackupsAllowed(existingExpense.id_viaje, isInternational, backups.length);
   if (backupsNotAllowed) {
     return {error: backupsNotAllowed, status: 400};
   }
