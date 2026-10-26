@@ -3,7 +3,7 @@ const {generateStatementHtml} = require('../../src/services/trip/tripStatementSe
 const {summarizeStatement, originalAmountLinesOf} = require('../../src/utils/expenseCurrency');
 
 const trip = {tipo: 'Internacional', fecha_inicio: '2026-10-01', motivo: 'Feria en Lima', monto_asignado: '1000', monto_asignado_usd: '0', Usuario: {nombre: 'Ana', apellido_paterno: 'Rojas'}};
-const nationalExpense = {tipo: 'S', monto_total: '50.00', fecha_gasto: '2026-10-01', descripcion: 'Taxi al aeropuerto', es_gasto_internacional: false, Recibo: [{numero: 12}]};
+const nationalExpense = {tipo: 'S', monto_total: '50.00', fecha_gasto: '2026-10-01', descripcion: 'Taxi al aeropuerto', es_gasto_internacional: false, numero_recibo: '0003431', Recibo: [{numero: 12}]};
 const internationalExpense = {
   tipo: 'C', monto_total: '44.97', fecha_gasto: '2026-10-02', descripcion: 'Taxi en Lima', es_gasto_internacional: true,
   moneda: 'PEN', monto_moneda_origen: '170.00', tipo_cambio: '3.7800', tipo_cambio_bs: '6.9600', Recibo: [{numero: 13}],
@@ -16,6 +16,9 @@ test('muestra los gastos internacionales en Bs con su monto original', () => {
   expect(html).toContain('<td class="col-importe">312.99</td>');
   expect(html).toContain('<td>362.99</td>');
   expect(html).toContain('44.97 USD');
+  expect(html).toContain('<td class="col-doc">0003431</td>');
+  expect(html).toContain('<td class="col-doc doc-sistema">000013</td>');
+  expect(html).toContain('N° DOCUMENTO en lila');
 });
 
 // Sin fondo en USD el gasto internacional sale del fondo en Bs; con fondo en USD sale de ese fondo

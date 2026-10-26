@@ -130,16 +130,32 @@ const latestJustificationPerDay = (comments) => {
   });
 };
 
-// Numero del documento del gasto: el de la factura o, en gastos sin factura, el recibo que le asigno el sistema
-const documentNumberOf = (expense) => {
+// Numero del documento del gasto: el de la factura, el del recibo original o, si no lo tiene, el que le asigno el sistema
+const documentNumberOf = (expense, tripReceipts) => {
   if (expense.Factura) {
-    return cleanValue(expense.Factura.numero_factura);
+    return {number: cleanValue(expense.Factura.numero_factura), isSystem: false};
+  }
+  const original = String(expense.numero_recibo || '').trim();
+  if (original) {
+    return {number: original, isSystem: false};
   }
   const ownReceipt = (expense.Recibo || [])[0];
   if (ownReceipt) {
-    return formatReceiptNumber(ownReceipt.numero);
+    return {number: formatReceiptNumber(ownReceipt.numero), isSystem: true};
   }
-  return '';
+  const grouped = (tripReceipts || []).find((receipt) => !receipt.id_gasto && receipt.tipo === expense.tipo && !!receipt.es_gasto_internacional === !!expense.es_gasto_internacional);
+  if (grouped) {
+    return {number: formatReceiptNumber(grouped.numero), isSystem: true};
+  }
+  return {number: '', isSystem: false};
+};
+
+// Clase de la celda del documento: en lila si el numero lo asigno el sistema
+const documentClassOf = (documentInfo) => {
+  if (documentInfo.isSystem) {
+    return 'col-doc doc-sistema';
+  }
+  return 'col-doc';
 };
 
 // Filas de la tabla de justificaciones de excesos; sin justificaciones, una fila que lo indica
@@ -184,6 +200,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
     const oracleType = toOracleExpenseType(expense.tipo);
     const detailText = getExpenseDescription(expense);
     const amountBs = amountInBsOf(expense);
+    const documentInfo = documentNumberOf(expense, trip.Recibo);
     let rowClass = 'fila-nacional';
     if (isInternational) {
       rowClass = 'fila-internacional';
@@ -217,7 +234,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
       <td class="col-oracle">${oracleValue}</td>
       <td class="col-detalle">${detailText}</td>
       <td class="col-tipo">${oracleType}</td>
-      <td class="col-doc">${escapeHtml(documentNumberOf(expense))}</td>
+      <td class="${documentClassOf(documentInfo)}">${escapeHtml(documentInfo.number)}</td>
       <td class="col-nit">${escapeHtml(cleanValue(expense.Proveedor?.numero_doc_fiscal))}</td>
       <td class="col-importe-fact">${hasInvoice ? amount.toFixed(2) : ''}</td>
       ${isInternationalTrip ? `<td class="col-original">${buildOriginalAmountText(expense)}</td>` : ''}
@@ -262,6 +279,9 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   .col-detalle { width: 18%; }
   .col-tipo { text-align: center; width: 5%; }
   .col-doc { text-align: center; width: 8%; }
+  .doc-sistema { background: #e4dfec; color: #5b3fa0; font-weight: bold; }
+  .leyenda-doc { font-size: 7pt; margin: -4px 0 8px; display: flex; align-items: center; gap: 6px; }
+  .leyenda-doc span:first-child { display: inline-block; width: 24px; height: 10px; background: #e4dfec; border: 1px solid #b0c4d4; }
   .col-nit { text-align: center; width: 6%; }
   .col-importe-fact { text-align: right; width: 6%; }
   .col-original { width: 12%; font-size: 6.5pt; }
@@ -332,6 +352,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
         </tr>` : ''}
       </tbody>
     </table>
+    <p class="leyenda-doc"><span></span><span>N° DOCUMENTO en lila: número de recibo que asignó el sistema, porque el gasto no tiene recibo original. Sin color: número de la factura o del recibo original.</span></p>
     <div class="zona-inferior">
       <table class="balance-table">
         <thead><tr><th>CONC.</th><th>Bs</th>${isInternationalTrip ? '<th>USD</th>' : ''}</tr></thead>
@@ -366,7 +387,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
 const generateStatementPdf = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, Seccion(nombre), Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, Seccion(nombre), Cargo(nombre)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
