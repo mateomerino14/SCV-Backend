@@ -3,6 +3,7 @@ const pdfService = require('../shared/pdfService');
 const tripCodeUtil = require('../../utils/tripCode');
 const {escapeDeep} = require('../../utils/htmlEscape');
 const {getExpenseRetentions} = require('../../utils/retentions');
+const {formatReceiptNumber} = require('../expense/receiptNumberService');
 
 const vatRate = 0.13;
 
@@ -130,6 +131,18 @@ const latestJustificationPerDay = (comments) => {
   });
 };
 
+// Numero del documento del gasto: el de la factura o, en gastos sin factura, el recibo que le asigno el sistema
+const documentNumberOf = (expense) => {
+  if (expense.Factura) {
+    return cleanValue(expense.Factura.numero_factura);
+  }
+  const ownReceipt = (expense.Recibo || [])[0];
+  if (ownReceipt) {
+    return formatReceiptNumber(ownReceipt.numero);
+  }
+  return '';
+};
+
 // Filas de la tabla de justificaciones de excesos; sin justificaciones, una fila que lo indica
 const buildJustificationRows = (dayJustifications) => {
   if (dayJustifications.length === 0) {
@@ -200,7 +213,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
       <td class="col-oracle">${oracleValue}</td>
       <td class="col-detalle">${detailText}</td>
       <td class="col-tipo">${oracleType}</td>
-      <td class="col-doc">${escapeHtml(cleanValue(expense.Factura?.numero_factura))}</td>
+      <td class="col-doc">${escapeHtml(documentNumberOf(expense))}</td>
       <td class="col-nit">${escapeHtml(cleanValue(expense.Proveedor?.numero_doc_fiscal))}</td>
       <td class="col-importe-fact">${hasInvoice ? amount.toFixed(2) : ''}</td>
       ${isInternationalTrip ? `<td class="col-tramos">${tramosText}</td>` : ''}
@@ -373,7 +386,7 @@ const generateStatementPdf = async (tripId) => {
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
+    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)')
     .eq('id_viaje', tripId)
     .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   if (expensesError) {

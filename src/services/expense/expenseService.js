@@ -5,6 +5,7 @@ const supplierService = require('./supplierService');
 const substitutionService = require('../approval/substitutionService');
 const {calculateRetentions} = require('../../utils/retentions');
 const storageService = require('../shared/storageService');
+const receiptNumberService = require('./receiptNumberService');
 
 const maxBackupImages = 2;
 const internationalTripType = 'Internacional';
@@ -259,9 +260,13 @@ const createExpense = async (expenseData, images, userId) => {
     await supabase.from('Gasto').delete().eq('id_gasto', expense.id_gasto);
     return failWith(backupsError.message);
   }
+  const assigned = await receiptNumberService.assignExpenseReceipt(expense);
+  if (assigned.error) {
+    console.warn('Error asignando el número de recibo del gasto:', assigned.error);
+  }
   // Se espera para que el viaje ya tenga tiene_alcohol actualizado si se finaliza enseguida
   await alcoholDetectionService.updateAlcoholInTrip(expenseData.id_viaje).catch((error) => console.warn('Error alcohol:', error.message));
-  return {expense};
+  return {expense: {...expense, numero_recibo_sistema: assigned.receiptNumber || null}};
 };
 
 // Actualiza un gasto existente, reemplazando sus tramos de moneda, subitems, comprobante y respaldos
@@ -421,8 +426,12 @@ const updateExpense = async (expenseId, expenseData, images, userId) => {
     replacedFiles.push(currentImage.url_archivo);
   }
   await storageService.removeFiles(replacedFiles);
-  const {data: updatedExpense} = await supabase.from('Gasto').select('id_viaje').eq('id_gasto', expenseId).single();
+  const {data: updatedExpense} = await supabase.from('Gasto').select('id_gasto, id_viaje, tipo, es_gasto_internacional').eq('id_gasto', expenseId).single();
   if (updatedExpense?.id_viaje) {
+    const assigned = await receiptNumberService.assignExpenseReceipt(updatedExpense);
+    if (assigned.error) {
+      console.warn('Error asignando el número de recibo del gasto:', assigned.error);
+    }
     await alcoholDetectionService.updateAlcoholInTrip(updatedExpense.id_viaje).catch((error) => console.warn('Error alcohol:', error.message));
   }
   return {};

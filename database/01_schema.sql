@@ -272,6 +272,8 @@ create table if not exists "Recibo" (
   id_gasto integer references "Gasto"(id_gasto) on delete cascade,
   tipo char(1) not null check (tipo in ('C', 'S')),
   es_gasto_internacional boolean not null default false,
+  -- el numero se asigna al registrar el gasto; enviado indica si el recibo ya se mando al empleado
+  enviado boolean not null default false,
   fecha_emision timestamptz not null default now()
 );
 

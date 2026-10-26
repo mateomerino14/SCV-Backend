@@ -5,6 +5,7 @@ const pdfService = require('../shared/pdfService');
 const {buildTripCode} = require('../../utils/tripCode');
 const {escapeDeep, escapeHtml: escapeText} = require('../../utils/htmlEscape');
 const {getExpenseRetentions, getExpenseLineBases} = require('../../utils/retentions');
+const {formatReceiptNumber, getReceiptNumber} = require('./receiptNumberService');
 
 // Los datos se escapan al entrar a cada plantilla (escapeDeep); aqui solo se normaliza el vacio
 const escapeHtml = (text) => text || '';
@@ -13,50 +14,6 @@ const escapeHtml = (text) => text || '';
 const formatShortDate = (isoString) => {
   const [year, month, day] = String(isoString || '').split('T')[0].split('-');
   return `${day}/${month}/${year}`;
-};
-
-// Completa el numero de recibo con ceros a la izquierda
-const formatReceiptNumber = (number) => String(number).padStart(6, '0');
-
-// Busca el recibo ya emitido (individual por gasto, o agrupado por viaje/tipo/moneda)
-const findIssuedReceipt = async ({tripId, expenseId, type, isInternational}) => {
-  let query = supabase.from('Recibo').select('numero');
-  if (expenseId) {
-    query = query.eq('id_gasto', expenseId);
-  }
-  else {
-    query = query.eq('id_viaje', tripId).is('id_gasto', null).eq('tipo', type).eq('es_gasto_internacional', isInternational);
-  }
-  const {data} = await query.maybeSingle();
-  return data;
-};
-
-// Devuelve el numero del recibo, reutilizando el ya emitido o tomando el siguiente
-const getReceiptNumber = async ({tripId, expenseId = null, type, isInternational}) => {
-  const existing = await findIssuedReceipt({tripId, expenseId, type, isInternational});
-  if (existing) {
-    return {receiptNumber: formatReceiptNumber(existing.numero), reissued: true};
-  }
-  const {data: correlativeData, error} = await supabase.rpc('incrementar_correlativo_recibo');
-  if (error) {
-    return {error: 'Error al generar el número de recibo'};
-  }
-  const {error: insertError} = await supabase.from('Recibo').insert({
-    numero: correlativeData,
-    id_viaje: tripId,
-    id_gasto: expenseId,
-    tipo: type,
-    es_gasto_internacional: isInternational,
-  });
-  if (insertError) {
-    // Dos envios simultaneos del mismo recibo: gana el primero y se usa su numero
-    const concurrent = await findIssuedReceipt({tripId, expenseId, type, isInternational});
-    if (concurrent) {
-      return {receiptNumber: formatReceiptNumber(concurrent.numero), reissued: true};
-    }
-    return {error: 'Error al registrar el número de recibo'};
-  }
-  return {receiptNumber: formatReceiptNumber(correlativeData), reissued: false};
 };
 
 // Datos de cabecera de un recibo: fecha de emision, moneda y titulos segun el tipo de gasto
@@ -98,6 +55,15 @@ const receiptMessage = (reissued) => {
   return 'Recibo generado y enviado correctamente';
 };
 
+// Numero de recibo que el sistema le asigno al gasto al registrarlo, para listarlo en el recibo agrupado
+const systemReceiptText = (expense) => {
+  const ownReceipt = (expense.Recibo || [])[0];
+  if (!ownReceipt) {
+    return '';
+  }
+  return `Recibo Nº ${formatReceiptNumber(ownReceipt.numero)}`;
+};
+
 // Referencia al recibo en papel del gasto, si el empleado anoto su numero
 const originalReceiptText = (expense) => {
   if (!expense.numero_recibo) {
@@ -126,8 +92,9 @@ const generateGroupedReceiptHtml = (rawExpenses, rawEmployee, receiptNumber, typ
     else {
       description = escapeHtml(expense.descripcion || expense.Categoria_Gasto?.nombre || '');
     }
-    if (originalReceiptText(expense)) {
-      description = `${description}\n(${originalReceiptText(expense)})`;
+    const references = [systemReceiptText(expense), originalReceiptText(expense)].filter(Boolean);
+    if (references.length > 0) {
+      description = `${description}\n(${references.join(' · ')})`;
     }
     let segmentsText = '—';
     if (exchangeSegments.length > 0) {
@@ -477,7 +444,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd)')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Recibo(numero)')
     .eq('id_viaje', tripId)
     .eq('tipo', type)
     .eq('es_gasto_internacional', isInternational)
