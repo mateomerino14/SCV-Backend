@@ -347,7 +347,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \rowcolor{maxamFondo} \code{Impuesto} y \code{Factura_Impuestos} & Catálogo de impuestos y su relación con facturas \\
 \code{Comentario} & Observaciones de revisión y justificaciones de exceso \\
 \rowcolor{maxamFondo} \code{Auditoria} & Ingresos, salidas y cambios de contraseña \\
-\code{Correlativo_Recibo} y \code{Recibo} & Numeración de recibos: cada gasto sin factura recibe su número al registrarlo (\code{receiptNumberService}, \code{enviado} falso hasta mandarlo) y es el N° DOCUMENTO de la planilla y de Oracle; si el gasto tiene número de recibo en papel, el recibo del sistema muestra los dos (``Recibo Nº … · Recibo original Nº …'') y el ``Son'' va en letras con el importe a cancelar \\
+\code{Correlativo_Recibo} y \code{Recibo} & Numeración de recibos: cada gasto sin factura recibe su número al registrarlo (\code{receiptNumberService}, \code{enviado} falso hasta mandarlo) y es el N° DOCUMENTO de la planilla cuando no hay recibo original (si lo hay, va el original), marcado en lila; si el gasto tiene número de recibo en papel, el recibo del sistema muestra los dos (``Recibo Nº … · Recibo original Nº …'') y el ``Son'' va en letras con el importe a cancelar \\
 \rowcolor{maxamFondo} \code{Correlativo_Rendicion} & Último número de rendición de cada mes; el trigger \code{viaje_numero_rendicion} asigna el siguiente al viaje (\code{numero_rendicion}, \code{periodo_rendicion}) cuando queda aprobado del todo, según el mes de su último comprobante \\
 \rowcolor{maxamFondo} \code{Revision_Viaje} & Historial de aprobaciones y rechazos por persona y etapa \\
 \code{Configuracion_Recordatorio} & Una sola fila con los días y horas del resumen de pendientes \\
