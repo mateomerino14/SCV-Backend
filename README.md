@@ -448,7 +448,14 @@ El presupuesto se controla día por día y **por moneda**: en un viaje nacional,
 
 ### Tipo de cambio
 
-En los gastos internacionales pagados en otra moneda (EUR, PEN, ARS, BRL, CLP, COP, MXN), el empleado registra cada tramo con su monto y el tipo de cambio que le aplicaron; el sistema calcula el equivalente en USD. Los tramos son referencia: el monto que vale es el ingresado por el empleado.
+Un gasto internacional se registra **en la moneda de su factura** (`Gasto.moneda`: USD, EUR, PEN, ARS, BRL, CLP, COP o MXN) y con dos tipos de cambio que escribe el empleado:
+
+- `tipo_cambio`: unidades de esa moneda por 1 USD (en USD vale 1). Se exige mayor a cero si la moneda no es USD.
+- `tipo_cambio_bs`: bolivianos por 1 USD. Se exige siempre en un gasto internacional, porque la planilla va en Bs.
+
+El backend guarda el monto escrito (o la suma de los subgastos, que también van en esa moneda) en `monto_moneda_origen` y calcula `monto_total` en USD = monto ÷ `tipo_cambio`, redondeado a centavos; el presupuesto diario y Oracle siguen usando ese monto en USD. En otra moneda deja además una fila en `Gasto_Tramo_Moneda` con la conversión, que muestran el detalle, las listas y los recibos. Los gastos internacionales no llevan impuestos.
+
+En la **planilla de rendición** (PDF y Excel) todo va en Bs: el importe de un gasto internacional es `monto_total × tipo_cambio_bs`, y la columna MONTO ORIGINAL muestra, por ejemplo, «170.00 PEN = 44.97 USD (T/C 3.7800)» y «T/C 6.9600 Bs por USD». Las sumas son en Bs y una fila aparte da el total internacional en USD, el que va a Oracle. En los saldos, un gasto internacional se descuenta del fondo en USD si el viaje lo tiene; si solo se entregaron bolivianos, se descuenta del fondo en Bs (`utils/expenseCurrency.js`, `summarizeStatement`). Un gasto antiguo sin `tipo_cambio_bs` se muestra en USD, marcado «Sin T/C a Bs», y no entra en las sumas en Bs; basta con editarlo y escribir el tipo de cambio. En una base existente, la columna se agrega con `alter table "Gasto" add column if not exists tipo_cambio_bs numeric(10, 4);`.
 
 ### Gestión de plazos
 
@@ -458,7 +465,8 @@ La extensión amplía el margen para **cargar** los gastos, no el rango de fecha
 
 ### Recibos y datos para Oracle
 
-- **N° de recibo en papel:** un gasto sin factura puede guardar el número impreso de su recibo (`Gasto.numero_recibo`, opcional). El recibo que genera el sistema lo menciona («Recibo original Nº …») y en «Son:» escribe en letras el importe a cancelar, como el recibo en papel.
+- **N° de recibo del sistema:** al registrar (o editar) un gasto sin factura, `receiptNumberService.assignExpenseReceipt` le asigna su número correlativo (`Recibo`, con `enviado = false`), haya o no recibo en papel. Ese número de 6 dígitos es el N° DOCUMENTO de la planilla, el del Excel de Oracle y el del detalle del gasto; al enviar el recibo se reutiliza y se marca `enviado`. El recibo agrupado tiene su propio número y lista el de cada gasto. En una base existente: `alter table "Recibo" add column if not exists enviado boolean not null default true; alter table "Recibo" alter column enviado set default false;` y luego numerar los gastos sin factura que aún no tienen recibo.
+- **N° de recibo en papel:** un gasto sin factura puede guardar el número impreso de su recibo (`Gasto.numero_recibo`, opcional). El recibo que genera el sistema muestra los dos («Recibo Nº … · Recibo original Nº …») y en «Son:» escribe en letras el importe a cancelar, como el recibo en papel.
 - **Número de rendición del mes:** el trigger `viaje_numero_rendicion` le da a cada viaje, al quedar `APROBADO_FINAL`, el siguiente número del mes de su último comprobante (`Viaje.numero_rendicion`, `periodo_rendicion`). El contador (`Correlativo_Rendicion`) avanza en un solo paso y un índice único impide repetir números aunque se aprueben varias rendiciones a la vez.
 - **Códigos de la cuenta del gasto:** cada sección guarda su código de Oracle (`Seccion.codigo_seccion`) y cada usuario su dependencia (`Usuario.codigo_dependencia`); el Excel toma la dependencia del jefe directo del que viaja, o la suya si no tiene jefe. Ambos se validan como 3 dígitos.
 - Las consultas de las planillas para Excel envían, además, el CUF de la factura, los recibos emitidos, los respaldos, el apellido materno y estos códigos.
@@ -473,8 +481,8 @@ La invocación (`geminiService`) reintenta ante errores temporales y, si el mode
 
 | Tipo | Qué prueba | Comando | Carpeta |
 |---|---|---|---|
-| Unitarias | Funciones sueltas: retenciones (también por subgasto), validación de la importación de usuarios, IVA de factura y recibo en la planilla, cantidades con decimales, CUF, HTML del recibo, control diario por moneda, recordatorios, jerarquía | `npm test` | `tests/services/` |
-| De la API | Endpoints completos contra una base de prueba: permisos, viajes, gastos en ambas monedas, tipo de cambio de los tramos, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos (solo en gastos internacionales) y N° de recibo de gastos sin factura, presupuesto con lo pagado, número de rendición del mes, códigos de Oracle de secciones y usuarios, cambio de un gasto a Hoteles, exportación, importación de usuarios desde Excel | `npm run test:api` | `tests/api/` |
+| Unitarias | Funciones sueltas: retenciones (también por subgasto), validación de la importación de usuarios, IVA de factura y recibo en la planilla, cantidades con decimales, CUF, HTML del recibo, planilla en Bs con el monto original y saldos por fondo, subgastos en moneda extranjera pasados a USD, control diario por moneda, recordatorios, jerarquía | `npm test` | `tests/services/` |
+| De la API | Endpoints completos contra una base de prueba: permisos, viajes, gastos en ambas monedas, gasto internacional en soles pasado a USD (también con subgastos) y tipo de cambio a Bs obligatorio, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos (solo en gastos internacionales) y N° de recibo de gastos sin factura, presupuesto con lo pagado, número de rendición del mes, códigos de Oracle de secciones y usuarios, cambio de un gasto a Hoteles, exportación, importación de usuarios desde Excel | `npm run test:api` | `tests/api/` |
 
 Las pruebas de la API necesitan una base PostgreSQL de prueba con los scripts de `database/` (`01` a `04` y `testing_02_organizacion_prueba.sql`), servida por PostgREST y el proxy `tests/support/supabaseProxy.js`, que imita la ruta `/rest/v1` de Supabase, acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar. **No se corren contra Supabase real.**
 

@@ -45,9 +45,9 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Solicitud_Autorizacion_Plazo | Solicitudes de extension de plazo para seguir registrando gastos; las puede pedir el titular o su reemplazo (`id_empleado` es quien la pidio) |
 | Categoria_Gasto | Categorias de gasto: el plan de cuentas de la empresa (112 cuentas de la planilla de Castro mas OTROS), con su cuenta contable de Oracle y, en `descripcion`, la nota de cuando usarla |
 | Proveedor | Proveedores/emisores de facturas |
-| Gasto | Gastos individuales de un viaje, con sus retenciones impositivas y, en los sin factura, el numero impreso del recibo en papel (`numero_recibo`, opcional) |
+| Gasto | Gastos individuales de un viaje, con sus retenciones impositivas; en los sin factura, el numero impreso del recibo en papel (`numero_recibo`, opcional); en los internacionales, la moneda de la factura, el monto en esa moneda (`monto_moneda_origen`), su tipo de cambio a USD (`tipo_cambio`) y el de USD a Bs (`tipo_cambio_bs`), con `monto_total` en USD |
 | Gasto_Subitem | Desglose de un gasto en varios conceptos |
-| Gasto_Tramo_Moneda | Tramos de conversion de moneda para gastos internacionales, con el tipo de cambio que registra el empleado |
+| Gasto_Tramo_Moneda | Conversion a USD de un gasto internacional en otra moneda (monto original, tipo de cambio y equivalente); los gastos antiguos pueden tener varios tramos |
 | Imagen | Imagenes/comprobantes asociados a un gasto (una por gasto) |
 | Imagen_Respaldo | Respaldos extra de un gasto sin factura, hasta 2 (por ejemplo, el comprobante del cambio de moneda); se borran con el gasto |
 | Factura | Facturas o recibos asociados a un gasto (una por gasto); el numero puede ser un codigo con simbolos; `cuf` guarda el codigo de autorizacion que pide Oracle |
@@ -58,7 +58,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Auditoria | Registro de auditoria (ingreso, salida, cambio de clave) |
 | Correlativo_Recibo | Tabla contador para numerar recibos y documentos PDF generados |
 | Correlativo_Rendicion | Ultimo numero de rendicion de cada mes (AAAA-MM) para la descripcion de Oracle (10-40); lo usa el trigger `viaje_numero_rendicion`; el incremento es atomico (`insert ... on conflict do update`) y un indice unico sobre `Viaje(periodo_rendicion, numero_rendicion)` impide repetir numeros aunque se aprueben varias a la vez |
-| Recibo | Numero asignado a cada recibo emitido (individual o agrupado), para reutilizarlo al reenviarlo |
+| Recibo | Numero del sistema de cada gasto sin factura, asignado al registrarlo, y de cada recibo agrupado; `enviado` indica si ya se mando al empleado |
 | Revision_Viaje | Quien aprobo o rechazo cada viaje, en que etapa y cuando (historial de revision de cada revisor) |
 | Solicitud_Reemplazo | Solicitudes para que un tercero rinda los gastos de un viaje en nombre de otro empleado |
 | Configuracion_Recordatorio | Una sola fila con los dias (`0` domingo a `6` sabado) y horas (`HH:MM`, hora Bolivia) del resumen de pendientes, si esta activo y quien lo cambio por ultima vez |
