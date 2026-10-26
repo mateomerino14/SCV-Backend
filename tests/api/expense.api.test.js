@@ -79,6 +79,22 @@ test('guarda el CUF de la factura', async () => {
   expect(detail.body.Factura.cuf).toBe('DD5F2336313F');
 });
 
+// El precio unitario se guarda con hasta 4 decimales, como en el papel
+test('guarda el precio unitario con 4 decimales y rechaza 5', async () => {
+  const invoice = (precio, numero) => ({
+    id_viaje: tripId, proveedor: 'Surtidor de prueba', numero_factura: numero, fecha_emision: boliviaDate(), tipo_doc: 'R',
+    monto: 149.82, iva: 0, monto_total: 149.82, id_categoria_gasto: 1, detalle: [{nombre_producto: 'Gasolina', cantidad: 40, precio}],
+  });
+  const saved = await employee.postForm('/invoice/save', invoice(3.7456, 'R-7456'));
+  expect(saved.status).toBe(200);
+  const detail = await employee.get(`/expense/${saved.body.gasto.id_gasto}/detail`);
+  const expense = detail.body.gasto || detail.body;
+  expect(parseFloat(expense.Factura.Detalle_Factura[0].precio)).toBe(3.7456);
+  const rejected = await employee.postForm('/invoice/save', invoice(3.74567, 'R-74567'));
+  expect(rejected.status).toBe(400);
+  expect(rejected.body.error).toMatch(/4 decimales/);
+});
+
 // Una cantidad con mas de 3 decimales se rechaza
 test('rechaza una cantidad con más de 3 decimales', async () => {
   const response = await employee.postForm('/invoice/save', {

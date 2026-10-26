@@ -56,7 +56,7 @@ const uploadInvoiceImage = async (file) => {
   return upload;
 };
 
-// Valida que cada producto tenga nombre, cantidad mayor a cero (hasta 3 decimales) y precio no negativo
+// Valida que cada producto tenga nombre, cantidad mayor a cero (hasta 3 decimales) y precio no negativo (hasta 4 decimales)
 const validateInvoiceLines = (lines) => {
   for (const item of lines) {
     if (!String(item?.nombre_producto || '').trim()) {
@@ -68,6 +68,10 @@ const validateInvoiceLines = (lines) => {
     // La cantidad admite decimales (litros, kilos) pero solo hasta 3, como la columna numeric(12, 3)
     if (!/^\d{1,9}(\.\d{1,3})?$/.test(String(item.cantidad))) {
       return 'La cantidad de cada producto admite como máximo 3 decimales';
+    }
+    // El precio unitario admite hasta 4 decimales, como la columna numeric(12, 4)
+    if (!/^\d{1,8}(\.\d{1,4})?$/.test(String(item.precio))) {
+      return 'El precio de cada producto admite como máximo 4 decimales';
     }
   }
   return null;

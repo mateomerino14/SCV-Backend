@@ -1,6 +1,8 @@
 const geminiService = require('../shared/geminiService');
 const {normalizeCuf} = require('../../utils/cuf');
 
+const maxPriceDecimals = 4;
+
 // Construye la instruccion enviada al modelo para interpretar el comprobante
 const buildPrompt = () => {
   return `Analiza esta imagen de una factura o recibo boliviano y devuelve SOLO un JSON sin texto adicional ni backticks con esta estructura exacta:
@@ -26,6 +28,7 @@ IMPORTANTE:
 - Si no encuentras algún dato, usa null para números y "No Especificado" para textos
 - La fecha debe estar en formato YYYY-MM-DD obligatoriamente
 - La cantidad puede tener decimales (por ejemplo 53.345 litros de combustible); usa como máximo 3 decimales
+- El precio es el precio unitario tal como figura en la factura, con hasta 4 decimales (por ejemplo 3.7456)
 - En un recibo (R) no hay impuesto: iva es 0 y monto es igual a monto_total
 - Devuelve SOLO el JSON, sin explicaciones ni texto adicional`;
 };
@@ -49,6 +52,15 @@ const normalizeQuantity = (value) => {
     return 1;
   }
   return parseFloat(quantity.toFixed(3));
+};
+
+// Redondea el precio unitario extraido a 4 decimales; un precio invalido queda en 0 para que el empleado lo corrija
+const normalizeUnitPrice = (value) => {
+  const price = parseFloat(value);
+  if (!(price >= 0)) {
+    return 0;
+  }
+  return parseFloat(price.toFixed(maxPriceDecimals));
 };
 
 // Normaliza la respuesta del modelo al formato que espera el sistema
@@ -86,7 +98,7 @@ const normalizeResult = (parsedData) => {
     monto: amount,
     monto_total: total,
     tipo_doc: docType,
-    detalle: (parsedData.detalle || []).map((item) => ({...item, cantidad: normalizeQuantity(item?.cantidad)})),
+    detalle: (parsedData.detalle || []).map((item) => ({...item, cantidad: normalizeQuantity(item?.cantidad), precio: normalizeUnitPrice(item?.precio)})),
   };
 };
 

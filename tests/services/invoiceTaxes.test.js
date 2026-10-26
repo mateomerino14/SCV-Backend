@@ -25,6 +25,13 @@ test('la extracción admite cantidades con decimales', () => {
   expect(result.detalle[1].cantidad).toBe(1);
 });
 
+// El precio unitario extraido conserva hasta 4 decimales
+test('la extracción conserva el precio unitario con hasta 4 decimales', () => {
+  const result = normalizeResult({detalle: [{nombre_producto: 'Gasolina', cantidad: 40, precio: 3.74567}, {nombre_producto: 'Pan', cantidad: 1, precio: null}]});
+  expect(result.detalle[0].precio).toBe(3.7457);
+  expect(result.detalle[1].precio).toBe(0);
+});
+
 // En un recibo extraido el monto es el total pagado, sin el 13% descontado
 test('el recibo extraído no descuenta el IVA del total', () => {
   const result = normalizeResult({tipo_doc: 'R', monto: 88.5, iva: 11.5, monto_total: 100, numero_factura: 'BOL-$45@7'});

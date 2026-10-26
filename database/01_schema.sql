@@ -215,7 +215,7 @@ create table if not exists "Detalle_Factura" (
   id_detalle serial primary key,
   nombre_producto varchar(255) not null,
   cantidad numeric(12, 3) not null, -- hasta 3 decimales: litros, kilos o unidades
-  precio decimal(10, 2) not null,
+  precio numeric(12, 4) not null, -- precio unitario con hasta 4 decimales, como en el papel (por ejemplo 3.7456 Bs por litro)
   id_factura integer not null references "Factura"(id_factura)
 );
 
