@@ -64,3 +64,22 @@ test('la rendición pasa del aprobador como jefe directo al revisor, aunque teng
   expect(trip.estado).toBe('APROBADO_SUPERVISOR');
   expect(trip.id_revisor_asignado).toBe(await idOf('lucia.revisora@maxam.com'));
 });
+
+// Como jefe directo, el aprobador observa y rechaza el viaje y la rendicion de su equipo
+test('el aprobador como jefe directo observa y rechaza el viaje y la rendición', async () => {
+  const employee = api(await login('sofia.sincobertura'));
+  const approver = api(await login('pedro.aprobador'));
+  const tripId = await submitTrip(employee, 'Viaje que el gerente observa');
+  expect((await approver.post(`/review/trip-review/${tripId}/comment`, {descripcion: 'Indica el cliente a visitar'})).status).toBe(200);
+  expect((await approver.post(`/review/trip-review/${tripId}/reject`)).status).toBe(200);
+  expect((await tripOf(tripId)).estado).toBe('RECHAZADO');
+  await supabase.from('Viaje').update({estado: 'EN_CURSO', fue_iniciado: true}).eq('id_viaje', tripId);
+  const expense = await employee.postForm('/expense/register', {
+    id_viaje: tripId, monto_total: 40, fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi', id_categoria: 1, es_gasto_internacional: false,
+  }, ['imagen']);
+  const expenseId = expense.body.gasto?.id_gasto || expense.body.id_gasto;
+  expect((await employee.put(`/trip/${tripId}/confirm-completion`, {justificaciones: []})).status).toBe(200);
+  expect((await approver.post(`/review/expense-review/${tripId}/comment`, {descripcion: 'Falta el detalle del taxi', id_gasto: expenseId})).status).toBe(200);
+  expect((await approver.post(`/review/expense-review/${tripId}/reject`)).status).toBe(200);
+  expect((await tripOf(tripId)).estado).toBe('RECHAZADO');
+});
