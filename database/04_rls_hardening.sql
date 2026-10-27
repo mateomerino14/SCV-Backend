@@ -27,6 +27,22 @@ begin
   end loop;
 end $block$;
 
+-- La numeracion de recibos solo la usa el backend (service_role): nadie con la llave publica puede llamarla
+do $block$
+declare
+  role_name text;
+begin
+  revoke execute on function public.incrementar_correlativo_recibo() from public;
+  foreach role_name in array array['anon', 'authenticated'] loop
+    if exists (select 1 from pg_roles where rolname = role_name) then
+      execute format('revoke execute on function public.incrementar_correlativo_recibo() from %I', role_name);
+    end if;
+  end loop;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function public.incrementar_correlativo_recibo() to service_role;
+  end if;
+end $block$;
+
 -- Verificacion: debe devolver 0 filas.
 select tablename, policyname, qual, with_check
 from pg_policies
