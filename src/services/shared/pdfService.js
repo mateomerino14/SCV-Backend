@@ -1,3 +1,9 @@
+// En contenedores como Render, /dev/shm es pequeño y Chrome se cuelga si lo usa para las paginas
+const chromeArgs = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'];
+
+// Los documentos no cargan recursos externos: alcanza con esperar a que la pagina termine de cargar
+const contentTimeoutMs = 30000;
+
 const defaultOptions = {
   format: 'A4',
   landscape: true,
@@ -15,13 +21,13 @@ const loadPuppeteer = async () => {
 const generatePdf = async (html, options = defaultOptions) => {
   const puppeteer = await loadPuppeteer();
   const browser = await puppeteer.launch({
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: chromeArgs,
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
   });
   try {
     const page = await browser.newPage();
     await page.setJavaScriptEnabled(false);
-    await page.setContent(html, {waitUntil: 'networkidle0', timeout: 60000});
+    await page.setContent(html, {waitUntil: 'load', timeout: contentTimeoutMs});
     const pdf = await page.pdf(options);
     return Buffer.from(pdf);
   }
