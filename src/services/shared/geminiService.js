@@ -56,4 +56,4 @@ const generateText = async (request, {taskName = 'consulta', maxAttempts = 3} = 
   }
 };
 
-module.exports = {generateText, isQuotaError};
+module.exports = {generateText};

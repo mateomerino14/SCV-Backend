@@ -12,6 +12,7 @@ drop table if exists
   "Factura_Impuestos",
   "Detalle_Factura",
   "Factura",
+  "Imagen_Respaldo",
   "Imagen",
   "Gasto_Tramo_Moneda",
   "Gasto_Subitem",
@@ -27,6 +28,7 @@ drop table if exists
   "Cargo",
   "Rol",
   "Recibo",
+  "Correlativo_Rendicion",
   "Revision_Viaje",
   "Correlativo_Recibo"
 cascade;

@@ -1,9 +1,17 @@
 const jwt = require('jsonwebtoken');
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+// En produccion el cliente vive en otro dominio y la cookie debe permitir el envio entre sitios
+let cookieSameSite = 'lax';
+if (isProduction) {
+  cookieSameSite = 'none';
+}
+
 const cookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  secure: isProduction,
+  sameSite: cookieSameSite,
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
@@ -45,7 +53,10 @@ const isPasswordExpired = (lastPasswordChange) => {
 const getPasswordChangeReason = (user) => {
   if (user.debe_cambiar_contrasenia) {
     // RECUPERACION: entro con codigo; TEMPORAL: cuenta nueva o clave puesta por el administrador
-    return user.motivo_cambio_contrasenia === 'RECUPERACION' ? 'RECUPERACION' : 'TEMPORAL';
+    if (user.motivo_cambio_contrasenia === 'RECUPERACION') {
+      return 'RECUPERACION';
+    }
+    return 'TEMPORAL';
   }
   if (isPasswordExpired(user.ultima_cambio_contrasenia)) {
     return 'VENCIDA';
@@ -53,4 +64,4 @@ const getPasswordChangeReason = (user) => {
   return null;
 };
 
-module.exports = {generateAccessToken, generateRefreshToken, isPasswordExpired, getPasswordChangeReason, cookieOptions};
+module.exports = {generateAccessToken, generateRefreshToken, getPasswordChangeReason, cookieOptions};

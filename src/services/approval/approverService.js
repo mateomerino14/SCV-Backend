@@ -130,7 +130,7 @@ const getMyTrips = async (approverId, filters) => {
 };
 
 // Obtiene el detalle de un viaje junto con los comentarios del aprobador
-const getTripDetail = async (tripId, approverId) => {
+const getTripDetail = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
@@ -147,8 +147,8 @@ const getTripDetail = async (tripId, approverId) => {
   return {trip, comments: comments || []};
 };
 
-// Aprueba un viaje en fase de aprobacion previa; con selfStageSkip se aprueba solo si es suyo
-const approveTrip = async (tripId, approverId, {selfStageSkip = false} = {}) => {
+// Aprueba un viaje en fase de aprobacion previa; con selfStageSkip se aprueba solo (es suyo o ya lo aprobo como jefe directo)
+const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedAsBoss = false} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
@@ -175,15 +175,14 @@ const approveTrip = async (tripId, approverId, {selfStageSkip = false} = {}) => 
   if (error) {
     return {error: error.message, status: 500};
   }
-  // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
   if (!updatedRows?.length) {
     return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
   }
   await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.tripApproval, 'APROBADO', {automatic: selfStageSkip});
   const {data: approverData} = await supabase
     .from('Usuario').select('nombre, apellido_paterno, email_corporativo, Cargo(nombre)').eq('id_usuario', approverId).single();
-  // Si es el viaje del propio aprobador, el memorandum indica aprobacion automatica
-  const approver = {...approverData, aprobacionAutomatica: selfStageSkip};
+  // Si es el viaje del propio aprobador, el memorandum indica aprobacion automatica; si lo aprobo como jefe directo, lo firma el
+  const approver = {...approverData, aprobacionAutomatica: selfStageSkip && !approvedAsBoss};
   const tripCode = tripCodeUtil.buildTripCode(trip);
   try {
     const allUsers = await getActiveUsers();
@@ -234,7 +233,6 @@ const rejectTrip = async (tripId, approverId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }

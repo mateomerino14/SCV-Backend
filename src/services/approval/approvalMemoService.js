@@ -9,7 +9,6 @@ const formatDate = (isoString) => {
 
 // Genera el HTML del memorandum de aprobacion de un viaje
 const generateMemoHtml = (rawTrip, rawApprover, tripCode) => {
-  // Datos escritos por usuarios: se escapan antes de armar el documento
   const trip = escapeDeep(rawTrip);
   const approver = escapeDeep(rawApprover);
   const employee = trip.Usuario;

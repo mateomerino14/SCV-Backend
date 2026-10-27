@@ -12,15 +12,19 @@ const getAllSections = async (req, res) => {
   }
 };
 
-// Actualiza una seccion existente, validando que el nombre no este duplicado
+// Actualiza una seccion existente, validando que el nombre no este duplicado y sus codigos de Oracle
 const updateSection = async (req, res) => {
+  const codesError = sectionService.validateOracleCodes(req.body);
+  if (codesError) {
+    return res.status(400).json({error: codesError});
+  }
   if (req.body.nombre !== undefined) {
     const duplicateError = await sectionService.validateSectionNotDuplicated(req.body.nombre, req.params.id);
     if (duplicateError) {
       return res.status(400).json({error: duplicateError});
     }
   }
-  const {data, error} = await supabase.from('Seccion').update(req.body).eq('id_seccion', req.params.id).select();
+  const {data, error} = await supabase.from('Seccion').update(sectionService.pickSectionFields(req.body)).eq('id_seccion', req.params.id).select();
   if (error) {
     return res.status(500).json({error: error.message});
   }
@@ -29,13 +33,17 @@ const updateSection = async (req, res) => {
   }
 };
 
-// Crea una nueva seccion, validando que el nombre no este duplicado
+// Crea una nueva seccion, validando que el nombre no este duplicado y sus codigos de Oracle
 const createSection = async (req, res) => {
+  const codesError = sectionService.validateOracleCodes(req.body);
+  if (codesError) {
+    return res.status(400).json({error: codesError});
+  }
   const duplicateError = await sectionService.validateSectionNotDuplicated(req.body.nombre, null);
   if (duplicateError) {
     return res.status(400).json({error: duplicateError});
   }
-  const {data, error} = await supabase.from('Seccion').insert(req.body).select();
+  const {data, error} = await supabase.from('Seccion').insert(sectionService.pickSectionFields(req.body)).select();
   if (error) {
     return res.status(500).json({error: error.message});
   }

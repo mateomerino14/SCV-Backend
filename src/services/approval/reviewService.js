@@ -83,7 +83,6 @@ const takeTripReview = async (tripId, supervisorId) => {
   if ((await hierarchyAssignmentService.getTripSubstituteIds(tripId)).includes(supervisorId)) {
     return {error: 'No puedes revisar una rendición que registraste como reemplazo', status: 403};
   }
-  // Si ya lo tiene asignado (por ejemplo, por jefatura directa) tomarlo no es un error
   if (trip.id_supervisor_asignado === supervisorId) {
     return {message: 'Ya tienes este viaje asignado'};
   }
@@ -98,7 +97,6 @@ const takeTripReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -123,7 +121,6 @@ const returnTripReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -176,7 +173,6 @@ const approveTripReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -217,7 +213,6 @@ const rejectTripReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -253,7 +248,7 @@ const attachSummaryToTrips = (trips) => {
 const getPendingExpenseReviews = async (supervisorId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'EN_REVISION')
     .is('id_supervisor_asignado', null)
     .neq('id_usuario', supervisorId);
@@ -280,7 +275,7 @@ const getPendingExpenseReviews = async (supervisorId, filters) => {
 
 // Lista los viajes de revision de gastos asignados al supervisor
 const getMyExpenseReviews = async (supervisorId, filters) => {
-  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)';
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)';
   let query = supabase
     .from('Viaje')
     .select(selectFields)
@@ -327,7 +322,6 @@ const takeExpenseReview = async (tripId, supervisorId) => {
   if ((await hierarchyAssignmentService.getTripSubstituteIds(tripId)).includes(supervisorId)) {
     return {error: 'No puedes revisar una rendición que registraste como reemplazo', status: 403};
   }
-  // Si ya lo tiene asignado (por ejemplo, por jefatura directa) tomarlo no es un error
   if (trip.id_supervisor_asignado === supervisorId) {
     return {message: 'Ya tienes este viaje asignado'};
   }
@@ -342,7 +336,6 @@ const takeExpenseReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -367,7 +360,6 @@ const returnExpenseReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -379,7 +371,7 @@ const returnExpenseReview = async (tripId, supervisorId) => {
 const getExpenseReviewDetail = async (tripId, supervisorId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -397,8 +389,9 @@ const getExpenseReviewDetail = async (tripId, supervisorId) => {
   }
   const {data: expenses} = await supabase
     .from('Gasto')
-    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
-    .eq('id_viaje', tripId);
+    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)')
+    .eq('id_viaje', tripId)
+    .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   const {data: comments} = await supabase
     .from('Comentario').select('*').eq('id_viaje', tripId).order('fecha', {ascending: false});
   const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip);
@@ -438,12 +431,14 @@ const approveExpenseReview = async (tripId, supervisorId) => {
   if ((await hierarchyAssignmentService.getTripSubstituteIds(tripId)).includes(supervisorId)) {
     return {error: 'No puedes aprobar una rendición que registraste como reemplazo', status: 403};
   }
-  const nextState = trip.tiene_alcohol ? 'EN_REVISION_APROBADOR' : 'APROBADO_SUPERVISOR';
+  let nextState = 'APROBADO_SUPERVISOR';
+  if (trip.tiene_alcohol) {
+    nextState = 'EN_REVISION_APROBADOR';
+  }
   const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: nextState}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION').select('id_viaje');
   if (error) {
     return {error: error.message, status: 500};
   }
-  // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
   if (!updatedRows?.length) {
     return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
   }
@@ -491,7 +486,6 @@ const rejectExpenseReview = async (tripId, supervisorId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }

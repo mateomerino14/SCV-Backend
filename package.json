@@ -4,10 +4,13 @@
   "description": "Sistema de Control de Viaticos",
   "main": "src/index.js",
   "scripts": {
-    "test": "jest",
+    "test": "jest --testPathIgnorePatterns tests/api",
+    "test:api": "jest tests/api --runInBand",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "resumen": "node scripts/sendDigest.js"
+    "resumen": "node scripts/sendDigest.js",
+    "limpiar-archivos": "node scripts/cleanStorage.js",
+    "probar-correo": "node scripts/testEmail.js"
   },
   "repository": {
     "type": "git",
@@ -31,16 +34,18 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.2",
     "helmet": "^8.3.0",
-    "html-pdf-node": "^1.0.8",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "node-cron": "^4.6.0",
-    "puppeteer": "^10.4.0",
+    "puppeteer": "^25.16.0",
     "sib-api-v3-sdk": "^8.5.0"
   },
   "devDependencies": {
     "jest": "^30.4.2",
     "nodemon": "^3.1.14",
     "supertest": "^7.2.2"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

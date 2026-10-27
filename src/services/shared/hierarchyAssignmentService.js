@@ -13,6 +13,12 @@ const getTripSubstituteIds = async (tripId) => {
   return (data || []).map((row) => row.id_sustituto);
 };
 
+// El aprobador (Gerente General) tambien revisa como supervisor a quienes tiene como subordinados directos
+const directBossRolesByStage = {SUPERVISOR: ['SUPERVISOR', 'APROBADOR']};
+
+// Roles que puede tener el jefe directo para atender la etapa de un rol
+const directBossRolesOf = (roleName) => directBossRolesByStage[roleName] || [roleName];
+
 // Resuelve quien revisa a una persona: su jefe directo, su seccion o todos con ese rol
 const resolveReviewerScope = async (personId, roleName, excludeIds = []) => {
   const {data: person} = await supabase
@@ -26,7 +32,7 @@ const resolveReviewerScope = async (personId, roleName, excludeIds = []) => {
       .select('id_usuario, activo, Rol(nombre)')
       .eq('id_usuario', person.id_jefe_directo)
       .single();
-    if (boss?.activo && boss.Rol?.nombre === roleName && !excludeIds.includes(boss.id_usuario)) {
+    if (boss?.activo && directBossRolesOf(roleName).includes(boss.Rol?.nombre) && !excludeIds.includes(boss.id_usuario)) {
       return {level: 'directo', userIds: [boss.id_usuario]};
     }
   }
@@ -75,12 +81,14 @@ const assignNextReviewer = async (tripId, personId, roleName, assignedField) => 
   if (uniqueRoles.includes(roleName)) {
     const {data: trip} = await supabase.from('Viaje').select('id_usuario').eq('id_viaje', tripId).single();
     let holderId = await getUniqueRoleHolder(roleName);
-    // Nadie revisa su propio viaje
     if (holderId && trip?.id_usuario === holderId) {
       holderId = null;
     }
     await supabase.from('Viaje').update({[assignedField]: holderId}).eq('id_viaje', tripId);
-    return {level: 'unico', userIds: holderId ? [holderId] : []};
+    if (!holderId) {
+      return {level: 'unico', userIds: []};
+    }
+    return {level: 'unico', userIds: [holderId]};
   }
   const substituteIds = await getTripSubstituteIds(tripId);
   const scope = await resolveReviewerScope(personId, roleName, substituteIds);

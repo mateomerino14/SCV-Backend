@@ -5,7 +5,10 @@ const parseFormData = (rawValue) => {
   }
   try {
     const parsed = JSON.parse(rawValue);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed;
   }
   catch (error) {
     return null;

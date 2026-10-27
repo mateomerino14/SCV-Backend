@@ -1,5 +1,8 @@
+const crypto = require('crypto');
 const supabase = require('../../config/supabase');
 const textNormalizer = require('../../utils/textNormalizer');
+const emailService = require('../shared/emailService');
+const {escapeHtml} = require('../../utils/htmlEscape');
 
 const approverRoleId = 5;
 const reviewerRoleId = 4;
@@ -85,4 +88,36 @@ const releaseAssignedTrips = async (userId) => {
     .eq('estado', 'EN_REVISION_TESORERO');
 };
 
-module.exports = {validateUniqueRole, validateUniquePosition, releaseAssignedTrips};
+// Genera una contrasenia temporal legible, sin caracteres ambiguos (0/O, 1/l/I)
+const generateTemporaryPassword = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let password = '';
+  for (let i = 0; i < 10; i++) {
+    password += chars[crypto.randomInt(0, chars.length)];
+  }
+  return password;
+};
+
+// Envia al usuario nuevo su correo y su contrasenia temporal; si falla, solo queda en el registro
+const sendWelcomeEmail = async (user, temporaryPassword) => {
+  try {
+    const loginUrl = process.env.FRONTEND_URL || 'https://scv-frontend.vercel.app';
+    const emailBody = `
+      ${emailService.emailParagraph(`Hola <strong>${escapeHtml(user.nombre)}</strong>,`)}
+      ${emailService.emailParagraph('Se creó tu cuenta en el Sistema de Control de Viáticos. Estas son tus credenciales de acceso:')}
+      ${emailService.emailInfoBox([{label: 'Correo', value: user.email_corporativo}])}
+      ${emailService.emailHighlightBox('Contraseña temporal', temporaryPassword)}
+      ${emailService.emailNote('Es una contraseña temporal: al ingresar por primera vez, el sistema te pedirá crear una propia.')}
+      ${emailService.emailButton('Ingresar al sistema', loginUrl)}
+    `;
+    const emailHtml = emailService.buildEmailLayout('Bienvenido al sistema', emailBody);
+    await emailService.sendEmail([{email: user.email_corporativo, name: `${user.nombre} ${user.apellido_paterno}`}], 'Tu cuenta fue creada', emailHtml);
+    return true;
+  }
+  catch (error) {
+    console.warn('Error al enviar correo de bienvenida:', error.message);
+    return false;
+  }
+};
+
+module.exports = {validateUniqueRole, validateUniquePosition, releaseAssignedTrips, generateTemporaryPassword, sendWelcomeEmail, uniquePositionsNormalized, uniqueRoles};

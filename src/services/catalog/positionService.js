@@ -29,4 +29,4 @@ const validatePositionNotDuplicated = async (name, excludeId) => {
   }
 };
 
-module.exports = {normalizePositionName, validatePositionNotDuplicated};
+module.exports = {validatePositionNotDuplicated};

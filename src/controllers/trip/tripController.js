@@ -1,5 +1,6 @@
 const supabase = require('../../config/supabase');
 const tripService = require('../../services/trip/tripService');
+const tripExportService = require('../../services/trip/tripExportService');
 const tripStatementService = require('../../services/trip/tripStatementService');
 const tripAccessService = require('../../services/trip/tripAccessService');
 
@@ -65,6 +66,10 @@ const createTrip = async (req, res) => {
   if (transporte === 'Vehículo de Empresa' && tipo === 'Internacional') {
     return res.status(400).json({error: 'El vehículo de empresa solo está disponible para viajes nacionales'});
   }
+  let vehiclePlate = null;
+  if (transporte === 'Vehículo de Empresa') {
+    vehiclePlate = placa_vehiculo.trim();
+  }
   const {data, error} = await supabase
     .from('Viaje')
     .insert({
@@ -75,7 +80,7 @@ const createTrip = async (req, res) => {
       fecha_fin,
       tipo,
       transporte: transporte || 'Terrestre',
-      placa_vehiculo: transporte === 'Vehículo de Empresa' ? placa_vehiculo.trim() : null,
+      placa_vehiculo: vehiclePlate,
       monto_asignado,
       monto_asignado_usd: monto_asignado_usd || 0,
       estado: 'BORRADOR',
@@ -142,4 +147,13 @@ const downloadStatementPdf = async (req, res) => {
   return res.send(result.buffer);
 };
 
-module.exports = {getDashboard, getHistory, getTripDetail, createTrip, editTrip, submitToReview, confirmCompletion, downloadStatementPdf};
+// Devuelve los datos de varias planillas de rendicion para exportarlas juntas a Excel
+const getStatementsForExport = async (req, res) => {
+  const result = await tripExportService.getStatementsForExport(req.query, req.user.id_usuario);
+  if (result.error) {
+    return res.status(result.status).json({error: result.error});
+  }
+  return res.json({planillas: result.statements});
+};
+
+module.exports = {getStatementsForExport, getDashboard, getHistory, getTripDetail, createTrip, editTrip, submitToReview, confirmCompletion, downloadStatementPdf};

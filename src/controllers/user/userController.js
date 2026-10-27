@@ -1,28 +1,18 @@
 const supabase = require('../../config/supabase');
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const userService = require('../../services/user/userService');
-const emailService = require('../../services/shared/emailService');
+const userImportService = require('../../services/user/userImportService');
 const auditLogService = require('../../services/shared/auditLogService');
 const tokenService = require('../../services/user/tokenService');
-const {escapeHtml} = require('../../utils/htmlEscape');
+const storageService = require('../../services/shared/storageService');
 const saltRounds = 10;
 
-// Genera una contrasenia temporal legible, sin caracteres ambiguos (0/O, 1/l/I)
-const generateTemporaryPassword = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-  let password = '';
-  for (let i = 0; i < 10; i++) {
-    password += chars[crypto.randomInt(0, chars.length)];
-  }
-  return password;
-};
-
 // Columnas que se devuelven al administrar usuarios (sin hash ni datos de sesion)
-const userPublicColumns = 'id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, id_rol, id_cargo, id_seccion, id_jefe_directo, carnet_identidad, foto_perfil';
+const userPublicColumns = 'id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, id_rol, id_cargo, id_seccion, id_jefe_directo, carnet_identidad, codigo_dependencia, foto_perfil';
 
 // Campos que el administrador puede enviar al crear o editar un usuario
-const editableUserFields = ['nombre', 'apellido_paterno', 'apellido_materno', 'email_corporativo', 'telefono', 'id_cargo', 'id_rol', 'id_jefe_directo', 'id_seccion', 'carnet_identidad', 'activo'];
+const dependencyCodeError = 'La dependencia de Oracle debe tener 3 dígitos';
+const editableUserFields = ['nombre', 'apellido_paterno', 'apellido_materno', 'email_corporativo', 'telefono', 'id_cargo', 'id_rol', 'id_jefe_directo', 'id_seccion', 'carnet_identidad', 'codigo_dependencia', 'activo'];
 
 // Deja solo los campos que el administrador puede enviar
 const pickEditableFields = (body, extraFields = []) => {
@@ -45,6 +35,12 @@ const getMe = async (req, res) => {
   }
 };
 
+// Foto de perfil actual del usuario, para borrarla del almacenamiento cuando se reemplaza o se quita
+const getCurrentPhoto = async (userId) => {
+  const {data} = await supabase.from('Usuario').select('foto_perfil').eq('id_usuario', userId).maybeSingle();
+  return data?.foto_perfil || null;
+};
+
 // Actualiza los datos basicos del usuario autenticado
 const updateMe = async (req, res) => {
   const userId = req.user.id_usuario;
@@ -65,8 +61,10 @@ const updateMe = async (req, res) => {
     fieldsToUpdate.email_corporativo = email;
   }
   // La foto se sube por /me/photo; aqui solo se permite quitarla (no poner una URL cualquiera)
+  let removedPhoto = null;
   if (foto_perfil === null || foto_perfil === '') {
     fieldsToUpdate.foto_perfil = null;
+    removedPhoto = await getCurrentPhoto(userId);
   }
   const {data, error} = await supabase
     .from('Usuario')
@@ -77,9 +75,8 @@ const updateMe = async (req, res) => {
   if (error) {
     return res.status(500).json({error: error.message});
   }
-  else {
-    return res.json(data);
-  }
+  await storageService.removeFiles([removedPhoto]);
+  return res.json(data);
 };
 
 // Actualiza la foto de perfil del usuario autenticado
@@ -88,27 +85,23 @@ const updateMyPhoto = async (req, res) => {
   if (!req.file) {
     return res.status(400).json({error: 'No se recibió ninguna imagen'});
   }
-  const fileExtension = req.file.originalname.split('.').pop();
-  const fileName = `perfiles/${userId}_${Date.now()}.${fileExtension}`;
-  const {error: storageError} = await supabase.storage
-    .from('facturas')
-    .upload(fileName, req.file.buffer, {contentType: req.file.mimetype});
-  if (storageError) {
-    return res.status(500).json({error: storageError.message});
+  const upload = await storageService.uploadFile('perfiles', req.file, `${userId}_`);
+  if (upload.error) {
+    return res.status(500).json({error: upload.error});
   }
-  const {data: urlData} = supabase.storage.from('facturas').getPublicUrl(fileName);
+  const previousPhoto = await getCurrentPhoto(userId);
   const {data, error} = await supabase
     .from('Usuario')
-    .update({foto_perfil: urlData.publicUrl})
+    .update({foto_perfil: upload.url})
     .eq('id_usuario', userId)
     .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, id_rol, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)')
     .single();
   if (error) {
+    await storageService.removeFiles([upload.url]);
     return res.status(500).json({error: error.message});
   }
-  else {
-    return res.json(data);
-  }
+  await storageService.removeFiles([previousPhoto]);
+  return res.json(data);
 };
 
 // Cambia la contrasena del usuario; con una temporal no se pide la actual
@@ -163,7 +156,7 @@ const changeMyPassword = async (req, res) => {
 const getAllUsers = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_cargo, id_seccion, Seccion(nombre), carnet_identidad');
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_cargo, id_seccion, Seccion(nombre), carnet_identidad, codigo_dependencia');
   if (error) {
     return res.status(500).json({error: error.message});
   }
@@ -189,6 +182,12 @@ const updateUser = async (req, res) => {
   }
   if (payload.carnet_identidad !== undefined) {
     payload.carnet_identidad = payload.carnet_identidad?.trim() || null;
+  }
+  if (payload.codigo_dependencia !== undefined) {
+    payload.codigo_dependencia = String(payload.codigo_dependencia || '').trim() || null;
+    if (payload.codigo_dependencia && !/^\d{3}$/.test(payload.codigo_dependencia)) {
+      return res.status(400).json({error: dependencyCodeError});
+    }
   }
   if (payload.contrasenia) {
     // Una contrasena puesta por el administrador es temporal: el usuario debe cambiarla al entrar
@@ -243,12 +242,18 @@ const updateUser = async (req, res) => {
 // Crea un nuevo usuario, validando rol y cargo unicos
 const createUser = async (req, res) => {
   const body = pickEditableFields(req.body);
-  const temporaryPassword = generateTemporaryPassword();
+  const temporaryPassword = userService.generateTemporaryPassword();
   if (body.telefono !== undefined) {
     body.telefono = body.telefono?.trim() || null;
   }
   if (body.carnet_identidad !== undefined) {
     body.carnet_identidad = body.carnet_identidad?.trim() || null;
+  }
+  if (body.codigo_dependencia !== undefined) {
+    body.codigo_dependencia = String(body.codigo_dependencia || '').trim() || null;
+    if (body.codigo_dependencia && !/^\d{3}$/.test(body.codigo_dependencia)) {
+      return res.status(400).json({error: dependencyCodeError});
+    }
   }
   body.contrasenia = bcrypt.hashSync(temporaryPassword, saltRounds);
   body.debe_cambiar_contrasenia = true;
@@ -269,37 +274,43 @@ const createUser = async (req, res) => {
     return res.status(500).json({error: error.message});
   }
   else {
-    const newUser = data[0];
-    try {
-      const loginUrl = process.env.FRONTEND_URL || 'https://scv-frontend.vercel.app';
-      const emailBody = `
-        ${emailService.emailParagraph(`Hola <strong>${escapeHtml(newUser.nombre)}</strong>,`)}
-        ${emailService.emailParagraph('Se creó tu cuenta en el Sistema de Control de Viáticos. Estas son tus credenciales de acceso:')}
-        ${emailService.emailInfoBox([{label: 'Correo', value: newUser.email_corporativo}])}
-        ${emailService.emailHighlightBox('Contraseña temporal', temporaryPassword)}
-        ${emailService.emailNote('Es una contraseña temporal: al ingresar por primera vez, el sistema te pedirá crear una propia.')}
-        ${emailService.emailButton('Ingresar al sistema', loginUrl)}
-      `;
-      const emailHtml = emailService.buildEmailLayout('Bienvenido al sistema', emailBody);
-      await emailService.sendEmail([{email: newUser.email_corporativo, name: `${newUser.nombre} ${newUser.apellido_paterno}`}], 'Tu cuenta fue creada', emailHtml);
-    }
-    catch (emailError) {
-      console.warn('Error al enviar correo de bienvenida:', emailError.message);
-    }
+    await userService.sendWelcomeEmail(data[0], temporaryPassword);
     return res.json(data);
+  }
+};
+
+// Valida las filas del Excel de usuarios y devuelve lo que se crearia, sin guardar nada
+const previewUserImport = async (req, res) => {
+  const result = await userImportService.previewImport(req.body?.filas);
+  if (result.error) {
+    return res.status(result.status).json({error: result.error});
+  }
+  else {
+    return res.json(result);
+  }
+};
+
+// Crea los usuarios validos del Excel y devuelve cuantos se crearon y que filas se omitieron
+const importUsers = async (req, res) => {
+  const result = await userImportService.importUsers(req.body?.filas);
+  if (result.error) {
+    return res.status(result.status).json({error: result.error});
+  }
+  else {
+    return res.json(result);
   }
 };
 
 // Elimina un usuario existente
 const deleteUser = async (req, res) => {
+  const previousPhoto = await getCurrentPhoto(req.params.id);
   const {data, error} = await supabase
     .from('Usuario').delete().eq('id_usuario', req.params.id).select(userPublicColumns);
   if (error) {
     return res.status(500).json({error: error.message});
   }
-  else {
-    return res.json(data);
-  }
+  await storageService.removeFiles([previousPhoto]);
+  return res.json(data);
 };
 
 // Verifica si un correo corporativo ya esta registrado
@@ -328,7 +339,7 @@ const getEmployees = async (req, res) => {
 const getAllUsersDetailed = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_seccion, Seccion(nombre), carnet_identidad, id_jefe_directo, Jefe:id_jefe_directo(id_usuario, nombre, apellido_paterno), Cargo(id_cargo, nombre), Rol(nombre)')
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_seccion, Seccion(nombre), carnet_identidad, codigo_dependencia, id_jefe_directo, Jefe:id_jefe_directo(id_usuario, nombre, apellido_paterno), Cargo(id_cargo, nombre), Rol(nombre)')
     .order('nombre', {ascending: true});
   if (error) {
     return res.status(500).json({error: error.message});
@@ -397,4 +408,4 @@ const getMyPosition = async (req, res) => {
   }
 };
 
-module.exports = {getMe, updateMe, updateMyPhoto, changeMyPassword, getAllUsers, updateUser, createUser, deleteUser, checkEmail, getEmployees, getAllUsersDetailed, activateUser, suspendUser, getMyPosition};
+module.exports = {getMe, updateMe, updateMyPhoto, changeMyPassword, getAllUsers, updateUser, createUser, deleteUser, checkEmail, getEmployees, getAllUsersDetailed, activateUser, suspendUser, getMyPosition, previewUserImport, importUsers};

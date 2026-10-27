@@ -3,6 +3,8 @@ const axios = require('axios');
 const {escapeHtml} = require('../../utils/htmlEscape');
 const defaultClient = SibApiV3Sdk.ApiClient.instance;
 defaultClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
+const defaultSenderEmail = 'mateomerino988@gmail.com';
+const senderEmail = process.env.BREVO_SENDER_EMAIL || defaultSenderEmail;
 
 // Valida que un correo exista y pueda recibir mensajes
 const validateEmailExists = async (email) => {
@@ -141,7 +143,6 @@ const emailButton = (text = 'Ingresar al sistema', url = process.env.FRONTEND_UR
 
 // Envia un correo con el codigo de verificacion
 const sendVerificationCode = async (toEmail, userName, code) => {
-  const api = new SibApiV3Sdk.TransactionalEmailsApi();
   const body = `
     ${emailParagraph(`Hola <strong>${escapeHtml(userName)}</strong>,`)}
     ${emailParagraph('Usa este código para continuar con la recuperación de tu cuenta:')}
@@ -150,12 +151,16 @@ const sendVerificationCode = async (toEmail, userName, code) => {
     </div>
     ${emailNote('Este código expira en 5 minutos. Si no solicitaste este código, ignora este mensaje.')}
   `;
-  await api.sendTransacEmail({
-    sender: {name: 'Sistema de Viáticos', email: 'mateomerino988@gmail.com'},
-    to: [{email: toEmail}],
-    subject: 'Código de verificación',
-    htmlContent: buildEmailLayout('Código de verificación', body),
-  });
+  await sendEmail([{email: toEmail}], 'Código de verificación', buildEmailLayout('Código de verificación', body));
+};
+
+// Explica por que Brevo rechazo un envio, con el detalle que devuelve su API
+const describeBrevoError = (error) => {
+  const detail = error.response?.text || error.response?.body?.message;
+  if (detail) {
+    return `${error.status || ''} ${detail}`.trim();
+  }
+  return error.message;
 };
 
 // Envia un correo generico, con adjuntos opcionales
@@ -165,7 +170,7 @@ const sendEmail = async (to, subject, htmlContent, attachments = [], senderName 
   }
   const api = new SibApiV3Sdk.TransactionalEmailsApi();
   const payload = {
-    sender: {name: senderName, email: 'mateomerino988@gmail.com'},
+    sender: {name: senderName, email: senderEmail},
     to,
     subject,
     htmlContent,
@@ -173,7 +178,13 @@ const sendEmail = async (to, subject, htmlContent, attachments = [], senderName 
   if (attachments.length > 0) {
     payload.attachment = attachments;
   }
-  await api.sendTransacEmail(payload);
+  try {
+    await api.sendTransacEmail(payload);
+  }
+  catch (error) {
+    console.error(`[Brevo] No se pudo enviar "${subject}" desde ${senderEmail}: ${describeBrevoError(error)}`);
+    throw error;
+  }
 };
 
 // Notifica a un empleado que su viaje o rendicion fue rechazado, sin detallar las observaciones
@@ -200,6 +211,6 @@ const sendRejectionNotice = async (employee) => {
 };
 
 module.exports = {
-  sendVerificationCode, validateEmailExists, sendEmail, sendRejectionNotice,
+  sendVerificationCode, validateEmailExists, sendEmail, sendRejectionNotice, describeBrevoError, senderEmail,
   buildEmailLayout, emailParagraph, emailNote, emailInfoBox, emailHighlightBox, emailButton,
 };

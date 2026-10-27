@@ -33,11 +33,17 @@ const checkCanComment = async (trip, userId) => {
   }
   const commenter = await getCommenter(userId);
   const isTreasurer = textNormalizer.normalizeText(commenter?.Cargo?.nombre || '') === textNormalizer.normalizeText(userDirectoryService.treasurerPositionName);
-  const matchesStage = stage.treasurer ? isTreasurer : commenter?.Rol?.nombre === stage.role;
+  let matchesStage = commenter?.Rol?.nombre === stage.role;
+  if (stage.treasurer) {
+    matchesStage = isTreasurer;
+  }
   if (!matchesStage) {
     return {error: 'Este viaje no está en tu etapa de revisión', status: 403};
   }
-  const assignedId = stage.field ? trip[stage.field] : null;
+  let assignedId = null;
+  if (stage.field) {
+    assignedId = trip[stage.field];
+  }
   if (stage.mustBeAssigned && assignedId !== userId) {
     return {error: 'Debes tomar el viaje para poder observarlo', status: 403};
   }
