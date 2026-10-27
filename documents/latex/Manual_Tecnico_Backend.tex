@@ -337,7 +337,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \code{Solicitud_Reemplazo} & Solicitudes para que otra persona rinda el viaje \\
 \rowcolor{maxamFondo} \code{Categoria_Gasto} & Plan de cuentas de la empresa (112 cuentas de la planilla de Castro más OTROS), con la cuenta contable de Oracle en el nombre y una nota de cuándo usarla (\code{descripcion}) \\
 \code{Proveedor} & Emisores de facturas \\
-\rowcolor{maxamFondo} \code{Gasto} & Gastos con sus retenciones impositivas y, en los sin factura, el número impreso del recibo en papel (\code{numero_recibo}, opcional) \\
+\rowcolor{maxamFondo} \code{Gasto} & Gastos con sus retenciones impositivas; en los sin factura, el número impreso del recibo en papel (\code{numero_recibo}, opcional); en los internacionales, la moneda de la factura, su monto, el tipo de cambio a USD y el de USD a Bs (\code{tipo_cambio_bs}) \\
 \code{Gasto_Subitem} & Desglose de un gasto en varios conceptos \\
 \rowcolor{maxamFondo} \code{Gasto_Tramo_Moneda} & Conversión a USD de un gasto internacional en otra moneda (monto original, tipo de cambio y equivalente) \\
 \code{Imagen} & Comprobante asociado a un gasto \\
@@ -512,7 +512,7 @@ El presupuesto se controla por día y por moneda. En un viaje nacional, lo gasta
 En un viaje internacional se puede registrar gastos en bolivianos o en dólares cualquier día. Un gasto internacional se escribe en la moneda de su factura y su \code{monto_total} se guarda en dólares; los gastos internacionales no llevan impuestos.
 
 \subsection{Tipo de cambio}
-El gasto internacional trae \code{moneda} (USD, EUR, PEN, ARS, BRL, CLP, COP o MXN), el monto en esa moneda (\code{monto_moneda_origen}, o la suma de los subgastos, que van en la misma moneda), \code{tipo_cambio} (unidades por 1 USD, obligatorio si no es USD) y \code{tipo_cambio_bs} (bolivianos por 1 USD, siempre obligatorio). El backend calcula \code{monto_total} = monto $\div$ \code{tipo_cambio}, redondeado a centavos, y en otra moneda deja la conversión en \code{Gasto_Tramo_Moneda}. La planilla en PDF va toda en Bs (\code{utils/expenseCurrency.js}): importe = \code{monto_total} $\times$ \code{tipo_cambio_bs}, con una columna MONTO ORIGINAL, una fila con el total internacional en USD para Oracle y saldos por fondo: un gasto internacional se descuenta del fondo en USD si el viaje lo tiene, o del fondo en Bs si solo se entregaron bolivianos. Un gasto antiguo sin \code{tipo_cambio_bs} se muestra en USD marcado ``Sin T/C a Bs''.
+El gasto internacional trae \code{moneda} (USD, EUR, PEN, ARS, BRL, CLP, COP o MXN), el monto en esa moneda (\code{monto_moneda_origen}, o la suma de los subgastos, que van en la misma moneda), \code{tipo_cambio} (unidades por 1 USD, obligatorio si no es USD) y \code{tipo_cambio_bs} (bolivianos por 1 USD, siempre obligatorio). El backend calcula \code{monto_total} = monto $\div$ \code{tipo_cambio}, redondeado a centavos, y en otra moneda deja la conversión en \code{Gasto_Tramo_Moneda}. La planilla en PDF sigue el formato de la empresa: una primera fila ``SALDO ANTERIOR FONDO RECIBIDO'' con lo recibido en la columna IMPORTE (en un viaje internacional, una en Bs y otra en USD) y el importe de cada gasto en IMPORTE FACT./REC.; la columna IMPORTE queda en blanco en los gastos. Va toda en Bs (\code{utils/expenseCurrency.js}): importe = \code{monto_total} $\times$ \code{tipo_cambio_bs}, con una columna MONTO ORIGINAL, una fila con el total internacional en USD para Oracle y saldos por fondo: un gasto internacional se descuenta del fondo en USD si el viaje lo tiene, o del fondo en Bs si solo se entregaron bolivianos. Un gasto antiguo sin \code{tipo_cambio_bs} se muestra en USD marcado ``Sin T/C a Bs''.
 
 \subsection{Retenciones impositivas}
 \begin{xltabular}{\textwidth}{L{1.4cm} L{5.2cm} Y}
@@ -781,7 +781,7 @@ Una prueba automática es código que usa el sistema como lo haría una persona 
 \endfirsthead
 \cabecera \tth{Tipo} & \tth{Qué prueba} & \tth{Comando} \\
 \endhead
-\rowcolor{maxamFondo} Unitarias & Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, cantidades con decimales, control diario por moneda, exportación, recordatorios, jerarquía, moderación, retenciones por subgasto y validación de la importación de usuarios (\code{tests/services/}) & \code{npm test} \\
+\rowcolor{maxamFondo} Unitarias & Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, planilla en Bs con el monto original, las filas del fondo recibido, el número de recibo original o del sistema y los saldos por fondo, subgastos en moneda extranjera pasados a USD, cantidades con decimales, control diario por moneda, exportación, recordatorios, jerarquía, moderación, retenciones por subgasto y validación de la importación de usuarios (\code{tests/services/}) & \code{npm test} \\
 De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, gasto internacional en soles pasado a USD y tipo de cambio a Bs obligatorio, número de recibo del sistema, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos solo en gastos internacionales, presupuesto con lo pagado, número de rendición, códigos de Oracle, exportación e importación de usuarios desde Excel (\code{tests/api/}) & \code{npm run test:api} \\
 \end{xltabular}
 
