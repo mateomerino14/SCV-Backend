@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase');
+const {spentAgainstFunds} = require('../../utils/expenseCurrency');
 const expenseSummaryService = require('../approval/expenseSummaryService');
 const substitutionService = require('../approval/substitutionService');
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService');
@@ -28,15 +29,10 @@ const getDashboardData = async (userId) => {
     (currentTrips || []).map(async (trip) => {
       const {data: expenses} = await supabase
         .from('Gasto')
-        .select('monto_total, es_gasto_internacional')
+        .select('monto_total, es_gasto_internacional, tipo_cambio_bs')
         .eq('id_viaje', trip.id_viaje);
-      const accumulatedExpense = (expenses || [])
-        .filter((expense) => !expense.es_gasto_internacional)
-        .reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
-      const accumulatedExpenseUsd = (expenses || [])
-        .filter((expense) => !!expense.es_gasto_internacional)
-        .reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
-      return {...trip, gastoAcumulado: accumulatedExpense, gastoAcumuladoUsd: accumulatedExpenseUsd};
+      const {spentBs, spentUsd} = spentAgainstFunds(trip, expenses);
+      return {...trip, gastoAcumulado: spentBs, gastoAcumuladoUsd: spentUsd};
     })
   );
   const {data: recentTrips, error: recentError} = await supabase
@@ -326,7 +322,7 @@ const confirmCompletion = async (tripId, userId, justifications) => {
   }
   const {data: expenses} = await supabase
     .from('Gasto')
-    .select('monto_total, fecha_gasto, es_gasto_internacional, Categoria_Gasto(nombre)')
+    .select('monto_total, fecha_gasto, es_gasto_internacional, tipo_cambio_bs, Categoria_Gasto(nombre)')
     .eq('id_viaje', tripId);
   const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip);
   const providedDates = new Set(

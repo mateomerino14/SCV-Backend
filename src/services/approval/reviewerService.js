@@ -8,6 +8,7 @@ const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService
 const tripCodeUtil = require('../../utils/tripCode');
 const reviewLogService = require('./reviewLogService');
 const {escapeHtml} = require('../../utils/htmlEscape');
+const {hasUsdFund} = require('../../utils/expenseCurrency');
 
 // Anexa el resumen de gastos y alertas a una lista de viajes
 const attachSummaryToTrips = (trips) => {
@@ -43,7 +44,7 @@ const getPreviousReviewerId = (trip) => {
 const getPendingReviews = async (reviewerId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'APROBADO_SUPERVISOR')
     .is('id_revisor_asignado', null)
     .neq('id_usuario', reviewerId);
@@ -70,7 +71,7 @@ const getPendingReviews = async (reviewerId, filters) => {
 
 // Lista las revisiones finales asignadas al revisor
 const getMyReviews = async (reviewerId, filters) => {
-  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)';
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)';
   // El revisor es unico: toda rendicion pendiente de revision final le corresponde
   await hierarchyAssignmentService.claimStageTrips(reviewerId, 'id_revisor_asignado', ['APROBADO_SUPERVISOR']);
   let query = supabase
@@ -168,7 +169,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
     throw new Error('El empleado no tiene correo corporativo registrado');
   }
   const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip);
-  const isInternational = trip.tipo === 'Internacional';
+  const usdFund = hasUsdFund(trip);
   const assignedAmount = parseFloat(trip.monto_asignado);
   const assignedAmountUsd = parseFloat(trip.monto_asignado_usd || 0);
   const nationalBalance = assignedAmount - summary.accumulatedExpense;
@@ -180,7 +181,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
     usdBalance,
     exceedsNational: nationalBalance < 0,
     exceedsUsd: usdBalance < 0,
-    isInternational,
+    hasUsdFund: usdFund,
   };
   const resultHtml = finalReviewDocumentService.generateEmployeeResultHtml(trip, tripCode, resultSummary);
   const pdfBuffer = await finalReviewDocumentService.generatePdf(resultHtml);
@@ -197,7 +198,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
     return `Debes devolver ${currency} ${balance.toFixed(2)} a la empresa`;
   };
   const resultRows = [{label: 'Bolivianos', value: describeBalance(nationalBalance, 'Bs')}];
-  if (isInternational) {
+  if (usdFund) {
     resultRows.push({label: 'Dólares', value: describeBalance(usdBalance, 'USD')});
   }
   const emailHtml = emailService.buildEmailLayout('Tu rendición fue aprobada', `

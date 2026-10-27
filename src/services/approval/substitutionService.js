@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase');
+const {spentAgainstFunds} = require('../../utils/expenseCurrency');
 const emailService = require('../shared/emailService');
 const {escapeHtml} = require('../../utils/htmlEscape');
 const {shortenText} = require('../../utils/textNormalizer');
@@ -366,7 +367,7 @@ const getActiveSubstitutions = async (substituteId) => {
   const tripIds = activeTrips.map((row) => row.Viaje.id_viaje);
   const {data: allExpenses} = await supabase
     .from('Gasto')
-    .select('id_viaje, monto_total, es_gasto_internacional')
+    .select('id_viaje, monto_total, es_gasto_internacional, tipo_cambio_bs')
     .in('id_viaje', tripIds);
   const expensesByTrip = {}
   ;(allExpenses || []).forEach((expense) => {
@@ -377,12 +378,7 @@ const getActiveSubstitutions = async (substituteId) => {
   });
   return activeTrips.map((row) => {
     const expenses = expensesByTrip[row.Viaje.id_viaje] || [];
-    const gastoAcumulado = expenses
-      .filter((expense) => !expense.es_gasto_internacional)
-      .reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
-    const gastoAcumuladoUsd = expenses
-      .filter((expense) => !!expense.es_gasto_internacional)
-      .reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
+    const {spentBs: gastoAcumulado, spentUsd: gastoAcumuladoUsd} = spentAgainstFunds(row.Viaje, expenses);
     return {
       ...row.Viaje,
       esSustitucion: true,

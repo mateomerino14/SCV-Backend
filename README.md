@@ -438,7 +438,9 @@ Calcular sobre el total de 240 de una vez daría 285.71: por eso se calcula por 
 
 ### Monto del viaje
 
-Al registrar el viaje, el monto se calcula con las tarifas del cargo del empleado: en un viaje nacional, días × tarifa en Bs; en uno internacional, el día de salida y el de regreso con la tarifa en Bs y los días intermedios con la tarifa en USD. Tesorería revisa y ajusta el monto final al asignar los fondos.
+Al registrar el viaje, el monto se calcula con las tarifas del cargo del empleado: en un viaje nacional, días × tarifa en Bs; en uno internacional, el día de salida y el de regreso con la tarifa en Bs y los días intermedios con la tarifa en USD. Tesorería revisa y ajusta el monto final al asignar los fondos. Si la empresa entrega todo en bolivianos (el empleado compra dólares o la moneda local en una casa de cambio), tesorería deja el fondo en USD en 0 y pone el total en Bs.
+
+**Fondo solo en Bs.** Si un viaje internacional no tiene fondo en USD (`monto_asignado_usd` = 0), cada gasto en el exterior se descuenta del fondo en Bs con su `tipo_cambio_bs`, que es el que pagó el empleado en la casa de cambio. La regla está en un solo lugar (`utils/expenseCurrency.js`, `hasUsdFund` y `spentAgainstFunds`) y la usan el resumen de gastos (`expenseSummaryService`: total, hoteles y saldos), la planilla, la lista de viajes en curso, las rendiciones de reemplazo, el documento de la revisión final, el PDF del fondo y el correo del resultado, que en ese caso no muestran filas en USD. El tope diario en USD del cargo se sigue controlando igual. Un viaje con fondo en USD funciona como antes.
 
 El motivo del viaje admite hasta 500 caracteres; en los asuntos de correo se acorta (`shortenText`) y en el nombre de los archivos se usan sus primeros caracteres.
 
@@ -481,7 +483,7 @@ La invocación (`geminiService`) reintenta ante errores temporales y, si el mode
 
 | Tipo | Qué prueba | Comando | Carpeta |
 |---|---|---|---|
-| Unitarias | Funciones sueltas: retenciones (también por subgasto), validación de la importación de usuarios, IVA de factura y recibo en la planilla, cantidades con decimales, CUF, HTML del recibo, planilla en Bs con el monto original y saldos por fondo, subgastos en moneda extranjera pasados a USD, control diario por moneda, recordatorios, jerarquía | `npm test` | `tests/services/` |
+| Unitarias | Funciones sueltas: retenciones (también por subgasto), validación de la importación de usuarios, IVA de factura y recibo en la planilla, cantidades con decimales, CUF, HTML del recibo, planilla en Bs con el monto original y saldos por fondo, viaje internacional con fondo solo en Bs, subgastos en moneda extranjera pasados a USD, control diario por moneda, recordatorios, jerarquía | `npm test` | `tests/services/` |
 | De la API | Endpoints completos contra una base de prueba: permisos, viajes, envío de cada viaje al jefe directo (y, sin jefe, a la bandeja de todos los supervisores), reemplazo aprobado que rinde junto al titular mientras nadie más puede registrar gastos, gastos en ambas monedas, gasto internacional en soles pasado a USD (también con subgastos) y tipo de cambio a Bs obligatorio, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos (solo en gastos internacionales) y N° de recibo de gastos sin factura, presupuesto con lo pagado, número de rendición del mes, códigos de Oracle de secciones y usuarios, cambio de un gasto a Hoteles, exportación, importación de usuarios desde Excel | `npm run test:api` | `tests/api/` |
 
 Las pruebas de la API necesitan una base PostgreSQL de prueba con los scripts de `database/` (`01` a `04` y `testing_02_organizacion_prueba.sql`), servida por PostgREST y el proxy `tests/support/supabaseProxy.js`, que imita la ruta `/rest/v1` de Supabase, acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar. **No se corren contra Supabase real.**

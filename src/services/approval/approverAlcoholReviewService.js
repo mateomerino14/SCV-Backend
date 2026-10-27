@@ -31,7 +31,7 @@ const attachSummaryToTrips = (trips) => {
 const getPendingAlcoholReviews = async (approverId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'EN_REVISION_APROBADOR')
     .is('id_aprobador_asignado', null)
     .neq('id_usuario', approverId);
@@ -56,7 +56,7 @@ const getPendingAlcoholReviews = async (approverId, filters) => {
 
 // Lista los viajes de revision adicional asignados al aprobador
 const getMyAlcoholReviews = async (approverId, filters) => {
-  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))';
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))';
   // El aprobador es unico: toda revision por alcohol pendiente le corresponde
   await hierarchyAssignmentService.claimStageTrips(approverId, 'id_aprobador_asignado', ['EN_REVISION_APROBADOR']);
   let query = supabase
