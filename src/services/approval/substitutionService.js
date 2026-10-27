@@ -42,6 +42,9 @@ const getCandidates = async (requesterId) => {
   return {candidates: data || [], sinSeccion: false};
 };
 
+// Indica si el viaje esta en la fase de gastos (en curso, o rechazado despues de recibir fondos), la unica en que un reemplazo tiene sentido
+const isInExpensePhase = (trip) => trip?.estado === 'EN_CURSO' || (trip?.estado === 'RECHAZADO' && !!trip?.fue_iniciado);
+
 // Crea una solicitud para que otra persona rinda los gastos de un viaje
 const createRequest = async (tripId, requesterId, substituteId) => {
   if (!substituteId) {
@@ -49,7 +52,7 @@ const createRequest = async (tripId, requesterId, substituteId) => {
   }
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('id_usuario, motivo, estado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno)')
+    .select('id_usuario, motivo, estado, fue_iniciado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno)')
     .eq('id_viaje', tripId)
     .single();
   if (!trip) {
@@ -61,8 +64,8 @@ const createRequest = async (tripId, requesterId, substituteId) => {
   if (parseInt(substituteId) === requesterId) {
     return {error: 'No puedes designarte a ti mismo como sustituto', status: 400};
   }
-  if (trip.estado !== 'EN_CURSO' && trip.estado !== 'RECHAZADO') {
-    return {error: 'Solo puedes solicitar un reemplazo mientras el viaje está en curso o rechazado', status: 400};
+  if (!isInExpensePhase(trip)) {
+    return {error: 'Solo puedes solicitar un reemplazo mientras registras o corriges los gastos del viaje', status: 400};
   }
   const {data: substitute} = await supabase
     .from('Usuario')
@@ -149,9 +152,6 @@ const getRequestStatus = async (tripId, requesterId) => {
   return {request: data || null};
 };
 
-
-// Estados del viaje en los que un reemplazo todavia tiene sentido: mientras se registran o corrigen gastos
-const requestableTripStates = ['EN_CURSO', 'RECHAZADO'];
 const autoCloseObservation = 'Cerrada automáticamente: el viaje ya se envió a revisión antes de que se respondiera la solicitud.';
 
 // Mensaje para quien intenta atender una solicitud que ya no esta pendiente
@@ -191,7 +191,7 @@ const closePendingRequests = async (tripIds) => {
 const getPendingRequests = async () => {
   const {data, error} = await supabase
     .from('Solicitud_Reemplazo')
-    .select('*, Viaje(id_viaje, estado, motivo, origen, destino, fecha_inicio, fecha_fin, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, Cargo(nombre))), Sustituto:Usuario!solicitud_reemplazo_sustituto_fkey(nombre, apellido_paterno)')
+    .select('*, Viaje(id_viaje, estado, fue_iniciado, motivo, origen, destino, fecha_inicio, fecha_fin, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, Cargo(nombre))), Sustituto:Usuario!solicitud_reemplazo_sustituto_fkey(nombre, apellido_paterno)')
     .eq('estado', 'PENDIENTE')
     .order('fecha_solicitud', {ascending: false});
   if (error) {
@@ -199,9 +199,9 @@ const getPendingRequests = async () => {
   }
   // Las de viajes que ya pasaron a revision se cierran y no se muestran
   const requests = data || [];
-  const staleTripIds = requests.filter((request) => !requestableTripStates.includes(request.Viaje?.estado)).map((request) => request.id_viaje);
+  const staleTripIds = requests.filter((request) => !isInExpensePhase(request.Viaje)).map((request) => request.id_viaje);
   await closePendingRequests(staleTripIds);
-  return {requests: requests.filter((request) => requestableTripStates.includes(request.Viaje?.estado))};
+  return {requests: requests.filter((request) => isInExpensePhase(request.Viaje))};
 };
 
 // Lista el historial de solicitudes de reemplazo ya procesadas
@@ -223,7 +223,7 @@ const getRequestHistory = async () => {
 const approveRequest = async (requestId, reviewerId) => {
   const {data: request} = await supabase
     .from('Solicitud_Reemplazo')
-    .select('*, Viaje(estado, motivo, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo)), Sustituto:Usuario!solicitud_reemplazo_sustituto_fkey(nombre, apellido_paterno, email_corporativo)')
+    .select('*, Viaje(estado, fue_iniciado, motivo, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo)), Sustituto:Usuario!solicitud_reemplazo_sustituto_fkey(nombre, apellido_paterno, email_corporativo)')
     .eq('id_solicitud', requestId)
     .single();
   if (!request) {
@@ -232,7 +232,7 @@ const approveRequest = async (requestId, reviewerId) => {
   if (request.estado !== 'PENDIENTE') {
     return {error: describeProcessedRequest(request), status: 409};
   }
-  if (!requestableTripStates.includes(request.Viaje?.estado)) {
+  if (!isInExpensePhase(request.Viaje)) {
     await closePendingRequests([request.id_viaje]);
     return {error: describeProcessedRequest({estado: 'RECHAZADA', id_revisor: null}), status: 409};
   }
@@ -298,7 +298,7 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   }
   const {data: request} = await supabase
     .from('Solicitud_Reemplazo')
-    .select('*, Viaje(estado, motivo, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo))')
+    .select('*, Viaje(estado, fue_iniciado, motivo, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo))')
     .eq('id_solicitud', requestId)
     .single();
   if (!request) {
@@ -307,7 +307,7 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   if (request.estado !== 'PENDIENTE') {
     return {error: describeProcessedRequest(request), status: 409};
   }
-  if (!requestableTripStates.includes(request.Viaje?.estado)) {
+  if (!isInExpensePhase(request.Viaje)) {
     await closePendingRequests([request.id_viaje]);
     return {error: describeProcessedRequest({estado: 'RECHAZADA', id_revisor: null}), status: 409};
   }
@@ -438,7 +438,6 @@ const canRegisterExpenseOnTrip = async (tripId, userId) => {
 
 module.exports = {
   closePendingRequests,
-  requestableTripStates,
   createRequest,
   getRequestStatus,
   getPendingRequests,
