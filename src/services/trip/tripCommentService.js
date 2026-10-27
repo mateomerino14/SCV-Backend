@@ -3,14 +3,17 @@ const commentModerationService = require('../shared/commentModerationService');
 const textNormalizer = require('../../utils/textNormalizer');
 const userDirectoryService = require('../user/userDirectoryService');
 
-// Etapas de revision y el campo que indica quien la tiene asignada
+// Roles que atienden como jefe directo: el supervisor y el aprobador (Gerente General) con su equipo
+const directBossRoles = ['SUPERVISOR', 'APROBADOR'];
+
+// Etapas de revision, los roles que las atienden y el campo que indica quien la tiene asignada
 const reviewStageFields = {
-  EN_REVISION_VIAJE: {field: 'id_supervisor_asignado', mustBeAssigned: true, role: 'SUPERVISOR'},
-  EN_REVISION: {field: 'id_supervisor_asignado', mustBeAssigned: true, role: 'SUPERVISOR'},
-  APROBADO_VIAJE: {field: 'id_aprobador_asignado', mustBeAssigned: false, role: 'APROBADOR'},
-  EN_REVISION_APROBADOR: {field: 'id_aprobador_asignado', mustBeAssigned: false, role: 'APROBADOR'},
+  EN_REVISION_VIAJE: {field: 'id_supervisor_asignado', mustBeAssigned: true, roles: directBossRoles},
+  EN_REVISION: {field: 'id_supervisor_asignado', mustBeAssigned: true, roles: directBossRoles},
+  APROBADO_VIAJE: {field: 'id_aprobador_asignado', mustBeAssigned: false, roles: ['APROBADOR']},
+  EN_REVISION_APROBADOR: {field: 'id_aprobador_asignado', mustBeAssigned: false, roles: ['APROBADOR']},
   EN_REVISION_TESORERO: {field: null, mustBeAssigned: false, treasurer: true},
-  APROBADO_SUPERVISOR: {field: 'id_revisor_asignado', mustBeAssigned: false, role: 'REVISOR'},
+  APROBADO_SUPERVISOR: {field: 'id_revisor_asignado', mustBeAssigned: false, roles: ['REVISOR']},
 };
 
 // Datos del usuario para saber si le corresponde la etapa (rol o cargo de tesorero)
@@ -33,7 +36,7 @@ const checkCanComment = async (trip, userId) => {
   }
   const commenter = await getCommenter(userId);
   const isTreasurer = textNormalizer.normalizeText(commenter?.Cargo?.nombre || '') === textNormalizer.normalizeText(userDirectoryService.treasurerPositionName);
-  let matchesStage = commenter?.Rol?.nombre === stage.role;
+  let matchesStage = (stage.roles || []).includes(commenter?.Rol?.nombre);
   if (stage.treasurer) {
     matchesStage = isTreasurer;
   }
