@@ -6,6 +6,7 @@
 --   revisa como jefe directo el viaje y la rendicion de Shanayna, y su aprobacion vale tambien como aprobador
 -- Flujo del viaje: Shanayna > Jorge Luis (jefe directo y aprobador) > Sonia (tesoreria, asigna el fondo)
 -- Flujo de la rendicion: Shanayna > Jorge Luis (jefe directo) > Luis (revisor, aprobacion final)
+-- Diego Demo es compañero de Shanayna en EXPORT SALES, para mostrar la solicitud de reemplazo (el correo es un alias de prueba)
 -- Contrasena de todos: Viaticos2026 (cada uno puede cambiarla en Ajustes de Cuenta)
 -- Las tarifas diarias son de prueba: se cambian desde Cargos en el panel del administrador
 -- ============================================================
@@ -43,11 +44,14 @@ insert into "Usuario" (email_corporativo, nombre, apellido_paterno, apellido_mat
     (select id_cargo from "Cargo" where nombre = 'Jefe de Administracion'), 4),
   ('aarraya@maxamcorp.com', 'Annel', 'Arraya', 'Vargas', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
     (select id_seccion from "Seccion" where nombre = 'FINANCE AND ADMINISTRATION'),
-    (select id_cargo from "Cargo" where nombre = 'Analista de Finanzas y Administracion'), 1)
+    (select id_cargo from "Cargo" where nombre = 'Analista de Finanzas y Administracion'), 1),
+  ('mateomerino14+reemplazo@gmail.com', 'Diego', 'Demo', 'Reemplazo', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
+    (select id_seccion from "Seccion" where nombre = 'EXPORT SALES'),
+    (select id_cargo from "Cargo" where nombre = 'Comercial'), 3)
 on conflict (email_corporativo) do nothing;
 
 update "Usuario" set id_jefe_directo = (select id_usuario from "Usuario" where email_corporativo = 'jvalencia@maxamcorp.com')
-  where email_corporativo in ('spardo@maxamcorp.com', 'smoya@maxamcorp.com', 'lasoliz@maxamcorp.com', 'aarraya@maxamcorp.com');
+  where email_corporativo in ('spardo@maxamcorp.com', 'smoya@maxamcorp.com', 'lasoliz@maxamcorp.com', 'aarraya@maxamcorp.com', 'mateomerino14+reemplazo@gmail.com');
 
 select
   u.nombre || ' ' || u.apellido_paterno as usuario,
