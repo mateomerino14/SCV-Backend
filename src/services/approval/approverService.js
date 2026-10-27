@@ -147,8 +147,8 @@ const getTripDetail = async (tripId) => {
   return {trip, comments: comments || []};
 };
 
-// Aprueba un viaje en fase de aprobacion previa; con selfStageSkip se aprueba solo si es suyo
-const approveTrip = async (tripId, approverId, {selfStageSkip = false} = {}) => {
+// Aprueba un viaje en fase de aprobacion previa; con selfStageSkip se aprueba solo (es suyo o ya lo aprobo como jefe directo)
+const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedAsBoss = false} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
@@ -181,8 +181,8 @@ const approveTrip = async (tripId, approverId, {selfStageSkip = false} = {}) => 
   await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.tripApproval, 'APROBADO', {automatic: selfStageSkip});
   const {data: approverData} = await supabase
     .from('Usuario').select('nombre, apellido_paterno, email_corporativo, Cargo(nombre)').eq('id_usuario', approverId).single();
-  // Si es el viaje del propio aprobador, el memorandum indica aprobacion automatica
-  const approver = {...approverData, aprobacionAutomatica: selfStageSkip};
+  // Si es el viaje del propio aprobador, el memorandum indica aprobacion automatica; si lo aprobo como jefe directo, lo firma el
+  const approver = {...approverData, aprobacionAutomatica: selfStageSkip && !approvedAsBoss};
   const tripCode = tripCodeUtil.buildTripCode(trip);
   try {
     const allUsers = await getActiveUsers();

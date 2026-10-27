@@ -55,6 +55,15 @@ const getSupervisorPendingCounts = async (supervisorId) => {
   };
 };
 
+// Pendientes que un aprobador atiende como jefe directo de su equipo
+const getTeamPendingCounts = async (bossId) => {
+  const [assignedTrips, assignedExpenses] = await Promise.all([
+    supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION_VIAJE').eq('id_supervisor_asignado', bossId),
+    supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('estado', 'EN_REVISION').eq('id_supervisor_asignado', bossId),
+  ]);
+  return {tripReviews: assignedTrips.count || 0, expenseReviews: assignedExpenses.count || 0};
+};
+
 // "1 viaje esperando" / "3 viajes esperando"
 const countLine = (count, singular, plural, rest) => `${count} ${count === 1 ? singular : plural} ${rest}`;
 
@@ -123,15 +132,25 @@ const sendDailyDigest = async ({dryRun = false} = {}) => {
       await sendDigestToGroup([supervisor], 'Resumen de Pendientes — Supervisión', supervisorLines, report, dryRun);
     }
 
+    // El aprobador recibe ademas lo que le toca revisar como jefe directo de su equipo
     const approvers = await getActiveUsersByRole('APROBADOR');
-    const approverLines = [];
-    if (counts.pendingApproverReviews > 0) {
-      approverLines.push(countLine(counts.pendingApproverReviews, 'viaje espera', 'viajes esperan', 'tu aprobación antes de pasar a tesorería.'));
+    for (const approver of approvers) {
+      const teamCounts = await getTeamPendingCounts(approver.id_usuario);
+      const approverLines = [];
+      if (teamCounts.tripReviews > 0) {
+        approverLines.push(countLine(teamCounts.tripReviews, 'viaje de tu equipo espera', 'viajes de tu equipo esperan', 'tu revisión como jefe directo.'));
+      }
+      if (teamCounts.expenseReviews > 0) {
+        approverLines.push(countLine(teamCounts.expenseReviews, 'rendición de tu equipo espera', 'rendiciones de tu equipo esperan', 'tu revisión como jefe directo.'));
+      }
+      if (counts.pendingApproverReviews > 0) {
+        approverLines.push(countLine(counts.pendingApproverReviews, 'viaje espera', 'viajes esperan', 'tu aprobación antes de pasar a tesorería.'));
+      }
+      if (counts.pendingAlcoholReviews > 0) {
+        approverLines.push(countLine(counts.pendingAlcoholReviews, 'rendición con alcohol espera', 'rendiciones con alcohol esperan', 'tu revisión adicional.'));
+      }
+      await sendDigestToGroup([approver], 'Resumen de Pendientes — Aprobación', approverLines, report, dryRun);
     }
-    if (counts.pendingAlcoholReviews > 0) {
-      approverLines.push(countLine(counts.pendingAlcoholReviews, 'rendición con alcohol espera', 'rendiciones con alcohol esperan', 'tu revisión adicional.'));
-    }
-    await sendDigestToGroup(approvers, 'Resumen de Pendientes — Aprobación', approverLines, report, dryRun);
 
     const reviewers = await getActiveUsersByRole('REVISOR');
     const reviewerLines = [];
