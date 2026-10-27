@@ -150,6 +150,25 @@ const documentNumberOf = (expense, tripReceipts) => {
   return {number: '', isSystem: false};
 };
 
+const fundLabel = 'SALDO ANTERIOR FONDO RECIBIDO';
+
+// Filas del fondo recibido antes de los gastos: en Bs, y en un viaje internacional tambien en USD
+const buildFundRows = (isInternationalTrip, fundBs, fundUsd) => {
+  let funds = [[fundLabel, fundBs.toFixed(2)]];
+  if (isInternationalTrip) {
+    funds = [[`${fundLabel} (Bs)`, `${fundBs.toFixed(2)} Bs`], [`${fundLabel} (USD)`, `${fundUsd.toFixed(2)} USD`]];
+  }
+  let originalCell = '';
+  if (isInternationalTrip) {
+    originalCell = '<td></td>';
+  }
+  return funds.map(([label, value]) => `
+    <tr class="fila-fondo">
+      <td></td><td></td><td></td><td class="col-detalle">${label}</td><td></td><td></td><td></td><td></td>${originalCell}
+      <td class="col-importe">${value}</td><td></td><td></td><td></td><td></td><td></td>
+    </tr>`).join('');
+};
+
 // Clase de la celda del documento: en lila si el numero lo asigno el sistema
 const documentClassOf = (documentInfo) => {
   if (documentInfo.isSystem) {
@@ -183,7 +202,6 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   const costCenter = employee?.Seccion?.nombre || '';
   const isInternationalTrip = trip.tipo === 'Internacional';
 
-  let totalImporteFactura = 0;
   let totalImporteBs = 0;
   let totalVat = 0;
   let totalRcIva = 0;
@@ -194,7 +212,6 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   const rows = expenses.map((expense, index) => {
     const amount = parseFloat(expense.monto_total) || 0;
     const isInternational = !!expense.es_gasto_internacional;
-    const hasInvoice = !!expense.Factura;
     const {vat, rcIva, iue, it, cost} = getExpenseTaxValues(expense);
     const oracleValue = escapeHtml(extractOracleAccount(expense.Categoria_Gasto?.nombre));
     const oracleType = toOracleExpenseType(expense.tipo);
@@ -220,9 +237,6 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
       }
       totalImporteBs += amountBs;
     }
-    if (hasInvoice) {
-      totalImporteFactura += amount;
-    }
     totalVat += vat;
     totalRcIva += rcIva;
     totalIue += iue;
@@ -236,9 +250,9 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
       <td class="col-tipo">${oracleType}</td>
       <td class="${documentClassOf(documentInfo)}">${escapeHtml(documentInfo.number)}</td>
       <td class="col-nit">${escapeHtml(cleanValue(expense.Proveedor?.numero_doc_fiscal))}</td>
-      <td class="col-importe-fact">${hasInvoice ? amount.toFixed(2) : ''}</td>
+      <td class="col-importe-fact">${amountText}</td>
       ${isInternationalTrip ? `<td class="col-original">${buildOriginalAmountText(expense)}</td>` : ''}
-      <td class="col-importe">${amountText}</td>
+      <td class="col-importe"></td>
       <td class="col-num">${vat.toFixed(2)}</td>
       <td class="col-num">${rcIva.toFixed(2)}</td>
       <td class="col-num">${iue.toFixed(2)}</td>
@@ -248,6 +262,8 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   }).join('');
 
   const {internationalUsd, balanceRows} = summarizeStatement(trip, expenses);
+  const [, fundBs, fundUsd] = balanceRows[0];
+  const fundRows = buildFundRows(isInternationalTrip, fundBs, fundUsd);
 
   return `<!DOCTYPE html>
 <html>
@@ -283,9 +299,10 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   .leyenda-doc { font-size: 7pt; margin: -4px 0 8px; display: flex; align-items: center; gap: 6px; }
   .leyenda-doc span:first-child { display: inline-block; width: 24px; height: 10px; background: #e4dfec; border: 1px solid #b0c4d4; }
   .col-nit { text-align: center; width: 6%; }
-  .col-importe-fact { text-align: right; width: 6%; }
+  .col-importe-fact { text-align: right; width: 8%; }
+  .fila-fondo td { background: #eaf3fb; font-weight: bold; }
   .col-original { width: 12%; font-size: 6.5pt; }
-  .col-importe { text-align: right; width: 8%; }
+  .col-importe { text-align: right; width: 7%; }
   .col-num { text-align: right; width: 5%; }
   .totales-fila td { background: #bfe0f5; font-weight: bold; text-align: right; }
   .totales-fila td:first-child { text-align: left; }
@@ -328,16 +345,17 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
         <tr>
           <th>N°</th><th>FECHA</th><th>CUENTA/ORACLE</th><th>DETALLE</th><th>TIPO GASTO</th>
           <th>N° DOCUMENTO</th><th>NIT</th><th>IMPORTE FACT./REC.</th>
-          ${isInternationalTrip ? '<th>MONTO ORIGINAL</th>' : ''}<th>IMPORTE Bs.</th><th>I.V.A.</th><th>RC-IVA</th><th>IUE</th><th>IT</th><th>IMPORTE COSTO/GASTO</th>
+          ${isInternationalTrip ? '<th>MONTO ORIGINAL</th>' : ''}<th>IMPORTE</th><th>I.V.A.</th><th>RC-IVA</th><th>IUE</th><th>IT</th><th>IMPORTE COSTO/GASTO</th>
         </tr>
       </thead>
       <tbody>
+        ${fundRows}
         ${rows}
         <tr class="totales-fila">
           <td colspan="7">Sumas Totales (Bs)</td>
-          <td>${totalImporteFactura.toFixed(2)}</td>
-          ${isInternationalTrip ? '<td></td>' : ''}
           <td>${totalImporteBs.toFixed(2)}</td>
+          ${isInternationalTrip ? '<td></td>' : ''}
+          <td>${fundBs.toFixed(2)}</td>
           <td>${totalVat.toFixed(2)}</td>
           <td>${totalRcIva.toFixed(2)}</td>
           <td>${totalIue.toFixed(2)}</td>
@@ -346,8 +364,10 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
         </tr>
         ${isInternationalTrip ? `
         <tr class="totales-fila">
-          <td colspan="9">Gastos internacionales en USD, para Oracle</td>
+          <td colspan="7">Gastos internacionales en USD, para Oracle</td>
           <td>${internationalUsd.toFixed(2)} USD</td>
+          <td></td>
+          <td>${fundUsd.toFixed(2)} USD</td>
           <td colspan="5"></td>
         </tr>` : ''}
       </tbody>

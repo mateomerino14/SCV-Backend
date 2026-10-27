@@ -13,8 +13,11 @@ const internationalExpense = {
 test('muestra los gastos internacionales en Bs con su monto original', () => {
   const html = generateStatementHtml(trip, [nationalExpense, internationalExpense], []);
   expect(html).toContain('170.00 PEN = 44.97 USD (T/C 3.7800)');
-  expect(html).toContain('<td class="col-importe">312.99</td>');
+  expect(html).toContain('<td class="col-importe-fact">312.99</td>');
   expect(html).toContain('<td>362.99</td>');
+  expect(html).toContain('SALDO ANTERIOR FONDO RECIBIDO (Bs)</td><td></td><td></td><td></td><td></td><td></td>\n      <td class="col-importe">1000.00 Bs</td>');
+  expect(html).toContain('SALDO ANTERIOR FONDO RECIBIDO (USD)');
+  expect(html).toContain('<td>1000.00</td>');
   expect(html).toContain('44.97 USD');
   expect(html).toContain('<td class="col-doc">0003431</td>');
   expect(html).toContain('<td class="col-doc doc-sistema">000013</td>');
