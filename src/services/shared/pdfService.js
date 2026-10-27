@@ -1,5 +1,10 @@
 // En contenedores como Render, /dev/shm es pequeño y Chrome se cuelga si lo usa para las paginas
-const chromeArgs = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'];
+const chromeArgs = [
+  '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu',
+  // Sin conexiones de fondo de Chrome (actualizaciones, sincronizacion), que no hacen falta para imprimir
+  '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-extensions',
+  '--disable-default-apps', '--no-first-run', '--no-default-browser-check',
+];
 
 // Los documentos no cargan recursos externos: alcanza con esperar a que la pagina termine de cargar
 const contentTimeoutMs = 30000;
@@ -36,4 +41,16 @@ const generatePdf = async (html, options = defaultOptions) => {
   }
 };
 
-module.exports = {generatePdf};
+// Genera un PDF minimo y anota cuanto tardo, para comprobar que Chrome funciona en el servidor
+const checkPdfGeneration = async () => {
+  const startedAt = Date.now();
+  try {
+    const pdf = await generatePdf('<html><body><p>Prueba</p></body></html>');
+    console.info(`[PDF] Prueba de arranque correcta: ${pdf.length} bytes en ${Date.now() - startedAt} ms`);
+  }
+  catch (error) {
+    console.error(`[PDF] Prueba de arranque fallida tras ${Date.now() - startedAt} ms: ${error.message}`);
+  }
+};
+
+module.exports = {generatePdf, checkPdfGeneration};
