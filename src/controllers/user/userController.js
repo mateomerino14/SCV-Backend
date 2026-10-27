@@ -339,7 +339,7 @@ const getEmployees = async (req, res) => {
 const getAllUsersDetailed = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_seccion, Seccion(nombre), carnet_identidad, id_jefe_directo, Jefe:id_jefe_directo(id_usuario, nombre, apellido_paterno), Cargo(id_cargo, nombre), Rol(nombre)')
+    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_seccion, Seccion(nombre), carnet_identidad, codigo_dependencia, id_jefe_directo, Jefe:id_jefe_directo(id_usuario, nombre, apellido_paterno), Cargo(id_cargo, nombre), Rol(nombre)')
     .order('nombre', {ascending: true});
   if (error) {
     return res.status(500).json({error: error.message});
