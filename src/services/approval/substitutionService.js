@@ -1,6 +1,8 @@
 const supabase = require('../../config/supabase');
+const {spentAgainstFunds} = require('../../utils/expenseCurrency');
 const emailService = require('../shared/emailService');
 const {escapeHtml} = require('../../utils/htmlEscape');
+const {shortenText} = require('../../utils/textNormalizer');
 
 // Obtiene los revisores activos con correo corporativo
 const getActiveReviewers = async () => {
@@ -243,7 +245,6 @@ const approveRequest = async (requestId, reviewerId) => {
   if (error) {
     return {error: error.message, status: 500};
   }
-  // Otra persona la resolvio entre la lectura y esta accion
   if (!updatedRequests?.length) {
     return processedRequestError(requestId);
   }
@@ -263,7 +264,7 @@ const approveRequest = async (requestId, reviewerId) => {
       `;
       const html = emailService.buildEmailLayout('Reemplazo aprobado', body);
       // Si falla este correo, igual se avisa al reemplazo
-      await emailService.sendEmail([{email: employee.email_corporativo, name: employeeName}], `Reemplazo Aprobado — ${request.Viaje?.motivo}`, html)
+      await emailService.sendEmail([{email: employee.email_corporativo, name: employeeName}], `Reemplazo Aprobado — ${shortenText(request.Viaje?.motivo)}`, html)
         .catch((employeeEmailError) => console.warn('Error notificando al titular del reemplazo:', employeeEmailError.message));
     }
     if (substitute?.email_corporativo) {
@@ -278,7 +279,7 @@ const approveRequest = async (requestId, reviewerId) => {
         ${emailService.emailButton()}
       `;
       const html = emailService.buildEmailLayout('Nueva rendición asignada', body);
-      await emailService.sendEmail([{email: substitute.email_corporativo, name: substituteName}], `Rendición de ${employeeName} — ${request.Viaje?.motivo}`, html);
+      await emailService.sendEmail([{email: substitute.email_corporativo, name: substituteName}], `Rendición de ${employeeName} — ${shortenText(request.Viaje?.motivo)}`, html);
     }
   }
   catch (emailError) {
@@ -319,7 +320,6 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   if (error) {
     return {error: error.message, status: 500};
   }
-  // Otra persona la resolvio entre la lectura y esta accion
   if (!updatedRequests?.length) {
     return processedRequestError(requestId);
   }
@@ -333,7 +333,7 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
         ${emailService.emailHighlightBox('Motivo del rechazo', observation.trim())}
       `;
       const html = emailService.buildEmailLayout('Reemplazo rechazado', body);
-      await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Reemplazo Rechazado — ${request.Viaje?.motivo}`, html);
+      await emailService.sendEmail([{email: employee.email_corporativo, name: `${employee.nombre} ${employee.apellido_paterno}`}], `Reemplazo Rechazado — ${shortenText(request.Viaje?.motivo)}`, html);
     }
   }
   catch (emailError) {
@@ -367,7 +367,7 @@ const getActiveSubstitutions = async (substituteId) => {
   const tripIds = activeTrips.map((row) => row.Viaje.id_viaje);
   const {data: allExpenses} = await supabase
     .from('Gasto')
-    .select('id_viaje, monto_total, es_gasto_internacional')
+    .select('id_viaje, monto_total, es_gasto_internacional, tipo_cambio_bs')
     .in('id_viaje', tripIds);
   const expensesByTrip = {}
   ;(allExpenses || []).forEach((expense) => {
@@ -378,12 +378,7 @@ const getActiveSubstitutions = async (substituteId) => {
   });
   return activeTrips.map((row) => {
     const expenses = expensesByTrip[row.Viaje.id_viaje] || [];
-    const gastoAcumulado = expenses
-      .filter((expense) => !expense.es_gasto_internacional)
-      .reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
-    const gastoAcumuladoUsd = expenses
-      .filter((expense) => !!expense.es_gasto_internacional)
-      .reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
+    const {spentBs: gastoAcumulado, spentUsd: gastoAcumuladoUsd} = spentAgainstFunds(row.Viaje, expenses);
     return {
       ...row.Viaje,
       esSustitucion: true,

@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase');
+const {spentAgainstFunds} = require('../../utils/expenseCurrency');
 const expenseSummaryService = require('../approval/expenseSummaryService');
 const substitutionService = require('../approval/substitutionService');
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService');
@@ -28,15 +29,10 @@ const getDashboardData = async (userId) => {
     (currentTrips || []).map(async (trip) => {
       const {data: expenses} = await supabase
         .from('Gasto')
-        .select('monto_total, es_gasto_internacional')
+        .select('monto_total, es_gasto_internacional, tipo_cambio_bs')
         .eq('id_viaje', trip.id_viaje);
-      const accumulatedExpense = (expenses || [])
-        .filter((expense) => !expense.es_gasto_internacional)
-        .reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
-      const accumulatedExpenseUsd = (expenses || [])
-        .filter((expense) => !!expense.es_gasto_internacional)
-        .reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
-      return {...trip, gastoAcumulado: accumulatedExpense, gastoAcumuladoUsd: accumulatedExpenseUsd};
+      const {spentBs, spentUsd} = spentAgainstFunds(trip, expenses);
+      return {...trip, gastoAcumulado: spentBs, gastoAcumuladoUsd: spentUsd};
     })
   );
   const {data: recentTrips, error: recentError} = await supabase
@@ -109,8 +105,9 @@ const getTripDetail = async (tripId, requesterId) => {
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
-    .eq('id_viaje', tripId);
+    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)')
+    .eq('id_viaje', tripId)
+    .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   if (expensesError) {
     return {error: expensesError.message};
   }
@@ -154,8 +151,8 @@ const isValidAmount = (value) => value !== undefined && value !== null && value 
 
 // Valida los datos de un viaje al crearlo o reeditarlo, con los mismos limites de la base
 const validateTripData = (tripData) => {
-  if (!tripData.motivo?.trim() || tripData.motivo.trim().length > 100) {
-    return 'El motivo es requerido y no puede superar los 100 caracteres';
+  if (!tripData.motivo?.trim() || tripData.motivo.trim().length > 500) {
+    return 'El motivo es requerido y no puede superar los 500 caracteres';
   }
   if (!tripData.destino?.trim() || tripData.destino.trim().length > 200) {
     return 'El destino es requerido y no puede superar los 200 caracteres';
@@ -212,6 +209,10 @@ const editTrip = async (tripId, userId, tripData) => {
   if (tripData.transporte === 'Vehículo de Empresa' && tripData.tipo === 'Internacional') {
     return {error: 'El vehículo de empresa solo está disponible para viajes nacionales', status: 400};
   }
+  let vehiclePlate = null;
+  if (tripData.transporte === 'Vehículo de Empresa') {
+    vehiclePlate = tripData.placa_vehiculo.trim();
+  }
   const updateData = {
     motivo: tripData.motivo,
     origen: tripData.origen || null,
@@ -220,7 +221,7 @@ const editTrip = async (tripId, userId, tripData) => {
     fecha_fin: tripData.fecha_fin,
     tipo: tripData.tipo,
     transporte: tripData.transporte || 'Terrestre',
-    placa_vehiculo: tripData.transporte === 'Vehículo de Empresa' ? tripData.placa_vehiculo.trim() : null,
+    placa_vehiculo: vehiclePlate,
     monto_asignado: tripData.monto_asignado,
     monto_asignado_usd: tripData.monto_asignado_usd || 0,
   };
@@ -307,7 +308,10 @@ const confirmCompletion = async (tripId, userId, justifications) => {
   if (trip.estado !== 'EN_CURSO' && !isExpensePhaseRejection) {
     return {error: 'Solo puedes finalizar viajes en curso o rechazados en la fase de gastos', status: 400};
   }
-  const justificationList = Array.isArray(justifications) ? justifications : [];
+  let justificationList = [];
+  if (Array.isArray(justifications)) {
+    justificationList = justifications;
+  }
   for (const item of justificationList) {
     if (item.descripcion && item.descripcion.length > 300) {
       return {error: 'Cada justificación no puede superar los 300 caracteres', status: 400};
@@ -318,7 +322,7 @@ const confirmCompletion = async (tripId, userId, justifications) => {
   }
   const {data: expenses} = await supabase
     .from('Gasto')
-    .select('monto_total, fecha_gasto, es_gasto_internacional, Categoria_Gasto(nombre)')
+    .select('monto_total, fecha_gasto, es_gasto_internacional, tipo_cambio_bs, Categoria_Gasto(nombre)')
     .eq('id_viaje', tripId);
   const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip);
   const providedDates = new Set(

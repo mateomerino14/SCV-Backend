@@ -87,4 +87,4 @@ const canManageTripReceipts = async (tripId, userId) => {
   return isTreasurer(await getRequester(userId));
 };
 
-module.exports = {canViewTrip, canManageTripReceipts, canSupervisorAccessTrip, isInSupervisorScope};
+module.exports = {canViewTrip, canManageTripReceipts, canSupervisorAccessTrip, isInSupervisorScope, getRequester, isTreasurer};

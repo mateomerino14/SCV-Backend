@@ -1,0 +1,146 @@
+const {login, api, boliviaDate} = require('./helpers');
+
+jest.setTimeout(60000);
+
+let employee;
+let tripId;
+
+beforeAll(async () => {
+  employee = api(await login('juan.empleado'));
+  const supervisor = api(await login('maria.supervisora'));
+  const approver = api(await login('pedro.aprobador'));
+  const treasurer = api(await login('tesoro.prueba'));
+  const created = await employee.post('/trip', {
+    motivo: 'Viaje internacional de prueba',
+    origen: 'La Paz',
+    destino: 'Lima',
+    fecha_inicio: boliviaDate(-1),
+    fecha_fin: boliviaDate(1),
+    tipo: 'Internacional',
+    transporte: 'Aéreo',
+    monto_asignado: 600,
+    monto_asignado_usd: 40,
+  });
+  tripId = created.body.id_viaje;
+  await employee.put(`/trip/${tripId}/submit-review`);
+  await supervisor.post(`/review/trip-review/${tripId}/take`);
+  await supervisor.post(`/review/trip-review/${tripId}/approve`);
+  await approver.post(`/approver/trip/${tripId}/approve`);
+  await treasurer.post(`/treasurer/${tripId}/approve`);
+});
+
+// En un viaje internacional se puede gastar en bolivianos cualquier dia, tambien uno intermedio
+test('acepta un gasto en bolivianos en un dia intermedio', async () => {
+  const response = await employee.postForm('/expense/register', {
+    id_viaje: tripId, monto_total: 50, fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi al hotel', id_categoria_gasto: 1, es_gasto_internacional: false,
+  });
+  expect(response.status).toBe(200);
+});
+
+// El gasto internacional se escribe en la moneda de la factura y se pasa a USD con el tipo de cambio del empleado
+test('pasa a USD un gasto escrito en soles con su tipo de cambio', async () => {
+  const response = await employee.postForm('/expense/register', {
+    id_viaje: tripId, monto_moneda_origen: 150, moneda: 'PEN', tipo_cambio: 3.75, tipo_cambio_bs: 6.96, fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi en Lima', id_categoria_gasto: 1, es_gasto_internacional: true,
+  });
+  expect(response.status).toBe(200);
+  const detail = await employee.get(`/expense/${response.body.gasto.id_gasto}/detail`);
+  expect(detail.body.moneda).toBe('PEN');
+  expect(parseFloat(detail.body.monto_moneda_origen)).toBe(150);
+  expect(parseFloat(detail.body.monto_total)).toBe(40);
+  expect(parseFloat(detail.body.tipo_cambio_bs)).toBe(6.96);
+  expect(parseFloat(detail.body.retencion_it)).toBe(0);
+  const segment = detail.body.Gasto_Tramo_Moneda[0];
+  expect(parseFloat(segment.tipo_cambio)).toBe(3.75);
+  expect(parseFloat(segment.monto_usd)).toBe(40);
+});
+
+// Los subgastos van en la moneda de la factura y su suma se pasa a USD
+test('suma los subgastos en soles y guarda el total en USD', async () => {
+  const response = await employee.postForm('/expense/register', {
+    id_viaje: tripId, moneda: 'PEN', tipo_cambio: 3.8, tipo_cambio_bs: 6.96, fecha_gasto: boliviaDate(), tipo: 'C', descripcion: 'Compras en Lima', id_categoria_gasto: 1, es_gasto_internacional: true,
+    subitems: [{descripcion: 'Agua', monto: 10}, {descripcion: 'Pilas', monto: 20}],
+  });
+  expect(response.status).toBe(200);
+  const detail = await employee.get(`/expense/${response.body.gasto.id_gasto}/detail`);
+  expect(parseFloat(detail.body.monto_moneda_origen)).toBe(30);
+  expect(parseFloat(detail.body.monto_total)).toBe(7.89);
+});
+
+// Sin tipo de cambio a bolivianos no se puede armar la planilla en Bs
+test('rechaza un gasto internacional sin tipo de cambio a bolivianos', async () => {
+  const withoutBs = await employee.postForm('/expense/register', {
+    id_viaje: tripId, monto_moneda_origen: 20, moneda: 'USD', fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi', id_categoria_gasto: 1, es_gasto_internacional: true,
+  });
+  expect(withoutBs.status).toBe(400);
+  const withoutRate = await employee.postForm('/expense/register', {
+    id_viaje: tripId, monto_moneda_origen: 20, moneda: 'PEN', tipo_cambio_bs: 6.96, fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi', id_categoria_gasto: 1, es_gasto_internacional: true,
+  });
+  expect(withoutRate.status).toBe(400);
+});
+
+// El recibo se guarda sin IVA, con un codigo con simbolos como numero y una cantidad con 3 decimales
+test('guarda un recibo sin IVA con código y cantidad decimal', async () => {
+  const invoiceCode = `BOL-$${Date.now() % 100000}@34`;
+  const response = await employee.postForm('/invoice/save', {
+    id_viaje: tripId, proveedor: 'Surtidor de prueba', numero_factura: invoiceCode, nit: '1020304', fecha_emision: boliviaDate(), tipo_doc: 'R',
+    monto: 199.51, iva: 0, monto_total: 199.51, id_categoria_gasto: 1, detalle: [{nombre_producto: 'Gasolina', cantidad: 53.345, precio: 3.74}],
+  });
+  expect(response.status).toBe(200);
+  const expenseId = response.body.gasto?.id_gasto || response.body.id_gasto;
+  const detail = await employee.get(`/expense/${expenseId}/detail`);
+  const expense = detail.body.gasto || detail.body;
+  expect(expense.tipo).toBe('R');
+  expect(expense.Factura.Factura_Impuestos || []).toHaveLength(0);
+  expect(expense.Factura.numero_factura).toBe(invoiceCode);
+  expect(parseFloat(expense.Factura.Detalle_Factura[0].cantidad)).toBe(53.345);
+});
+
+// La factura guarda el CUF limpio para el Excel de Oracle
+test('guarda el CUF de la factura', async () => {
+  const response = await employee.postForm('/invoice/save', {
+    id_viaje: tripId, proveedor: 'Estacion de prueba', numero_factura: `F-${Date.now() % 100000}`, nit: '1020305', fecha_emision: boliviaDate(), tipo_doc: 'F',
+    monto: 87, iva: 13, monto_total: 100, cuf: 'dd5f 2336-313f', id_categoria_gasto: 1, detalle: [{nombre_producto: 'Gasolina', cantidad: 26.738, precio: 3.74}],
+  });
+  expect(response.status).toBe(200);
+  const expenseId = response.body.gasto?.id_gasto || response.body.id_gasto;
+  const detail = await employee.get(`/expense/${expenseId}/detail`);
+  expect(detail.body.Factura.cuf).toBe('DD5F2336313F');
+});
+
+// El precio unitario se guarda con hasta 4 decimales, como en el papel
+test('guarda el precio unitario con 4 decimales y rechaza 5', async () => {
+  const invoice = (precio, numero) => ({
+    id_viaje: tripId, proveedor: 'Surtidor de prueba', numero_factura: numero, fecha_emision: boliviaDate(), tipo_doc: 'R',
+    monto: 149.82, iva: 0, monto_total: 149.82, id_categoria_gasto: 1, detalle: [{nombre_producto: 'Gasolina', cantidad: 40, precio}],
+  });
+  const saved = await employee.postForm('/invoice/save', invoice(3.7456, 'R-7456'));
+  expect(saved.status).toBe(200);
+  const detail = await employee.get(`/expense/${saved.body.gasto.id_gasto}/detail`);
+  const expense = detail.body.gasto || detail.body;
+  expect(parseFloat(expense.Factura.Detalle_Factura[0].precio)).toBe(3.7456);
+  const rejected = await employee.postForm('/invoice/save', invoice(3.74567, 'R-74567'));
+  expect(rejected.status).toBe(400);
+  expect(rejected.body.error).toMatch(/4 decimales/);
+});
+
+// Una cantidad con mas de 3 decimales se rechaza
+test('rechaza una cantidad con más de 3 decimales', async () => {
+  const response = await employee.postForm('/invoice/save', {
+    id_viaje: tripId, proveedor: 'Surtidor de prueba', numero_factura: 'R-5335', fecha_emision: boliviaDate(), tipo_doc: 'R',
+    monto: 10, iva: 0, monto_total: 10, id_categoria_gasto: 1, detalle: [{nombre_producto: 'Gasolina', cantidad: 2.3456, precio: 4}],
+  });
+  expect(response.status).toBe(400);
+  expect(response.body.error).toMatch(/3 decimales/);
+});
+
+// Los gastos del viaje se devuelven ordenados por fecha, sin importar el orden en que se registraron
+test('devuelve los gastos del viaje ordenados por fecha', async () => {
+  for (const offset of [1, -1, 0]) {
+    await employee.postForm('/expense/register', {
+      id_viaje: tripId, monto_total: 10, fecha_gasto: boliviaDate(offset), tipo: 'S', descripcion: `Gasto del día ${offset}`, id_categoria_gasto: 1, es_gasto_internacional: false,
+    });
+  }
+  const detail = await employee.get(`/trip/${tripId}`);
+  const dates = detail.body.gastos.map((expense) => expense.fecha_gasto);
+  expect(dates).toEqual([...dates].sort());
+});

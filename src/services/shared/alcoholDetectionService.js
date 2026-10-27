@@ -63,19 +63,25 @@ const innocuousWords = [
   'servicio', 'servicios',
   'papeleria', 'papelería', 'utiles', 'útiles',
   'medicamento', 'farmacia',
-  'combustible', 'gasolina', 'diesel',
+  'combustible', 'gasolina', 'diesel', 'gasoil', 'gnv', 'gas', 'lubricante', 'aceite de motor',
+  // Abreviaturas de combustible en facturas de surtidor (G.ESPECIAL+, G.PREMIUM, D.OIL)
+  'g especial', 'especial', 'g premium', 'premium', 'super', 'd oil', 'litros', 'lts',
 ];
+
+// Pasa el texto a palabras separadas por espacios para comparar palabras completas
+const toWordText = (text) => ` ${textNormalizer.normalizeText(String(text || '')).replace(/\s+/g, ' ')} `;
+
+// Indica si el texto contiene la palabra o frase completa (no un pedazo de otra palabra)
+const containsWord = (text, word) => toWordText(text).includes(toWordText(word));
 
 // Verifica si el nombre del producto contiene alguna palabra clave de alcohol
 const containsAlcoholKeyword = (productName) => {
-  const normalizedName = textNormalizer.normalizeText(productName);
-  return alcoholKeywords.some((keyword) => normalizedName.includes(textNormalizer.normalizeText(keyword)));
+  return alcoholKeywords.some((keyword) => containsWord(productName, keyword));
 };
 
 // Verifica si el nombre del producto es claramente inocuo
 const isInnocuousProduct = (productName) => {
-  const normalizedName = textNormalizer.normalizeText(productName);
-  return innocuousWords.some((keyword) => normalizedName.includes(textNormalizer.normalizeText(keyword)));
+  return innocuousWords.some((keyword) => containsWord(productName, keyword));
 };
 
 // Analiza una lista de detalles de factura y determina si hay alcohol
@@ -96,14 +102,14 @@ const analyzeAlcohol = async (details) => {
   }
   try {
     const productList = ambiguousProducts.join(', ');
-    const prompt = `Analiza esta lista de productos y responde SOLO con "true" si alguno es una bebida alcohólica (incluyendo cualquier tipo de cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago, o cualquier bebida con contenido alcohólico de cualquier región o país). Responde SOLO "true" o "false", sin explicación. Lista: ${productList}`;
+    const prompt = `Analiza esta lista de productos de facturas bolivianas y responde SOLO con "true" si alguno es claramente una bebida alcohólica (cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago o cualquier bebida con alcohol). Las abreviaturas de surtidor como "G.ESPECIAL+", "G.PREMIUM" o "D.OIL" son combustible, no alcohol. Si no es claramente alcohol, responde "false". Responde SOLO "true" o "false", sin explicación. Lista: ${productList}`;
     const response = (await geminiService.generateText(prompt, {taskName: 'deteccion de alcohol', maxAttempts: 2})).toLowerCase();
     return response === 'true';
   }
   catch (error) {
     console.warn('Deteccion de alcohol por IA no disponible, se usan palabras de riesgo:', error.message);
     const riskWords = ['trago', 'copa', 'bebida', 'brebaje', 'fermentado', 'destilado', 'macerado'];
-    return details.some((item) => riskWords.some((word) => textNormalizer.normalizeText(item.nombre_producto).includes(word)));
+    return details.some((item) => riskWords.some((word) => containsWord(item.nombre_producto, word)));
   }
 };
 
@@ -119,40 +125,14 @@ const analyzeAlcoholText = async (text) => {
     return false;
   }
   try {
-    const prompt = `Analiza este texto y responde SOLO con "true" si menciona o hace referencia a bebidas alcohólicas (cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago, o cualquier bebida con contenido alcohólico de cualquier región o país). Responde SOLO "true" o "false", sin explicación. Texto: ${text}`;
+    const prompt = `Analiza este texto de un gasto de viaje y responde SOLO con "true" si menciona claramente bebidas alcohólicas (cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago o cualquier bebida con alcohol). Si no es claramente alcohol, responde "false". Responde SOLO "true" o "false", sin explicación. Texto: ${text}`;
     const response = (await geminiService.generateText(prompt, {taskName: 'deteccion de alcohol en texto', maxAttempts: 2})).toLowerCase();
     return response === 'true';
   }
   catch (error) {
     console.warn('Deteccion de alcohol en texto por IA no disponible, se usan palabras de riesgo:', error.message);
     const riskWords = ['trago', 'copa', 'bebida', 'brebaje', 'fermentado', 'destilado', 'macerado'];
-    return riskWords.some((word) => textNormalizer.normalizeText(text).includes(word));
-  }
-};
-
-// Recalcula y actualiza el indicador de alcohol de un gasto puntual a partir del detalle de su factura
-const updateAlcoholInExpenseFromDetails = async (expenseId, details) => {
-  try {
-    const result = await analyzeAlcohol(details);
-    await supabase.from('Gasto').update({tiene_alcohol: result}).eq('id_gasto', expenseId);
-    return result;
-  }
-  catch (error) {
-    console.warn('Error en updateAlcoholInExpenseFromDetails:', error.message);
-    return false;
-  }
-};
-
-// Recalcula y actualiza el indicador de alcohol de un gasto puntual a partir de su descripcion libre
-const updateAlcoholInExpenseFromText = async (expenseId, text) => {
-  try {
-    const result = await analyzeAlcoholText(text);
-    await supabase.from('Gasto').update({tiene_alcohol: result}).eq('id_gasto', expenseId);
-    return result;
-  }
-  catch (error) {
-    console.warn('Error en updateAlcoholInExpenseFromText:', error.message);
-    return false;
+    return riskWords.some((word) => containsWord(text, word));
   }
 };
 
@@ -173,62 +153,9 @@ const updateAlcoholInTrip = async (tripId) => {
   }
 };
 
-// Lista de palabras inapropiadas que se bloquean sin necesidad de IA
-const hardcodedBadWords = [
-  'puta', 'mierda', 'coño', 'polla', 'gilipollas', 'imbécil', 'imbecil',
-  'idiota', 'estúpido', 'estupido', 'pendejo', 'culero', 'chingada',
-  'verga', 'maricón', 'maricon', 'cabrón', 'cabron', 'bastardo',
-  'hijo de puta', 'hdp', 'conchetumare', 'weon', 'weón', 'huevon', 'huevón',
-];
-
-// Verifica si el texto contiene alguna palabra de la lista negra
-const containsHardcodedBadWord = (text) => {
-  const lower = text.toLowerCase();
-  return hardcodedBadWords.some((word) => lower.includes(word));
-};
-
-// Usa Gemini para detectar si un texto contiene lenguaje inapropiado o agresivo
-const detectWithGemini = async (text) => {
-  const prompt = `Eres un moderador de contenido para un sistema corporativo de gestión de viáticos.
-Tu tarea es determinar si el siguiente texto contiene lenguaje inapropiado, ofensivo, agresivo, vulgar o que no corresponde a un contexto profesional empresarial.
-
-Texto a evaluar: "${text}"
-
-Responde ÚNICAMENTE con un JSON sin texto adicional ni backticks:
-{"inapropiado": true/false, "motivo": "explicación breve solo si es inapropiado, sino null"}`;
-
-  const responseText = await geminiService.generateText(prompt, {taskName: 'moderacion de comentario', maxAttempts: 2});
-  const cleanJson = responseText.replace(/```json|```/g, '').trim();
-  const parsed = JSON.parse(cleanJson);
-  return parsed.inapropiado === true;
-};
-
-// Valida si un texto es apropiado para usarse en observaciones del sistema
-const validateText = async (text) => {
-  if (!text || text.trim().length === 0) {
-    return {valid: true};
-  }
-  if (containsHardcodedBadWord(text)) {
-    return {valid: false, error: 'El comentario contiene palabras inapropiadas'};
-  }
-  try {
-    const isInappropriate = await detectWithGemini(text);
-    if (isInappropriate) {
-      return {valid: false, error: 'El comentario contiene palabras inapropiadas'};
-    }
-    return {valid: true};
-  }
-  catch (error) {
-    console.warn('Error en detección con Gemini:', error.message);
-    return {valid: true};
-  }
-};
-
 module.exports = {
   analyzeAlcohol,
   analyzeAlcoholText,
   updateAlcoholInTrip,
-  updateAlcoholInExpenseFromDetails,
-  updateAlcoholInExpenseFromText,
-  validateText,
+  containsAlcoholKeyword,
 };

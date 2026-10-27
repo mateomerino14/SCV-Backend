@@ -1,5 +1,3 @@
-const puppeteer = require('puppeteer');
-
 const defaultOptions = {
   format: 'A4',
   landscape: true,
@@ -7,8 +5,15 @@ const defaultOptions = {
   preferCSSPageSize: true,
 };
 
+// Carga Puppeteer (modulo ES) solo cuando se genera el primer PDF
+const loadPuppeteer = async () => {
+  const puppeteerModule = await import('puppeteer');
+  return puppeteerModule.default;
+};
+
 // Genera un PDF desde HTML (A4 apaisado por defecto) y siempre cierra el navegador
 const generatePdf = async (html, options = defaultOptions) => {
+  const puppeteer = await loadPuppeteer();
   const browser = await puppeteer.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,

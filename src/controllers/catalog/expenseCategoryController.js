@@ -1,8 +1,8 @@
 const supabase = require('../../config/supabase');
 
-// Lista todas las categorias de gasto
+// Lista todas las categorias de gasto ordenadas por numero de cuenta
 const getAllExpenseCategories = async (req, res) => {
-  const {data, error} = await supabase.from('Categoria_Gasto').select('*');
+  const {data, error} = await supabase.from('Categoria_Gasto').select('*').order('nombre', {ascending: true});
   if (error) {
     return res.status(500).json({error: error.message});
   }

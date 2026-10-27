@@ -1,3 +1,5 @@
+const {spentAgainstFunds} = require('../../utils/expenseCurrency');
+
 // Determina si un gasto corresponde a la categoria de hoteles
 const isHotelExpense = (expense) => {
   const categoryName = expense.Categoria_Gasto?.nombre || '';
@@ -10,15 +12,13 @@ const calculateExpenseSummary = (expenses, trip) => {
   const hotelExpenses = allExpenses.filter(isHotelExpense);
   const nonHotelExpenses = allExpenses.filter((expense) => !isHotelExpense(expense));
 
-  const nationalExpenses = allExpenses.filter((expense) => !expense.es_gasto_internacional);
-  const internationalExpenses = allExpenses.filter((expense) => !!expense.es_gasto_internacional);
-  const accumulatedExpense = nationalExpenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
-  const accumulatedExpenseUsd = internationalExpenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
+  const spent = spentAgainstFunds(trip, allExpenses);
+  const accumulatedExpense = spent.spentBs;
+  const accumulatedExpenseUsd = spent.spentUsd;
 
-  const hotelNational = hotelExpenses.filter((expense) => !expense.es_gasto_internacional);
-  const hotelInternational = hotelExpenses.filter((expense) => !!expense.es_gasto_internacional);
-  const hotelAccumulated = hotelNational.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
-  const hotelAccumuladoUsd = hotelInternational.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
+  const hotelSpent = spentAgainstFunds(trip, hotelExpenses);
+  const hotelAccumulated = hotelSpent.spentBs;
+  const hotelAccumuladoUsd = hotelSpent.spentUsd;
   const hotelExceeds = hotelAccumulated > parseFloat(trip.monto_asignado || 0);
   const hotelExceedsUsd = hotelAccumuladoUsd > parseFloat(trip.monto_asignado_usd || 0);
 
@@ -88,4 +88,4 @@ const buildReviewAlerts = (summary, trip) => {
   return {alerts, reviewStatus};
 };
 
-module.exports = {calculateExpenseSummary, buildReviewAlerts, isHotelExpense};
+module.exports = {calculateExpenseSummary, buildReviewAlerts};

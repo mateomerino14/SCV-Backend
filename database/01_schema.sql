@@ -18,12 +18,14 @@ create table if not exists "Cargo" (
 create table if not exists "Seccion" (
   id_seccion serial primary key,
   nombre varchar(100) not null unique,
+  codigo_seccion varchar(3), -- seccion en la cuenta de Oracle, por ejemplo 200
   activo boolean not null default true
 );
 
 create table if not exists "Categoria_Gasto" (
   id_categoria serial primary key,
-  nombre varchar(50) not null unique,
+  nombre varchar(100) not null unique,
+  descripcion text, -- cuando usar la cuenta, segun la planilla de Castro
   requiere_comprobante boolean not null default true
 );
 
@@ -57,6 +59,8 @@ create table if not exists "Usuario" (
   id_jefe_directo integer references "Usuario"(id_usuario),
   id_seccion integer references "Seccion"(id_seccion),
   carnet_identidad varchar(15),
+  -- dependencia de Oracle de quienes tienen a este usuario como jefe directo (por ejemplo 421); sin jefe, tambien la suya
+  codigo_dependencia varchar(3),
   ultima_cambio_contrasenia timestamptz default now(),
   refresh_token_invalido_desde timestamptz,
   -- true mientras tenga una contrasena temporal (recien creado, puesta por el administrador
@@ -89,7 +93,7 @@ create table if not exists "Auditoria" (
 
 create table if not exists "Viaje" (
   id_viaje serial primary key,
-  motivo varchar(100) not null,
+  motivo varchar(500) not null,
   origen text,
   destino varchar(200) not null,
   fecha_inicio date not null,
@@ -106,6 +110,9 @@ create table if not exists "Viaje" (
   fue_iniciado boolean default false,
   ciclo_revision integer not null default 1,
   tiene_alcohol boolean,
+  -- numero de rendicion del mes para Oracle (10-40): lo asigna un trigger al quedar APROBADO_FINAL
+  numero_rendicion integer,
+  periodo_rendicion char(7),
   id_usuario integer not null,
   id_supervisor_asignado integer,
   id_aprobador_asignado integer,
@@ -146,14 +153,16 @@ create table if not exists "Gasto" (
   modificado boolean not null default false,
   es_gasto_internacional boolean default false,
   moneda varchar(10) default 'BOB',
-  tipo_cambio numeric(10, 4) default 1,
+  tipo_cambio numeric(10, 4) default 1, -- unidades de la moneda del gasto por 1 USD
   monto_moneda_origen numeric(10, 2) default 0,
+  tipo_cambio_bs numeric(10, 4), -- bolivianos por 1 USD de un gasto internacional, para la planilla en Bs
   base_imponible numeric(10, 2) default 0,
   retencion_rc_iva numeric(10, 2) default 0,
   retencion_iue numeric(10, 2) default 0,
   retencion_it numeric(10, 2) default 0,
   importe_costo numeric(10, 2) default 0,
   tiene_alcohol boolean not null default false,
+  numero_recibo varchar(50), -- numero impreso del recibo en papel de un gasto sin factura, si lo tiene
   id_viaje integer not null references "Viaje"(id_viaje),
   id_categoria integer references "Categoria_Gasto"(id_categoria),
   id_proveedor integer references "Proveedor"(id_proveedor)
@@ -181,6 +190,13 @@ create table if not exists "Imagen" (
   id_gasto integer not null references "Gasto"(id_gasto) unique
 );
 
+-- Respaldos extra de un gasto sin factura (por ejemplo, el comprobante del cambio de moneda); hasta 2 por gasto
+create table if not exists "Imagen_Respaldo" (
+  id_respaldo serial primary key,
+  url_archivo text not null,
+  id_gasto integer not null references "Gasto"(id_gasto) on delete cascade
+);
+
 -- ------------------------------------------------------------
 -- Facturas
 -- ------------------------------------------------------------
@@ -190,6 +206,7 @@ create table if not exists "Factura" (
   numero_factura varchar(50) not null,
   fecha_emision date not null,
   monto_parcial decimal(10, 2) not null,
+  cuf varchar(100), -- codigo de autorizacion (CUF) que pide Oracle
   id_gasto integer not null references "Gasto"(id_gasto) unique,
   id_proveedor integer references "Proveedor"(id_proveedor),
   constraint factura_numero_proveedor_fecha_unique unique (numero_factura, fecha_emision, id_proveedor)
@@ -198,8 +215,8 @@ create table if not exists "Factura" (
 create table if not exists "Detalle_Factura" (
   id_detalle serial primary key,
   nombre_producto varchar(255) not null,
-  cantidad numeric(10, 2) not null,
-  precio decimal(10, 2) not null,
+  cantidad numeric(12, 3) not null, -- hasta 3 decimales: litros, kilos o unidades
+  precio numeric(12, 4) not null, -- precio unitario con hasta 4 decimales, como en el papel (por ejemplo 3.7456 Bs por litro)
   id_factura integer not null references "Factura"(id_factura)
 );
 
@@ -239,6 +256,15 @@ insert into "Correlativo_Recibo" (numero)
 select 0
 where not exists (select 1 from "Correlativo_Recibo" where id = 1);
 
+-- Ultimo numero de rendicion asignado en cada mes (AAAA-MM), para la descripcion de Oracle
+create table if not exists "Correlativo_Rendicion" (
+  periodo char(7) primary key,
+  numero integer not null default 0
+);
+
+-- Seguro extra: dos rendiciones nunca comparten numero en el mismo mes
+create unique index if not exists viaje_numero_rendicion_unique on "Viaje"(periodo_rendicion, numero_rendicion) where numero_rendicion is not null;
+
 -- Numero de cada recibo emitido (por gasto o agrupado por viaje), para conservarlo al reenviar
 create table if not exists "Recibo" (
   id_recibo serial primary key,
@@ -247,6 +273,8 @@ create table if not exists "Recibo" (
   id_gasto integer references "Gasto"(id_gasto) on delete cascade,
   tipo char(1) not null check (tipo in ('C', 'S')),
   es_gasto_internacional boolean not null default false,
+  -- el numero se asigna al registrar el gasto; enviado indica si el recibo ya se mando al empleado
+  enviado boolean not null default false,
   fecha_emision timestamptz not null default now()
 );
 

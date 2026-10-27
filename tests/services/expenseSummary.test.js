@@ -104,3 +104,62 @@ test('no genera alertas cuando el viaje esta conforme', () => {
   expect(result.alerts).toHaveLength(0);
   expect(result.reviewStatus).toBe('CONFORME');
 });
+
+// En viajes internacionales cada dia se controla por separado en Bs y en USD
+test('controla cada dia con la tarifa de cada moneda por separado', () => {
+  const expenses = [
+    {monto_total: '280', fecha_gasto: '2026-01-01', es_gasto_internacional: false},
+    {monto_total: '70', fecha_gasto: '2026-01-01', es_gasto_internacional: true},
+    {monto_total: '90', fecha_gasto: '2026-01-02', es_gasto_internacional: true},
+  ];
+  const trip = tripWithDailyRate(250, 80, 1000, 500);
+  const result = expenseSummaryService.calculateExpenseSummary(expenses, trip);
+  expect(result.dailyBreakdown).toEqual([
+    {fecha: '2026-01-01', montoBs: 280, montoUsd: 70, excedeBs: true, excedeUsd: false},
+    {fecha: '2026-01-02', montoBs: 0, montoUsd: 90, excedeBs: false, excedeUsd: true},
+  ]);
+  expect(result.exceedsBudget).toBe(true);
+  expect(result.exceedsBudgetUsd).toBe(true);
+});
+
+// Verifica que en un viaje internacional con fondo solo en Bs los gastos en el exterior se descuenten del fondo en Bs
+test('descuenta los gastos internacionales del fondo en Bs cuando no hay fondo en USD', () => {
+  const expenses = [
+    {monto_total: '100', fecha_gasto: '2026-01-01', es_gasto_internacional: false},
+    {monto_total: '50', tipo_cambio_bs: '10', fecha_gasto: '2026-01-02', es_gasto_internacional: true, Categoria_Gasto: {nombre: 'HOTEL'}},
+    {monto_total: '20', tipo_cambio_bs: '10', fecha_gasto: '2026-01-02', es_gasto_internacional: true},
+  ];
+  const trip = tripWithDailyRate(300, 100, 1000, 0);
+  const result = expenseSummaryService.calculateExpenseSummary(expenses, trip);
+  expect(result.accumulatedExpense).toBe(800);
+  expect(result.accumulatedExpenseUsd).toBe(0);
+  expect(result.totalExceeds).toBe(false);
+  expect(result.totalExceedsUsd).toBe(false);
+  expect(result.hotelAccumulated).toBe(500);
+  expect(result.hotelExceedsUsd).toBe(false);
+  expect(result.exceedsBudgetUsd).toBe(false);
+});
+
+// Verifica que el tope diario en USD del cargo se siga controlando aunque el fondo se haya entregado en Bs
+test('mantiene el tope diario en USD cuando el fondo es solo en Bs', () => {
+  const expenses = [
+    {monto_total: '120', tipo_cambio_bs: '10', fecha_gasto: '2026-01-02', es_gasto_internacional: true},
+  ];
+  const trip = tripWithDailyRate(300, 100, 5000, 0);
+  const result = expenseSummaryService.calculateExpenseSummary(expenses, trip);
+  expect(result.accumulatedExpense).toBe(1200);
+  expect(result.totalExceeds).toBe(false);
+  expect(result.exceededDays[0].excedeUsd).toBe(true);
+});
+
+// Verifica que con fondo en USD los gastos internacionales sigan saliendo de ese fondo
+test('sigue usando el fondo en USD cuando el viaje lo tiene', () => {
+  const expenses = [
+    {monto_total: '50', tipo_cambio_bs: '10', fecha_gasto: '2026-01-02', es_gasto_internacional: true},
+  ];
+  const trip = tripWithDailyRate(300, 100, 1000, 40);
+  const result = expenseSummaryService.calculateExpenseSummary(expenses, trip);
+  expect(result.accumulatedExpense).toBe(0);
+  expect(result.accumulatedExpenseUsd).toBe(50);
+  expect(result.totalExceedsUsd).toBe(true);
+});

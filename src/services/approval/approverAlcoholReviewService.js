@@ -31,7 +31,7 @@ const attachSummaryToTrips = (trips) => {
 const getPendingAlcoholReviews = async (approverId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'EN_REVISION_APROBADOR')
     .is('id_aprobador_asignado', null)
     .neq('id_usuario', approverId);
@@ -56,7 +56,7 @@ const getPendingAlcoholReviews = async (approverId, filters) => {
 
 // Lista los viajes de revision adicional asignados al aprobador
 const getMyAlcoholReviews = async (approverId, filters) => {
-  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))';
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))';
   // El aprobador es unico: toda revision por alcohol pendiente le corresponde
   await hierarchyAssignmentService.claimStageTrips(approverId, 'id_aprobador_asignado', ['EN_REVISION_APROBADOR']);
   let query = supabase
@@ -102,7 +102,6 @@ const takeAlcoholReview = async (tripId, approverId) => {
   if (trip.id_usuario === approverId) {
     return {error: 'No puedes revisar tu propio viaje', status: 403};
   }
-  // Si ya lo tiene asignado (por ejemplo, por jefatura directa) tomarlo no es un error
   if (trip.id_aprobador_asignado === approverId) {
     return {message: 'Ya tienes este viaje asignado'};
   }
@@ -114,7 +113,6 @@ const takeAlcoholReview = async (tripId, approverId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -139,7 +137,6 @@ const returnAlcoholReview = async (tripId, approverId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -151,7 +148,7 @@ const returnAlcoholReview = async (tripId, approverId) => {
 const getAlcoholReviewDetail = async (tripId, approverId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -166,8 +163,9 @@ const getAlcoholReviewDetail = async (tripId, approverId) => {
   }
   const {data: expenses} = await supabase
     .from('Gasto')
-    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
-    .eq('id_viaje', tripId);
+    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)')
+    .eq('id_viaje', tripId)
+    .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   const {data: comments} = await supabase
     .from('Comentario').select('*').eq('id_viaje', tripId).order('fecha', {ascending: false});
   const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip);
@@ -209,7 +207,6 @@ const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} 
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
@@ -251,7 +248,6 @@ const rejectAlcoholReview = async (tripId, approverId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }

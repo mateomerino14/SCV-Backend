@@ -25,6 +25,8 @@ router.put('/me/change-password', authMiddleware, userController.changeMyPasswor
 router.get('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.getAllUsers);
 router.put('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.updateUser);
 router.post('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.createUser);
+router.post('/import/preview', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.previewUserImport);
+router.post('/import', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.importUsers);
 router.delete('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.deleteUser);
 // Sin sesion (se usa en la recuperacion de contrasena): con el mismo limite que el envio de codigos
 router.post('/check-email', sendCodeRateLimiter, userController.checkEmail);

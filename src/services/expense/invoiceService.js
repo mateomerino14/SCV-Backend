@@ -1,11 +1,21 @@
 const supabase = require('../../config/supabase');
-const expenseService = require('./expenseService');
 const deadlineService = require('../shared/deadlineService');
 const alcoholDetectionService = require('../shared/alcoholDetectionService');
 const supplierService = require('./supplierService');
 const substitutionService = require('../approval/substitutionService');
+const {calculateRetentions} = require('../../utils/retentions');
+const {normalizeCuf} = require('../../utils/cuf');
+const storageService = require('../shared/storageService');
 
 const ivaPercentageBolivia = 13;
+
+// El CUF solo aplica a facturas; el recibo no lo lleva
+const getInvoiceCuf = (invoiceData) => {
+  if (invoiceData.tipo_doc !== 'F') {
+    return null;
+  }
+  return normalizeCuf(invoiceData.cuf);
+};
 
 // Asocia o crea el registro de impuesto IVA para una factura
 const attachIvaTax = async (invoiceId, ivaAmount) => {
@@ -39,18 +49,14 @@ const attachIvaTax = async (invoiceId, ivaAmount) => {
 
 // Sube la imagen de la factura antes de escribir y devuelve su URL publica
 const uploadInvoiceImage = async (file) => {
-  const fileExtension = file.originalname.split('.').pop();
-  const fileName = `facturas/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExtension}`;
-  const {error: storageError} = await supabase.storage
-    .from('facturas')
-    .upload(fileName, file.buffer, {contentType: file.mimetype});
-  if (storageError) {
+  const upload = await storageService.uploadFile('facturas', file);
+  if (upload.error) {
     return {error: 'No se pudo subir el comprobante de la factura. Intenta nuevamente.'};
   }
-  return {url: supabase.storage.from('facturas').getPublicUrl(fileName).data.publicUrl};
+  return upload;
 };
 
-// Valida que cada producto tenga nombre, cantidad mayor a cero y precio no negativo
+// Valida que cada producto tenga nombre, cantidad mayor a cero (hasta 3 decimales) y precio no negativo (hasta 4 decimales)
 const validateInvoiceLines = (lines) => {
   for (const item of lines) {
     if (!String(item?.nombre_producto || '').trim()) {
@@ -58,6 +64,14 @@ const validateInvoiceLines = (lines) => {
     }
     if (!(parseFloat(item.cantidad) > 0) || isNaN(parseFloat(item.precio)) || parseFloat(item.precio) < 0) {
       return 'Cada producto debe tener una cantidad mayor a cero y un precio válido';
+    }
+    // La cantidad admite decimales (litros, kilos) pero solo hasta 3, como la columna numeric(12, 3)
+    if (!/^\d{1,9}(\.\d{1,3})?$/.test(String(item.cantidad))) {
+      return 'La cantidad de cada producto admite como máximo 3 decimales';
+    }
+    // El precio unitario admite hasta 4 decimales, como la columna numeric(12, 4)
+    if (!/^\d{1,8}(\.\d{1,4})?$/.test(String(item.precio))) {
+      return 'El precio de cada producto admite como máximo 4 decimales';
     }
   }
   return null;
@@ -68,7 +82,7 @@ const validateInvoiceData = (invoiceData) => {
   if (!invoiceData.proveedor) {
     return 'El nombre del proveedor es requerido';
   }
-  if (!invoiceData.numero_factura) {
+  if (!String(invoiceData.numero_factura || '').trim()) {
     return 'El número de factura es requerido';
   }
   if (!invoiceData.fecha_emision) {
@@ -103,11 +117,6 @@ const saveInvoice = async (invoiceData, file, userId) => {
   if (!access.allowed) {
     return {error: access.error, status: access.status};
   }
-  // Las facturas son en bolivianos: en un viaje internacional solo valen el primer y el ultimo dia
-  const currencyError = expenseService.validateCurrencyByDay(access.trip, invoiceData.fecha_emision, false);
-  if (currencyError) {
-    return {error: currencyError, status: 400};
-  }
   const deadlineValidation = await deadlineService.validateTripDeadline(invoiceData.id_viaje, invoiceData.fecha_emision);
   if (!deadlineValidation.valid) {
     return {error: deadlineValidation.error, status: 400, requiereAutorizacion: !!deadlineValidation.requiereAutorizacion};
@@ -120,6 +129,11 @@ const saveInvoice = async (invoiceData, file, userId) => {
     }
     imageUrl = upload.url;
   }
+  // Si algo falla al guardar, se borra el comprobante recien subido para no dejarlo suelto
+  const failWith = async (result) => {
+    await storageService.removeFiles([imageUrl]);
+    return result;
+  };
   const supplierName = invoiceData.proveedor.trim();
   const {data: existingSupplier} = await supabase
     .from('Proveedor')
@@ -139,7 +153,7 @@ const saveInvoice = async (invoiceData, file, userId) => {
       .select()
       .single();
     if (supplierError) {
-      return {error: supplierError.message, status: 500};
+      return failWith({error: supplierError.message, status: 500});
     }
     else {
       supplierId = newSupplier?.id_proveedor;
@@ -162,12 +176,12 @@ const saveInvoice = async (invoiceData, file, userId) => {
       moneda: 'BOB',
       monto_moneda_origen: parseFloat(invoiceData.monto_total),
       // Factura o recibo: sin retenciones, el costo es el monto completo
-      ...expenseService.calculateRetentions(invoiceData.monto_total, invoiceData.tipo_doc, false, hasAlcohol),
+      ...calculateRetentions(invoiceData.monto_total, invoiceData.tipo_doc, false, hasAlcohol),
     })
     .select()
     .single();
   if (expenseError) {
-    return {error: expenseError.message, status: 500};
+    return failWith({error: expenseError.message, status: 500});
   }
   const {data: invoice, error: invoiceError} = await supabase
     .from('Factura')
@@ -175,6 +189,7 @@ const saveInvoice = async (invoiceData, file, userId) => {
       numero_factura: invoiceData.numero_factura,
       fecha_emision: invoiceData.fecha_emision,
       monto_parcial: invoiceData.monto,
+      cuf: getInvoiceCuf(invoiceData),
       id_gasto: expense.id_gasto,
       id_proveedor: supplierId,
     })
@@ -183,10 +198,10 @@ const saveInvoice = async (invoiceData, file, userId) => {
   if (invoiceError) {
     await supabase.from('Gasto').delete().eq('id_gasto', expense.id_gasto);
     if (invoiceError.code === '23505') {
-      return {error: `La factura número ${invoiceData.numero_factura} de este proveedor ya fue registrada para esta fecha`, status: 400};
+      return failWith({error: `La factura número ${invoiceData.numero_factura} de este proveedor ya fue registrada para esta fecha`, status: 400});
     }
     else {
-      return {error: invoiceError.message, status: 500};
+      return failWith({error: invoiceError.message, status: 500});
     }
   }
   if (invoiceData.detalle && invoiceData.detalle.length > 0) {
@@ -200,7 +215,7 @@ const saveInvoice = async (invoiceData, file, userId) => {
     if (detailError) {
       await supabase.from('Factura').delete().eq('id_factura', invoice.id_factura);
       await supabase.from('Gasto').delete().eq('id_gasto', expense.id_gasto);
-      return {error: detailError.message, status: 500};
+      return failWith({error: detailError.message, status: 500});
     }
   }
   try {
@@ -244,7 +259,6 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   if (!existingExpense) {
     return {error: 'Gasto no encontrado', status: 404};
   }
-  // Solo se editan por aqui los gastos que son facturas
   const {data: existingInvoice} = await supabase.from('Factura').select('id_factura').eq('id_gasto', expenseId).maybeSingle();
   if (!existingInvoice) {
     return {error: 'Este gasto no es una factura', status: 400};
@@ -255,10 +269,6 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
   const access = await substitutionService.canRegisterExpenseOnTrip(existingExpense.id_viaje, userId);
   if (!access.allowed) {
     return {error: access.error, status: access.status};
-  }
-  const currencyError = expenseService.validateCurrencyByDay(access.trip, invoiceData.fecha_emision, false);
-  if (currencyError) {
-    return {error: currencyError, status: 400};
   }
   // Siempre con el viaje real del gasto (no el que envie el cliente) para que no se salte el plazo
   const deadlineValidation = await deadlineService.validateTripDeadline(existingExpense.id_viaje, invoiceData.fecha_emision);
@@ -273,6 +283,10 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
     }
     newImageUrl = upload.url;
   }
+  const failWith = async (result) => {
+    await storageService.removeFiles([newImageUrl]);
+    return result;
+  };
   const supplierName = invoiceData.proveedor.trim();
   const {data: existingSupplier} = await supabase
     .from('Proveedor')
@@ -292,7 +306,7 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
       .select()
       .single();
     if (supplierError) {
-      return {error: supplierError.message, status: 500};
+      return failWith({error: supplierError.message, status: 500});
     }
     else {
       supplierId = newSupplier?.id_proveedor;
@@ -309,7 +323,7 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
     .neq('id_factura', existingInvoice.id_factura)
     .limit(1);
   if ((duplicateInvoice || []).length > 0) {
-    return {error: `La factura número ${invoiceData.numero_factura} de este proveedor ya fue registrada para esta fecha`, status: 400};
+    return failWith({error: `La factura número ${invoiceData.numero_factura} de este proveedor ya fue registrada para esta fecha`, status: 400});
   }
   const {error: expenseError} = await supabase
     .from('Gasto')
@@ -323,11 +337,11 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
       id_categoria: invoiceData.id_categoria_gasto || null,
       tiene_alcohol: hasAlcohol,
       monto_moneda_origen: parseFloat(invoiceData.monto_total),
-      ...expenseService.calculateRetentions(invoiceData.monto_total, invoiceData.tipo_doc || 'F', false, hasAlcohol),
+      ...calculateRetentions(invoiceData.monto_total, invoiceData.tipo_doc || 'F', false, hasAlcohol),
     })
     .eq('id_gasto', expenseId);
   if (expenseError) {
-    return {error: expenseError.message, status: 500};
+    return failWith({error: expenseError.message, status: 500});
   }
   const {error: invoiceUpdateError} = await supabase
     .from('Factura')
@@ -335,15 +349,16 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
       numero_factura: invoiceData.numero_factura,
       fecha_emision: invoiceData.fecha_emision,
       monto_parcial: invoiceData.monto,
+      cuf: getInvoiceCuf(invoiceData),
       id_proveedor: supplierId,
     })
     .eq('id_factura', existingInvoice.id_factura);
   if (invoiceUpdateError) {
     if (invoiceUpdateError.code === '23505') {
-      return {error: `La factura número ${invoiceData.numero_factura} de este proveedor ya fue registrada para esta fecha`, status: 400};
+      return failWith({error: `La factura número ${invoiceData.numero_factura} de este proveedor ya fue registrada para esta fecha`, status: 400});
     }
     else {
-      return {error: invoiceUpdateError.message, status: 500};
+      return failWith({error: invoiceUpdateError.message, status: 500});
     }
   }
   await supabase.from('Detalle_Factura').delete().eq('id_factura', existingInvoice.id_factura);
@@ -367,8 +382,10 @@ const updateInvoice = async (expenseId, invoiceData, file, userId) => {
     console.warn('Error alcohol:', error.message);
   }
   if (newImageUrl) {
+    const {data: previousImages} = await supabase.from('Imagen').select('url_archivo').eq('id_gasto', expenseId);
     await supabase.from('Imagen').delete().eq('id_gasto', expenseId);
     await supabase.from('Imagen').insert({url_archivo: newImageUrl, id_gasto: expenseId});
+    await storageService.removeFiles((previousImages || []).map((image) => image.url_archivo));
   }
   return {};
 };

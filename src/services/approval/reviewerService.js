@@ -8,6 +8,7 @@ const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService
 const tripCodeUtil = require('../../utils/tripCode');
 const reviewLogService = require('./reviewLogService');
 const {escapeHtml} = require('../../utils/htmlEscape');
+const {hasUsdFund} = require('../../utils/expenseCurrency');
 
 // Anexa el resumen de gastos y alertas a una lista de viajes
 const attachSummaryToTrips = (trips) => {
@@ -31,11 +32,19 @@ const attachSummaryToTrips = (trips) => {
   });
 };
 
+// Quien reviso antes al revisor final: el aprobador si hubo alcohol, si no el supervisor
+const getPreviousReviewerId = (trip) => {
+  if (trip.tiene_alcohol) {
+    return trip.id_aprobador_asignado;
+  }
+  return trip.id_supervisor_asignado;
+};
+
 // Lista los viajes pendientes de revision final
 const getPendingReviews = async (reviewerId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'APROBADO_SUPERVISOR')
     .is('id_revisor_asignado', null)
     .neq('id_usuario', reviewerId);
@@ -54,7 +63,7 @@ const getPendingReviews = async (reviewerId, filters) => {
   }
   else {
     const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
-      data || [], reviewerId, 'REVISOR', (trip) => (trip.tiene_alcohol ? trip.id_aprobador_asignado : trip.id_supervisor_asignado)
+      data || [], reviewerId, 'REVISOR', getPreviousReviewerId
     );
     return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(trips, filters.id_seccion))};
   }
@@ -62,7 +71,7 @@ const getPendingReviews = async (reviewerId, filters) => {
 
 // Lista las revisiones finales asignadas al revisor
 const getMyReviews = async (reviewerId, filters) => {
-  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)';
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)';
   // El revisor es unico: toda rendicion pendiente de revision final le corresponde
   await hierarchyAssignmentService.claimStageTrips(reviewerId, 'id_revisor_asignado', ['APROBADO_SUPERVISOR']);
   let query = supabase
@@ -95,10 +104,10 @@ const getMyReviews = async (reviewerId, filters) => {
 };
 
 // Obtiene el detalle de un viaje en revision final
-const getReviewDetail = async (tripId, reviewerId) => {
+const getReviewDetail = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -109,8 +118,9 @@ const getReviewDetail = async (tripId, reviewerId) => {
   }
   const {data: expenses} = await supabase
     .from('Gasto')
-    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto)')
-    .eq('id_viaje', tripId);
+    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)')
+    .eq('id_viaje', tripId)
+    .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   const {data: comments} = await supabase
     .from('Comentario').select('*').eq('id_viaje', tripId).order('fecha', {ascending: false});
   const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip);
@@ -159,7 +169,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
     throw new Error('El empleado no tiene correo corporativo registrado');
   }
   const summary = expenseSummaryService.calculateExpenseSummary(expenses, trip);
-  const isInternational = trip.tipo === 'Internacional';
+  const usdFund = hasUsdFund(trip);
   const assignedAmount = parseFloat(trip.monto_asignado);
   const assignedAmountUsd = parseFloat(trip.monto_asignado_usd || 0);
   const nationalBalance = assignedAmount - summary.accumulatedExpense;
@@ -171,7 +181,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
     usdBalance,
     exceedsNational: nationalBalance < 0,
     exceedsUsd: usdBalance < 0,
-    isInternational,
+    hasUsdFund: usdFund,
   };
   const resultHtml = finalReviewDocumentService.generateEmployeeResultHtml(trip, tripCode, resultSummary);
   const pdfBuffer = await finalReviewDocumentService.generatePdf(resultHtml);
@@ -188,7 +198,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
     return `Debes devolver ${currency} ${balance.toFixed(2)} a la empresa`;
   };
   const resultRows = [{label: 'Bolivianos', value: describeBalance(nationalBalance, 'Bs')}];
-  if (isInternational) {
+  if (usdFund) {
     resultRows.push({label: 'Dólares', value: describeBalance(usdBalance, 'USD')});
   }
   const emailHtml = emailService.buildEmailLayout('Tu rendición fue aprobada', `
@@ -228,7 +238,6 @@ const approveReview = async (tripId, reviewerId, {selfStageSkip = false} = {}) =
   if (error) {
     return {error: error.message, status: 500};
   }
-  // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
   if (!updatedRows?.length) {
     return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
   }
@@ -290,12 +299,10 @@ const rejectReview = async (tripId, reviewerId) => {
     return {error: error.message, status: 500};
   }
   else {
-    // Si no se actualizo ninguna fila, otra persona cambio el viaje entre la lectura y esta accion
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
     await reviewLogService.recordReview(tripId, reviewerId, reviewLogService.reviewStages.finalReview, 'RECHAZADO');
-    // Igual que en las demas etapas, el empleado recibe el aviso para corregir
     await emailService.sendRejectionNotice(trip.Usuario);
     return {message: 'Viaje rechazado correctamente'};
   }

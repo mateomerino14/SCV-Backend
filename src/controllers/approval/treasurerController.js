@@ -27,8 +27,7 @@ const getMyTrips = async (req, res) => {
 // Obtiene el detalle de un viaje para tesoreria
 const getTripDetail = async (req, res) => {
   const {tripId} = req.params;
-  const treasurerId = req.user.id_usuario;
-  const result = await treasurerService.getTripDetail(tripId, treasurerId);
+  const result = await treasurerService.getTripDetail(tripId);
   if (result.error) {
     return res.status(result.status).json({error: result.error});
   }

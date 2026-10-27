@@ -1,16 +1,15 @@
 const pdfService = require('../shared/pdfService');
 const {escapeDeep} = require('../../utils/htmlEscape');
+const {hasUsdFund} = require('../../utils/expenseCurrency');
 
 // Genera el HTML de confirmacion de fondo asignado
 const generateFundConfirmationHtml = (rawTrip, rawTreasurer, tripCode) => {
-  // Datos escritos por usuarios: se escapan antes de armar el documento
   const trip = escapeDeep(rawTrip);
   const treasurer = escapeDeep(rawTreasurer);
   const employee = trip.Usuario;
   const today = new Date().toLocaleDateString('es-ES', {day: 'numeric', month: 'long', year: 'numeric'});
-  const isInternational = trip.tipo === 'Internacional';
   let internationalRow = '';
-  if (isInternational) {
+  if (trip.tipo === 'Internacional' && hasUsdFund(trip)) {
     internationalRow = `<div class="montos-fila"><span>Fondo Internacional (USD)</span><span><strong>USD ${parseFloat(trip.monto_asignado_usd || 0).toFixed(2)}</strong></span></div>`;
   }
   return `<!DOCTYPE html>

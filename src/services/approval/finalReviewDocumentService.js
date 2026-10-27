@@ -1,5 +1,6 @@
 const pdfService = require('../shared/pdfService');
 const {escapeDeep} = require('../../utils/htmlEscape');
+const {hasUsdFund, spentAgainstFunds} = require('../../utils/expenseCurrency');
 
 // Formatea una fecha ISO a formato dia/mes/anio
 const formatDate = (isoString) => {
@@ -38,7 +39,6 @@ const buildExpenseRow = (expense, isInternational) => {
 
 // Genera el HTML de la rendicion final para tesoreria
 const generateRenditionHtml = (rawTrip, rawReviewer, tripCode, rawExpenses) => {
-  // Datos escritos por usuarios: se escapan antes de armar el documento
   const trip = escapeDeep(rawTrip);
   const reviewer = escapeDeep(rawReviewer);
   const expenses = escapeDeep(rawExpenses);
@@ -47,8 +47,7 @@ const generateRenditionHtml = (rawTrip, rawReviewer, tripCode, rawExpenses) => {
   const period = `${formatDate(trip.fecha_inicio)} al ${formatDate(trip.fecha_fin)}`;
   const nationalExpenses = (expenses || []).filter((expense) => !expense.es_gasto_internacional);
   const internationalExpenses = (expenses || []).filter((expense) => !!expense.es_gasto_internacional);
-  const totalNational = nationalExpenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
-  const totalUsd = internationalExpenses.reduce((sum, expense) => sum + parseFloat(expense.monto_total || 0), 0);
+  const {spentBs: totalNational, spentUsd: totalUsd, internationalUsd} = spentAgainstFunds(rawTrip, rawExpenses);
   const assignedAmount = parseFloat(trip.monto_asignado);
   const assignedAmountUsd = parseFloat(trip.monto_asignado_usd || 0);
   const nationalBalance = assignedAmount - totalNational;
@@ -72,14 +71,18 @@ const generateRenditionHtml = (rawTrip, rawReviewer, tripCode, rawExpenses) => {
     ${internationalExpenses.map((expense) => buildExpenseRow(expense, true)).join('')}
   </table>`;
     }
-    internationalSection = `<div class="seccion">Gastos Internacionales (USD)</div>
-  ${internationalTable}
-  <div class="resumen-row"><span>Fondo asignado (USD)</span><span>USD ${assignedAmountUsd.toFixed(2)}</span></div>
+    let internationalSummary = `<div class="resumen-row"><span>Total en USD (descontado del fondo en Bs)</span><span>USD ${internationalUsd.toFixed(2)}</span></div>`;
+    if (hasUsdFund(trip)) {
+      internationalSummary = `<div class="resumen-row"><span>Fondo asignado (USD)</span><span>USD ${assignedAmountUsd.toFixed(2)}</span></div>
   <div class="resumen-row"><span>Total gastado (USD)</span><span>USD ${totalUsd.toFixed(2)}</span></div>
   <div class="resumen-total" style="color:${exceedsUsd ? '#870002' : '#155724'}">
     <span>${exceedsUsd ? 'Exceso a reembolsar (USD)' : 'Saldo a devolver (USD)'}</span>
     <span>USD ${Math.abs(usdBalance).toFixed(2)}</span>
   </div>`;
+    }
+    internationalSection = `<div class="seccion">Gastos Internacionales (USD)</div>
+  ${internationalTable}
+  ${internationalSummary}`;
   }
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
@@ -136,7 +139,7 @@ const generateEmployeeResultHtml = (rawTrip, tripCode, summary) => {
   const trip = escapeDeep(rawTrip);
   const employee = trip.Usuario;
   let internationalBlock = '';
-  if (summary.isInternational) {
+  if (summary.hasUsdFund) {
     internationalBlock = `
     <div class="resultado-fila" style="margin-top:12px;"><span>Fondo asignado (USD)</span><span>USD ${parseFloat(trip.monto_asignado_usd || 0).toFixed(2)}</span></div>
     <div class="resultado-fila"><span>Total gastado (USD)</span><span>USD ${summary.totalUsd.toFixed(2)}</span></div>
@@ -146,8 +149,8 @@ const generateEmployeeResultHtml = (rawTrip, tripCode, summary) => {
     </div>`;
   }
   // En viajes internacionales puede haber devolucion en una moneda y reembolso en la otra
-  const mustReturn = summary.nationalBalance > 0.005 || (summary.isInternational && summary.usdBalance > 0.005);
-  const getsRefund = summary.exceedsNational || (summary.isInternational && summary.exceedsUsd);
+  const mustReturn = summary.nationalBalance > 0.005 || (summary.hasUsdFund && summary.usdBalance > 0.005);
+  const getsRefund = summary.exceedsNational || (summary.hasUsdFund && summary.exceedsUsd);
   let closingText = 'No quedan saldos pendientes.';
   if (mustReturn && getsRefund) {
     closingText = 'Por favor coordina con Tesorería la devolución del saldo pendiente y el reembolso correspondiente.';
