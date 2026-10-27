@@ -38,11 +38,14 @@ FRONTEND_URL=...
 | `JWT_REFRESH_SECRET` | Clave de firma del refresh token |
 | `GEMINI_API_KEY` | Extracción de comprobantes y detección de alcohol (Google Generative AI) |
 | `BREVO_API_KEY` | Envío de correo transaccional |
+| `BREVO_SENDER_EMAIL` | Opcional. Remitente de los correos; debe estar verificado en Brevo. Sin ella se usa el remitente de siempre |
 | `ABSTRACT_EMAIL_API_KEY` | Validación de existencia de direcciones de correo |
 | `FRONTEND_URL` | URL del cliente web, usada en el botón "Ingresar al sistema" de los correos |
 | `CORS_ORIGINS` | Opcional. Dominios del cliente web que pueden usar la API, separados por coma. Sin ella se aceptan `localhost:5173` y los dominios de Vercel del proyecto |
 | `TRUST_PROXY` | Opcional. `true` si el servidor está detrás de un proxy (en Render no hace falta: se detecta solo con la variable `RENDER`) |
 | `PUPPETEER_EXECUTABLE_PATH` | Opcional. Ruta a un Chrome/Chromium propio si no se usa el que descarga `puppeteer` al instalar |
+
+Los correos salen por la API HTTPS de Brevo, no por SMTP, así que funcionan en Render aunque el plan gratuito bloquee los puertos de correo. Si Brevo rechaza un envío, el registro del servidor muestra la línea `[Brevo]` con el motivo exacto (por ejemplo, remitente sin verificar o IP no autorizada). Para probar la configuración: `npm run probar-correo -- destinatario@correo.com`.
 
 En Render el servidor confía en el proxy de la plataforma (`trust proxy`) para leer la IP real de cada usuario; así el límite de intentos de ingreso se aplica por persona y no a todos juntos.
 
@@ -290,6 +293,7 @@ src/
 
 scripts/sendDigest.js         Envío manual del resumen de pendientes (npm run resumen)
 scripts/cleanStorage.js       Borra los archivos que ya no usa nadie (npm run limpiar-archivos)
+scripts/testEmail.js          Envía un correo de prueba y muestra por qué Brevo lo rechaza (npm run probar-correo)
 database/                     Scripts SQL del esquema (ver su README.md)
 tests/                        Pruebas: services/ (unitarias), api/ (de la API), support/ (ayudas)
 .github/workflows/pruebas.yml Ejecución automática de las pruebas en GitHub Actions

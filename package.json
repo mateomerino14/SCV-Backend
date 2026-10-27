@@ -9,7 +9,8 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "resumen": "node scripts/sendDigest.js",
-    "limpiar-archivos": "node scripts/cleanStorage.js"
+    "limpiar-archivos": "node scripts/cleanStorage.js",
+    "probar-correo": "node scripts/testEmail.js"
   },
   "repository": {
     "type": "git",
