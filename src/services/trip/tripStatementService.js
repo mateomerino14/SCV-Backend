@@ -395,8 +395,6 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
       <div class="firma-bloque"><div class="firma-linea">Preparado por</div><div class="firma-rol">Responsable</div></div>
       <div class="firma-bloque"><div class="firma-linea">Vo/ Bo</div><div class="firma-rol">Jefe de Área</div></div>
       <div class="firma-bloque"><div class="firma-linea">Vo/ Bo</div><div class="firma-rol">Gerente de Área</div></div>
-      <div class="firma-bloque"><div class="firma-linea">Verificado por</div><div class="firma-rol">Contabilidad</div></div>
-      <div class="firma-bloque"><div class="firma-linea">Aprobado por</div><div class="firma-rol">Gerencia Administrativa</div></div>
     </div>
   </div>
 </body>
