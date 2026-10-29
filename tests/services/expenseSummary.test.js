@@ -114,7 +114,7 @@ test('controla cada dia con la tarifa de cada moneda por separado', () => {
   ];
   const trip = tripWithDailyRate(250, 80, 1000, 500);
   const result = expenseSummaryService.calculateExpenseSummary(expenses, trip);
-  expect(result.dailyBreakdown).toEqual([
+  expect(result.dailyBreakdown).toMatchObject([
     {fecha: '2026-01-01', montoBs: 280, montoUsd: 70, excedeBs: true, excedeUsd: false},
     {fecha: '2026-01-02', montoBs: 0, montoUsd: 90, excedeBs: false, excedeUsd: true},
   ]);
@@ -140,16 +140,23 @@ test('descuenta los gastos internacionales del fondo en Bs cuando no hay fondo e
   expect(result.exceedsBudgetUsd).toBe(false);
 });
 
-// Verifica que el tope diario en USD del cargo se siga controlando aunque el fondo se haya entregado en Bs
-test('mantiene el tope diario en USD cuando el fondo es solo en Bs', () => {
+// Con fondo en USD el control diario va por moneda; con fondo solo en Bs todo se controla en Bs
+test('controla en Bs el viaje internacional con fondo solo en Bs', () => {
   const expenses = [
+    {monto_total: '20', tipo_cambio_bs: '10', fecha_gasto: '2026-01-01', es_gasto_internacional: true},
     {monto_total: '120', tipo_cambio_bs: '10', fecha_gasto: '2026-01-02', es_gasto_internacional: true},
+    {monto_total: '150', fecha_gasto: '2026-01-03', es_gasto_internacional: false},
   ];
-  const trip = tripWithDailyRate(300, 100, 5000, 0);
-  const result = expenseSummaryService.calculateExpenseSummary(expenses, trip);
-  expect(result.accumulatedExpense).toBe(1200);
-  expect(result.totalExceeds).toBe(false);
-  expect(result.exceededDays[0].excedeUsd).toBe(true);
+  const onlyBs = {...tripWithDailyRate(300, 100, 5000, 0), tipo: 'Internacional', fecha_inicio: '2026-01-01', fecha_fin: '2026-01-04'};
+  const result = expenseSummaryService.calculateExpenseSummary(expenses, onlyBs);
+  expect(result.accumulatedExpense).toBe(1550);
+  expect(result.dailyBreakdown).toMatchObject([
+    {fecha: '2026-01-01', montoBs: 200, montoUsd: 0, limiteBs: 300, soloBs: true, excedeBs: false},
+    {fecha: '2026-01-02', montoBs: 1200, montoUsd: 0, limiteBs: 1000, tipoCambio: 10, excedeBs: true},
+    {fecha: '2026-01-03', montoBs: 150, limiteBs: 1000, tipoCambio: 10, excedeBs: false},
+  ]);
+  const withUsd = expenseSummaryService.calculateExpenseSummary(expenses, {...onlyBs, monto_asignado_usd: 200});
+  expect(withUsd.dailyBreakdown[1]).toMatchObject({montoBs: 0, montoUsd: 120, limiteBs: 300, limiteUsd: 100, soloBs: false, excedeUsd: true});
 });
 
 // Verifica que con fondo en USD los gastos internacionales sigan saliendo de ese fondo
