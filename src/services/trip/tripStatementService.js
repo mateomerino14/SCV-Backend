@@ -4,7 +4,7 @@ const tripCodeUtil = require('../../utils/tripCode');
 const {escapeDeep} = require('../../utils/htmlEscape');
 const {getExpenseRetentions, hasOriginCurrencyLines} = require('../../utils/retentions');
 const {formatReceiptNumber} = require('../expense/receiptNumberService');
-const {amountInBsOf, originalAmountLinesOf, summarizeStatement} = require('../../utils/expenseCurrency');
+const {amountInBsOf, originalAmountLinesOf, summarizeStatement, isRenderedInUsd} = require('../../utils/expenseCurrency');
 
 const vatRate = 0.13;
 
@@ -208,6 +208,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   let totalIue = 0;
   let totalIt = 0;
   let totalCostBs = 0;
+  let totalUsd = 0;
 
   const rows = expenses.map((expense, index) => {
     const amount = parseFloat(expense.monto_total) || 0;
@@ -222,10 +223,13 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
     if (isInternational) {
       rowClass = 'fila-internacional';
     }
-    // Un gasto internacional antiguo sin tipo de cambio a Bs se muestra en USD y no entra en las sumas en Bs
+    // El gasto internacional rendido en USD (o antiguo sin tipo de cambio a Bs) se muestra en USD y no entra en las sumas en Bs
     let amountText = `${amount.toFixed(2)} USD`;
     let costText = amountText;
-    if (amountBs !== null) {
+    if (isRenderedInUsd(trip, expense)) {
+      totalUsd += amount;
+    }
+    else {
       amountText = amountBs.toFixed(2);
       costText = cost.toFixed(2);
       if (isInternational) {
@@ -261,7 +265,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
     </tr>`;
   }).join('');
 
-  const {internationalUsd, balanceRows} = summarizeStatement(trip, expenses);
+  const {balanceRows} = summarizeStatement(trip, expenses);
   const [, fundBs, fundUsd] = balanceRows[0];
   const fundRows = buildFundRows(isInternationalTrip, fundBs, fundUsd);
 
@@ -364,8 +368,8 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
         </tr>
         ${isInternationalTrip ? `
         <tr class="totales-fila">
-          <td colspan="7">Gastos internacionales en USD, para Oracle</td>
-          <td>${internationalUsd.toFixed(2)} USD</td>
+          <td colspan="7">Gastos internacionales rendidos en USD</td>
+          <td>${totalUsd.toFixed(2)} USD</td>
           <td></td>
           <td>${fundUsd.toFixed(2)} USD</td>
           <td colspan="5"></td>

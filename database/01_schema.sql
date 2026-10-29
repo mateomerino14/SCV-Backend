@@ -178,6 +178,8 @@ create table if not exists "Gasto" (
   tipo_cambio numeric(10, 4) default 1, -- unidades de la moneda del gasto por 1 USD
   monto_moneda_origen numeric(10, 2) default 0,
   tipo_cambio_bs numeric(10, 4), -- bolivianos por 1 USD de un gasto internacional, para la planilla en Bs
+  -- moneda en la que se rinde el gasto internacional (USD o BOB), elegida por el empleado; null toma la del fondo del viaje
+  moneda_rendicion char(3) check (moneda_rendicion in ('USD', 'BOB')),
   base_imponible numeric(10, 2) default 0,
   retencion_rc_iva numeric(10, 2) default 0,
   retencion_iue numeric(10, 2) default 0,

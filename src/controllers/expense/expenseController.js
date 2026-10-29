@@ -30,7 +30,7 @@ const getExpenseDetail = async (req, res) => {
         Gasto_Tramo_Moneda(id_tramo, moneda, monto_origen, tipo_cambio, monto_usd),
         Gasto_Subitem(id_subitem, descripcion, monto),
         Recibo(numero, periodo),
-        Viaje(id_viaje, tipo, fecha_inicio, fecha_fin, estado)
+        Viaje(id_viaje, tipo, fecha_inicio, fecha_fin, estado, monto_asignado_usd)
       `)
       .eq('id_gasto', expenseId)
       .maybeSingle();

@@ -29,10 +29,19 @@ const buildAlcoholText = (expenseData, usesSubItems) => {
 // Moneda del gasto escrita por el empleado; en internacionales es USD si no eligio otra
 const currencyOf = (expenseData) => String(expenseData.moneda || usdCurrency).trim().toUpperCase();
 
+// Moneda a la que el empleado convierte el gasto internacional para rendirlo (USD o Bs); sin eleccion queda null
+const renditionCurrencyInput = (expenseData) => {
+  const currency = String(expenseData.moneda_rendicion || '').trim().toUpperCase();
+  if (['USD', 'BOB'].includes(currency)) {
+    return currency;
+  }
+  return null;
+};
+
 // Montos y tipos de cambio del gasto: los nacionales van en Bs; los internacionales se escriben en la moneda de la factura y se pasan a USD
 const resolveExpenseAmounts = (expenseData, isInternational, enteredAmount) => {
   if (!isInternational) {
-    return {moneda: nationalCurrency, tipo_cambio: 1, tipo_cambio_bs: null, monto_moneda_origen: enteredAmount, monto_total: enteredAmount};
+    return {moneda: nationalCurrency, tipo_cambio: 1, tipo_cambio_bs: null, monto_moneda_origen: enteredAmount, monto_total: enteredAmount, moneda_rendicion: null};
   }
   const currency = currencyOf(expenseData);
   let exchangeRate = 1;
@@ -45,6 +54,7 @@ const resolveExpenseAmounts = (expenseData, isInternational, enteredAmount) => {
     tipo_cambio_bs: parseFloat(expenseData.tipo_cambio_bs),
     monto_moneda_origen: enteredAmount,
     monto_total: roundCents(enteredAmount / exchangeRate),
+    moneda_rendicion: renditionCurrencyInput(expenseData),
   };
 };
 
