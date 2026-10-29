@@ -446,7 +446,7 @@ const approveExpenseReview = async (tripId, supervisorId) => {
   if (trip.tiene_alcohol) {
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'APROBADOR', 'id_aprobador_asignado');
     await require('./selfReviewSkipService').advanceSelfReviewStages(tripId);
-    return {message: 'Gastos aprobados por supervisor, pasan a revisión adicional del aprobador por contener alcohol'};
+    return {message: 'Gastos aprobados por supervisor, pasan a revisión adicional del aprobador por contener gastos no deducibles'};
   }
   else {
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'REVISOR', 'id_revisor_asignado');
