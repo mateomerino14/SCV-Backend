@@ -54,45 +54,12 @@ const getTripDetail = async (req, res) => {
 
 // Crea un nuevo viaje en estado borrador
 const createTrip = async (req, res) => {
-  const {motivo, origen, destino, fecha_inicio, fecha_fin, tipo, transporte, placa_vehiculo, monto_asignado, monto_asignado_usd} = req.body;
-  const userId = req.user.id_usuario;
-  const tripDataError = tripService.validateTripData(req.body);
-  if (tripDataError) {
-    return res.status(400).json({error: tripDataError});
-  }
-  if (transporte === 'Vehículo de Empresa' && !placa_vehiculo?.trim()) {
-    return res.status(400).json({error: 'La placa del vehículo es requerida'});
-  }
-  if (transporte === 'Vehículo de Empresa' && tipo === 'Internacional') {
-    return res.status(400).json({error: 'El vehículo de empresa solo está disponible para viajes nacionales'});
-  }
-  let vehiclePlate = null;
-  if (transporte === 'Vehículo de Empresa') {
-    vehiclePlate = placa_vehiculo.trim();
-  }
-  const {data, error} = await supabase
-    .from('Viaje')
-    .insert({
-      motivo: motivo.trim(),
-      origen: origen?.trim() || null,
-      destino: destino.trim(),
-      fecha_inicio,
-      fecha_fin,
-      tipo,
-      transporte: transporte || 'Terrestre',
-      placa_vehiculo: vehiclePlate,
-      monto_asignado,
-      monto_asignado_usd: monto_asignado_usd || 0,
-      estado: 'BORRADOR',
-      id_usuario: userId,
-    })
-    .select()
-    .single();
-  if (error) {
-    return res.status(500).json({error: error.message});
+  const result = await tripService.createTrip(req.user.id_usuario, req.body);
+  if (result.error) {
+    return res.status(result.status).json({error: result.error});
   }
   else {
-    return res.json(data);
+    return res.json(result.trip);
   }
 };
 

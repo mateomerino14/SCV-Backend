@@ -88,6 +88,19 @@ create table if not exists "Auditoria" (
 );
 
 -- ------------------------------------------------------------
+-- Vehiculos de la empresa
+-- ------------------------------------------------------------
+
+-- Flota que el administrador registra; al crear un viaje solo se ofrecen los activos que no estan en otro viaje
+create table if not exists "Vehiculo" (
+  id_vehiculo serial primary key,
+  placa varchar(20) not null unique,
+  descripcion varchar(100),
+  activo boolean not null default true,
+  fecha_creacion timestamptz not null default now()
+);
+
+-- ------------------------------------------------------------
 -- Viajes
 -- ------------------------------------------------------------
 
@@ -101,7 +114,13 @@ create table if not exists "Viaje" (
   tipo varchar(15) not null check (tipo in ('Nacional', 'Internacional')),
   transporte text default 'Terrestre',
   placa_vehiculo varchar(20),
+  -- vehiculo de la empresa usado en el viaje; placa_vehiculo guarda la placa que tenia en ese momento
+  id_vehiculo integer references "Vehiculo"(id_vehiculo),
+  -- monto_asignado es el fondo total; monto_combustible es la parte para combustible del vehiculo de la empresa
   monto_asignado decimal(10, 2) not null,
+  monto_combustible numeric(10, 2) not null default 0,
+  -- quien gestiona el hospedaje: la empresa lo reserva o el propio empleado
+  gestion_hospedaje varchar(10) not null default 'Propio' check (gestion_hospedaje in ('Empresa', 'Propio')),
   monto_asignado_usd numeric(10, 2) default 0,
   estado varchar(25) not null default 'BORRADOR' constraint viaje_estado_check check (estado in (
     'BORRADOR', 'EN_REVISION_VIAJE', 'APROBADO_VIAJE', 'EN_REVISION_TESORERO', 'EN_CURSO',
@@ -261,6 +280,10 @@ create table if not exists "Correlativo_Viaje" (
   anio smallint primary key,
   numero integer not null default 0
 );
+
+-- Un vehiculo esta ocupado mientras su viaje se revisa o esta en curso; se libera cuando el empleado lo termina
+create unique index if not exists viaje_vehiculo_ocupado_unique on "Viaje"(id_vehiculo)
+where id_vehiculo is not null and estado in ('EN_REVISION_VIAJE', 'APROBADO_VIAJE', 'EN_REVISION_TESORERO', 'EN_CURSO');
 
 create unique index if not exists viaje_numero_anual_unique on "Viaje"(anio_viaje, numero_viaje) where numero_viaje is not null;
 

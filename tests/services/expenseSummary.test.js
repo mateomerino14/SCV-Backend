@@ -163,3 +163,18 @@ test('sigue usando el fondo en USD cuando el viaje lo tiene', () => {
   expect(result.accumulatedExpenseUsd).toBe(50);
   expect(result.totalExceedsUsd).toBe(true);
 });
+
+const fuelTrip = {monto_asignado: 1100, monto_asignado_usd: 0, Usuario: {Cargo: {monto_diario: 300}}};
+const fuelExpenses = [
+  {fecha_gasto: '2026-11-03', monto_total: 200, Categoria_Gasto: {nombre: '626040 MANUTENCION (VIAJE)'}},
+  {fecha_gasto: '2026-11-03', monto_total: 400, Categoria_Gasto: {nombre: '628021 GASOLINA'}},
+];
+
+// Con fondo aparte para combustible la gasolina no suma a la cuota diaria; sin el, si
+test('la gasolina no cuenta en el control diario si el viaje tiene fondo de combustible', () => {
+  const withFuel = expenseSummaryService.calculateExpenseSummary(fuelExpenses, {...fuelTrip, monto_combustible: 500});
+  expect(withFuel.dailyBreakdown[0]).toMatchObject({montoBs: 200, excedeBs: false});
+  expect(withFuel.accumulatedExpense).toBe(600);
+  const withoutFuel = expenseSummaryService.calculateExpenseSummary(fuelExpenses, {...fuelTrip, monto_combustible: 0});
+  expect(withoutFuel.dailyBreakdown[0]).toMatchObject({montoBs: 600, excedeBs: true});
+});

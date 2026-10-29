@@ -31,6 +31,7 @@ const api = (token) => ({
   post: (path, body = {}) => request(app).post(path).set('authorization', `Bearer ${token}`).send(body),
   put: (path, body = {}) => request(app).put(path).set('authorization', `Bearer ${token}`).send(body),
   del: (path) => request(app).delete(path).set('authorization', `Bearer ${token}`),
+  patch: (path, body = {}) => request(app).patch(path).set('authorization', `Bearer ${token}`).send(body),
   postForm: (path, data, images = []) => attachImages(request(app).post(path).set('authorization', `Bearer ${token}`).field('datos', JSON.stringify(data)), images),
   putForm: (path, data, images = []) => attachImages(request(app).put(path).set('authorization', `Bearer ${token}`).field('datos', JSON.stringify(data)), images),
 });

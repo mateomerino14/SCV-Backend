@@ -6,11 +6,19 @@ const isHotelExpense = (expense) => {
   return categoryName.toUpperCase().includes('HOTEL');
 };
 
+// Determina si un gasto es combustible (gas, gasolina o diesel), que se paga del fondo aparte del vehiculo
+const isFuelExpense = (expense) => {
+  const categoryName = expense.Categoria_Gasto?.nombre || '';
+  return ['628020', '628021', '628022'].some((code) => categoryName.startsWith(code));
+};
+
 // Resume los gastos: hoteles contra el total del viaje y el resto por dia contra la cuota del cargo
 const calculateExpenseSummary = (expenses, trip) => {
   const allExpenses = expenses || [];
   const hotelExpenses = allExpenses.filter(isHotelExpense);
-  const nonHotelExpenses = allExpenses.filter((expense) => !isHotelExpense(expense));
+  // Con fondo aparte para combustible, la gasolina no cuenta en la cuota diaria
+  const hasFuelFund = parseFloat(trip.monto_combustible || 0) > 0;
+  const nonHotelExpenses = allExpenses.filter((expense) => !isHotelExpense(expense) && !(hasFuelFund && isFuelExpense(expense)));
 
   const spent = spentAgainstFunds(trip, allExpenses);
   const accumulatedExpense = spent.spentBs;
