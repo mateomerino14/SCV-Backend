@@ -40,10 +40,15 @@ const sendApprovalMemo = async (trip, approver, tripCode, allUsers) => {
     return normalizedMemoPositions.includes(normalizedPosition);
   });
   const treasurers = allUsers.filter((user) => textNormalizer.normalizeText(user.Cargo?.nombre || '') === textNormalizer.normalizeText(treasurerPosition));
-  treasurers.forEach((treasurer) => {
-    const alreadyIncluded = recipients.some((recipient) => recipient.email_corporativo === treasurer.email_corporativo);
+  // Ademas de tesoreria y los cargos del memorandum, lo recibe el empleado que creo el viaje
+  const extraRecipients = [...treasurers];
+  if (trip.Usuario?.email_corporativo) {
+    extraRecipients.push(trip.Usuario);
+  }
+  extraRecipients.forEach((person) => {
+    const alreadyIncluded = recipients.some((recipient) => recipient.email_corporativo === person.email_corporativo);
     if (!alreadyIncluded) {
-      recipients.push(treasurer);
+      recipients.push(person);
     }
   });
   if (recipients.length === 0) {
@@ -55,7 +60,7 @@ const sendApprovalMemo = async (trip, approver, tripCode, allUsers) => {
   const pdfBase64 = pdfBuffer.toString('base64');
   const attachments = [{content: pdfBase64, name: `Memorandum_${tripCode.replace('/', '-')}.pdf`}];
   const emailHtml = emailService.buildEmailLayout('Memorándum de aprobación', `
-    ${emailService.emailParagraph(`Se adjunta el memorándum del viaje <strong>${tripCode}</strong>.`)}
+    ${emailService.emailParagraph(`Se adjunta el memorándum que autoriza el viaje <strong>${tripCode}</strong>.`)}
     ${emailService.emailInfoBox([
       {label: 'Viaje', value: `${tripCode} — ${trip.motivo || ''}`},
       {label: 'Empleado', value: trip.Usuario ? `${trip.Usuario.nombre} ${trip.Usuario.apellido_paterno}` : ''},
@@ -151,7 +156,7 @@ const getTripDetail = async (tripId) => {
 const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedAsBoss = false} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
     .eq('id_viaje', tripId)
     .single();
   if (!trip) {
@@ -180,7 +185,7 @@ const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedA
   }
   await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.tripApproval, 'APROBADO', {automatic: selfStageSkip});
   const {data: approverData} = await supabase
-    .from('Usuario').select('nombre, apellido_paterno, email_corporativo, Cargo(nombre)').eq('id_usuario', approverId).single();
+    .from('Usuario').select('nombre, apellido_paterno, apellido_materno, email_corporativo, Cargo(nombre)').eq('id_usuario', approverId).single();
   // Si es el viaje del propio aprobador, el memorandum indica aprobacion automatica; si lo aprobo como jefe directo, lo firma el
   const approver = {...approverData, aprobacionAutomatica: selfStageSkip && !approvedAsBoss};
   const tripCode = tripCodeUtil.buildTripCode(trip);
