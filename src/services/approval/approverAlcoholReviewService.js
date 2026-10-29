@@ -148,7 +148,7 @@ const returnAlcoholReview = async (tripId, approverId) => {
 const getAlcoholReviewDetail = async (tripId, approverId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, periodo, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -163,7 +163,7 @@ const getAlcoholReviewDetail = async (tripId, approverId) => {
   }
   const {data: expenses} = await supabase
     .from('Gasto')
-    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)')
+    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero, periodo)')
     .eq('id_viaje', tripId)
     .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   const {data: comments} = await supabase

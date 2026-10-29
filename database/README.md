@@ -5,7 +5,7 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 ## Orden de ejecucion
 
 1. `01_schema.sql` - crea las 24 tablas, relaciones e indices
-2. `02_functions.sql` - crea la funcion `incrementar_correlativo_recibo()`, usada por el backend para numerar recibos, y el trigger `viaje_numero_rendicion`, que al quedar un viaje en `APROBADO_FINAL` le asigna el siguiente numero de rendicion del mes de su ultimo comprobante (`Viaje.numero_rendicion` y `periodo_rendicion`). Para empezar desde un numero, por ejemplo si contabilidad ya va por la 40: `insert into "Correlativo_Rendicion" (periodo, numero) values ('2026-10', 40) on conflict (periodo) do update set numero = 40;`
+2. `02_functions.sql` - crea la funcion `incrementar_correlativo_recibo(periodo)`, usada por el backend para numerar recibos (el correlativo vuelve a 1 cada mes), el trigger `viaje_numero_anual`, que al crear un viaje le da el siguiente numero de su año para el codigo `VIA-numero/año` (`Viaje.numero_viaje` y `anio_viaje`), y el trigger `viaje_numero_rendicion`, que al quedar un viaje en `APROBADO_FINAL` le asigna el siguiente numero de rendicion del mes de su ultimo comprobante (`Viaje.numero_rendicion` y `periodo_rendicion`). Para empezar desde un numero, por ejemplo si contabilidad ya va por la 40: `insert into "Correlativo_Rendicion" (periodo, numero) values ('2026-10', 40) on conflict (periodo) do update set numero = 40;`
 3. `03_seed.sql` - datos iniciales: roles, cargos, impuesto de IVA, categorias de gasto y la configuracion de recordatorios por defecto
 4. `04_rls_hardening.sql` - activa seguridad por fila (RLS) en todas las tablas
 
@@ -57,9 +57,10 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Factura_Impuestos | Relacion muchos a muchos entre facturas e impuestos |
 | Comentario | Observaciones sobre un viaje o gasto especifico, y justificaciones (una por dia excedido) |
 | Auditoria | Registro de auditoria (ingreso, salida, cambio de clave) |
-| Correlativo_Recibo | Tabla contador para numerar recibos y documentos PDF generados |
+| Correlativo_Recibo | Ultimo numero de recibo de cada mes (AAAA-MM); el recibo se muestra como `000012/10-2026` |
+| Correlativo_Viaje | Ultimo numero de viaje de cada año, para el codigo `VIA-numero/año` que vuelve a 1 cada año |
 | Correlativo_Rendicion | Ultimo numero de rendicion de cada mes (AAAA-MM) para la descripcion de Oracle (10-40); lo usa el trigger `viaje_numero_rendicion`; el incremento es atomico (`insert ... on conflict do update`) y un indice unico sobre `Viaje(periodo_rendicion, numero_rendicion)` impide repetir numeros aunque se aprueben varias a la vez |
-| Recibo | Numero del sistema de cada gasto sin factura, asignado al registrarlo, y de cada recibo agrupado; `enviado` indica si ya se mando al empleado |
+| Recibo | Numero del sistema (con su mes en `periodo`, unico por mes) de cada gasto sin factura, asignado al registrarlo, y de cada recibo agrupado; `enviado` indica si ya se mando al empleado |
 | Revision_Viaje | Quien aprobo o rechazo cada viaje, en que etapa y cuando (historial de revision de cada revisor) |
 | Solicitud_Reemplazo | Solicitudes para que un tercero rinda los gastos de un viaje en nombre de otro empleado |
 | Configuracion_Recordatorio | Una sola fila con los dias (`0` domingo a `6` sabado) y horas (`HH:MM`, hora Bolivia) del resumen de pendientes, si esta activo y quien lo cambio por ultima vez |

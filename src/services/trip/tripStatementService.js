@@ -141,11 +141,11 @@ const documentNumberOf = (expense, tripReceipts) => {
   }
   const ownReceipt = (expense.Recibo || [])[0];
   if (ownReceipt) {
-    return {number: formatReceiptNumber(ownReceipt.numero), isSystem: true};
+    return {number: formatReceiptNumber(ownReceipt.numero, ownReceipt.periodo), isSystem: true};
   }
   const grouped = (tripReceipts || []).find((receipt) => !receipt.id_gasto && receipt.tipo === expense.tipo && !!receipt.es_gasto_internacional === !!expense.es_gasto_internacional);
   if (grouped) {
-    return {number: formatReceiptNumber(grouped.numero), isSystem: true};
+    return {number: formatReceiptNumber(grouped.numero, grouped.periodo), isSystem: true};
   }
   return {number: '', isSystem: false};
 };
@@ -405,7 +405,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
 const generateStatementPdf = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, Seccion(nombre), Cargo(nombre)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
+    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, Seccion(nombre), Cargo(nombre)), Recibo(numero, periodo, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -419,7 +419,7 @@ const generateStatementPdf = async (tripId) => {
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)')
+    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero, periodo)')
     .eq('id_viaje', tripId)
     .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   if (expensesError) {

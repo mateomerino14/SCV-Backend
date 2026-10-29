@@ -8,6 +8,8 @@
 truncate table
   "Recibo",
   "Correlativo_Rendicion",
+  "Correlativo_Recibo",
+  "Correlativo_Viaje",
   "Revision_Viaje",
   "Comentario",
   "Solicitud_Reemplazo",
@@ -26,8 +28,6 @@ truncate table
   "Proveedor",
   "Usuario"
 restart identity cascade;
-
-update "Correlativo_Recibo" set numero = 0;
 
 -- La limpieza borra en cascada la configuracion de recordatorios: se repone la de fabrica
 insert into "Configuracion_Recordatorio" (id) values (1)

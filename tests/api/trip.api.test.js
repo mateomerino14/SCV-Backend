@@ -48,3 +48,14 @@ test('acepta un motivo de 500 caracteres y rechaza uno más largo', async () => 
   const rejected = await employee.post('/trip', tripData({motivo: 'm'.repeat(501)}));
   expect(rejected.status).toBe(400);
 });
+
+// Cada viaje recibe el siguiente numero de su año para el codigo VIA-numero/año
+test('numera los viajes por año', async () => {
+  const first = await employee.post('/trip', tripData());
+  const second = await employee.post('/trip', tripData());
+  const year = Number(boliviaDate().slice(0, 4));
+  expect(first.body.anio_viaje).toBe(year);
+  expect(second.body.numero_viaje).toBe(first.body.numero_viaje + 1);
+  const {buildTripCode} = require('../../src/utils/tripCode');
+  expect(buildTripCode(second.body)).toBe(`VIA-${second.body.numero_viaje}/${year}`);
+});

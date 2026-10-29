@@ -61,7 +61,7 @@ const systemReceiptText = (expense) => {
   if (!ownReceipt) {
     return '';
   }
-  return `Recibo Nº ${formatReceiptNumber(ownReceipt.numero)}`;
+  return `Recibo Nº ${formatReceiptNumber(ownReceipt.numero, ownReceipt.periodo)}`;
 };
 
 // Referencia al recibo en papel del gasto, si el empleado anoto su numero
@@ -424,7 +424,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   }
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad)')
+    .select('id_viaje, numero_viaje, anio_viaje, fecha_inicio, motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -448,7 +448,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Recibo(numero)')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Recibo(numero, periodo)')
     .eq('id_viaje', tripId)
     .eq('tipo', type)
     .eq('es_gasto_internacional', isInternational)
@@ -509,7 +509,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
 const sendIndividualReceipt = async (expenseId) => {
   const {data: expense, error: expenseError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, estado, fecha_inicio, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad))')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, numero_viaje, anio_viaje, motivo, estado, fecha_inicio, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad))')
     .eq('id_gasto', expenseId)
     .single();
   if (expenseError) {

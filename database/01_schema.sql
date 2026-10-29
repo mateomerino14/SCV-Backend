@@ -113,6 +113,9 @@ create table if not exists "Viaje" (
   -- numero de rendicion del mes para Oracle (10-40): lo asigna un trigger al quedar APROBADO_FINAL
   numero_rendicion integer,
   periodo_rendicion char(7),
+  -- codigo VIA-numero/año: el numero vuelve a 1 cada año, lo asigna un trigger al crear el viaje
+  numero_viaje integer,
+  anio_viaje smallint,
   id_usuario integer not null,
   id_supervisor_asignado integer,
   id_aprobador_asignado integer,
@@ -247,14 +250,19 @@ create table if not exists "Comentario" (
 -- Contador de recibos
 -- ------------------------------------------------------------
 
+-- Ultimo numero de recibo emitido en cada mes (AAAA-MM): el correlativo vuelve a 1 cada mes
 create table if not exists "Correlativo_Recibo" (
-  id serial primary key,
+  periodo char(7) primary key,
   numero integer not null default 0
 );
 
-insert into "Correlativo_Recibo" (numero)
-select 0
-where not exists (select 1 from "Correlativo_Recibo" where id = 1);
+-- Ultimo numero de viaje asignado en cada año, para el codigo VIA-numero/año
+create table if not exists "Correlativo_Viaje" (
+  anio smallint primary key,
+  numero integer not null default 0
+);
+
+create unique index if not exists viaje_numero_anual_unique on "Viaje"(anio_viaje, numero_viaje) where numero_viaje is not null;
 
 -- Ultimo numero de rendicion asignado en cada mes (AAAA-MM), para la descripcion de Oracle
 create table if not exists "Correlativo_Rendicion" (
@@ -268,7 +276,9 @@ create unique index if not exists viaje_numero_rendicion_unique on "Viaje"(perio
 -- Numero de cada recibo emitido (por gasto o agrupado por viaje), para conservarlo al reenviar
 create table if not exists "Recibo" (
   id_recibo serial primary key,
-  numero integer not null unique,
+  numero integer not null,
+  -- mes (AAAA-MM) del correlativo: el numero solo se repite entre meses distintos
+  periodo char(7) not null,
   id_viaje integer not null references "Viaje"(id_viaje) on delete cascade,
   id_gasto integer references "Gasto"(id_gasto) on delete cascade,
   tipo char(1) not null check (tipo in ('C', 'S')),
@@ -278,6 +288,7 @@ create table if not exists "Recibo" (
   fecha_emision timestamptz not null default now()
 );
 
+create unique index if not exists recibo_numero_periodo_unique on "Recibo"(periodo, numero);
 create unique index if not exists recibo_individual_unique on "Recibo"(id_gasto) where id_gasto is not null;
 create unique index if not exists recibo_agrupado_unique on "Recibo"(id_viaje, tipo, es_gasto_internacional) where id_gasto is null;
 
