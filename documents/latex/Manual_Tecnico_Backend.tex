@@ -311,11 +311,11 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \endfirsthead
 \cabecera \tth{Archivo} & \tth{Contenido} \\
 \endhead
-\rowcolor{maxamFondo} \code{01_schema.sql} & Las 26 tablas, relaciones e índices \\
+\rowcolor{maxamFondo} \code{01_schema.sql} & Las 28 tablas, relaciones e índices \\
 \code{02_functions.sql} & Función \code{incrementar_correlativo_recibo(periodo)} (recibos por mes) y triggers \code{viaje_numero_anual} (código VIA por año) y \code{viaje_numero_rendicion} \\
 \rowcolor{maxamFondo} \code{03_seed.sql} & Roles, cargos, impuesto IVA, categorías de gasto y configuración de recordatorios \\
 \code{04_rls_hardening.sql} & Activa seguridad por fila (RLS) en todas las tablas \\
-\rowcolor{maxamFondo} \code{testing_00_borrar_todo.sql} & Elimina las 26 tablas (solo pruebas) \\
+\rowcolor{maxamFondo} \code{testing_00_borrar_todo.sql} & Elimina las 28 tablas (solo pruebas) \\
 \code{testing_01_limpieza_completa.sql} & Borra datos operativos, conserva catálogos \\
 \rowcolor{maxamFondo} \code{testing_02_organizacion_prueba.sql} & Organización de prueba con jerarquía completa y tres vehículos; la usan también las pruebas automáticas \\
 \code{demo_01_usuarios_ficticios.sql} & Demo con personas ficticias; solo empleado, aprobador y tesorera usan correos reales de prueba \\
