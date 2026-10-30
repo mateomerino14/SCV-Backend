@@ -89,4 +89,4 @@ const assignExpenseReceipt = async (expense) => {
   return {receiptNumber: formatReceiptNumber(receipt.numero, receipt.periodo)};
 };
 
-module.exports = {formatReceiptNumber, currentReceiptPeriod, getReceiptNumber, assignExpenseReceipt};
+module.exports = {formatReceiptNumber, getReceiptNumber, assignExpenseReceipt};

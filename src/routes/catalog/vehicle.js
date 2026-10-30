@@ -10,6 +10,5 @@ router.post('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), vehicleContr
 router.put('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), vehicleController.updateVehicle);
 router.patch('/:id/suspend', authMiddleware, roleMiddleware(['ADMINISTRADOR']), vehicleController.suspendVehicle);
 router.patch('/:id/activate', authMiddleware, roleMiddleware(['ADMINISTRADOR']), vehicleController.activateVehicle);
-router.delete('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), vehicleController.deleteVehicle);
 
 module.exports = router;

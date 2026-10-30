@@ -28,7 +28,4 @@ const suspendVehicle = async (req, res) => respond(res, await vehicleService.set
 // Vuelve a activar un vehiculo suspendido
 const activateVehicle = async (req, res) => respond(res, await vehicleService.setVehicleActive(req.params.id, true), 'vehicle');
 
-// Elimina un vehiculo que nunca se uso
-const deleteVehicle = async (req, res) => respond(res, await vehicleService.deleteVehicle(req.params.id), 'message');
-
-module.exports = {getAllVehicles, getAvailableVehicles, createVehicle, updateVehicle, suspendVehicle, activateVehicle, deleteVehicle};
+module.exports = {getAllVehicles, getAvailableVehicles, createVehicle, updateVehicle, suspendVehicle, activateVehicle};

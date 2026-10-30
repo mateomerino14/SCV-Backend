@@ -110,17 +110,4 @@ const setVehicleActive = async (vehicleId, active) => {
   return {vehicle: data};
 };
 
-// Elimina un vehiculo que nunca se uso en un viaje; si ya se uso, se debe suspender
-const deleteVehicle = async (vehicleId) => {
-  const {count} = await supabase.from('Viaje').select('id_viaje', {count: 'exact', head: true}).eq('id_vehiculo', vehicleId);
-  if (count > 0) {
-    return {error: 'El vehículo ya se usó en viajes; suspéndelo en lugar de eliminarlo', status: 400};
-  }
-  const {error} = await supabase.from('Vehiculo').delete().eq('id_vehiculo', vehicleId);
-  if (error) {
-    return {error: error.message, status: 500};
-  }
-  return {message: 'Vehículo eliminado'};
-};
-
-module.exports = {busyTripStates, listVehicles, listAvailableVehicles, checkVehicleAvailable, saveVehicle, setVehicleActive, deleteVehicle};
+module.exports = {listVehicles, listAvailableVehicles, checkVehicleAvailable, saveVehicle, setVehicleActive};
