@@ -115,12 +115,16 @@ const verifyDocument = async (rawCode) => {
     }));
   }
   const trip = document.Viaje;
+  let tripData = null;
+  if (trip) {
+    tripData = {codigo: buildTripCode(trip), motivo: trip.motivo, destino: trip.destino, empleado: signatureService.signerNameOf({Usuario: trip.Usuario})};
+  }
   return {
     document: {
       codigo: formatCode(document.codigo),
       tipo: documentLabels[document.tipo] || document.tipo,
       emitido: document.fecha,
-      viaje: trip ? {codigo: buildTripCode(trip), motivo: trip.motivo, destino: trip.destino, empleado: signatureService.signerNameOf({Usuario: trip.Usuario})} : null,
+      viaje: tripData,
       resumen: document.resumen,
       firmas: signatures,
     },

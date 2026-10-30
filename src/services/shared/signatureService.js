@@ -6,6 +6,9 @@ const maxSignatureLength = 400000;
 const minSignatureBytes = 300;
 const signatureStages = {memo: 'MEMORANDUM', prepared: 'PREPARADO', boss: 'JEFE', manager: 'GERENTE'};
 const missingSignatureMessage = 'Firma en el recuadro antes de continuar';
+const managerNotRequiredText = 'No requiere Vo/ Bo de gerencia';
+// Estados en los que la rendicion ya paso la etapa en que el gerente podia dar su Vo/ Bo
+const statesAfterManagerStage = ['APROBADO_SUPERVISOR', 'APROBADO_FINAL'];
 
 // Valida que la firma sea un PNG dibujado con trazos (no vacio ni demasiado grande); devuelve el error o null
 const validateSignature = (image) => {
@@ -52,7 +55,7 @@ const getTripSignatures = async (tripId, until = null) => {
   return latest;
 };
 
-// Firmas de los tres casilleros de la planilla; si el jefe directo es el gerente, su Vo/ Bo vale para los dos
+// Firmas de los tres casilleros de la planilla; si el jefe directo es el gerente, su Vo/ Bo vale para los dos, y si la rendicion no paso por el gerente se indica que no lo requiere
 const getStatementSignatures = async (tripId, until = null) => {
   const latest = await getTripSignatures(tripId, until);
   const boss = latest[signatureStages.boss] || null;
@@ -60,7 +63,12 @@ const getStatementSignatures = async (tripId, until = null) => {
   if (!manager && boss?.Usuario?.Rol?.nombre === 'APROBADOR') {
     manager = boss;
   }
-  return {prepared: latest[signatureStages.prepared] || null, boss, manager};
+  let managerNotRequired = false;
+  if (!manager) {
+    const {data: trip} = await supabase.from('Viaje').select('estado').eq('id_viaje', tripId).maybeSingle();
+    managerNotRequired = statesAfterManagerStage.includes(trip?.estado);
+  }
+  return {prepared: latest[signatureStages.prepared] || null, boss, manager, managerNotRequired};
 };
 
 // Firmas de la planilla listas para el Excel: trazo, nombre, cargo y fecha de cada casillero
@@ -72,7 +80,7 @@ const statementSignaturesForExport = async (tripId) => {
     }
     return {imagen: signature.imagen, automatica: signature.automatica, nombre: signerNameOf(signature), cargo: signature.Usuario?.Cargo?.nombre || '', fecha: signatureDateOf(signature)};
   };
-  return {preparado: toExport(signatures.prepared), jefe: toExport(signatures.boss), gerente: toExport(signatures.manager)};
+  return {preparado: toExport(signatures.prepared), jefe: toExport(signatures.boss), gerente: toExport(signatures.manager), gerenteNoRequerido: signatures.managerNotRequired};
 };
 
 // Nombre completo de quien firmo
@@ -81,10 +89,13 @@ const signerNameOf = (signature) => [signature?.Usuario?.nombre, signature?.Usua
 // Fecha y hora de Bolivia de una firma
 const signatureDateOf = (signature) => new Date(signature.fecha).toLocaleString('es-BO', {timeZone: 'America/La_Paz', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
 
-// Casillero de firma para los PDF: el trazo, la linea, el titulo, el nombre y cargo, y cuando se firmo
-const signatureBlockHtml = (signature, title, fallbackRole) => {
+// Casillero de firma para los PDF: el trazo, la linea, el titulo, el nombre y cargo, y cuando se firmo (o la leyenda si no hace falta)
+const signatureBlockHtml = (signature, title, fallbackRole, {notRequired = false} = {}) => {
   let stroke = '<div class="firma-espacio"></div>';
   let detail = `<div class="firma-rol">${escapeHtml(fallbackRole)}</div>`;
+  if (!signature && notRequired) {
+    stroke = `<div class="firma-espacio firma-auto">${managerNotRequiredText}</div>`;
+  }
   if (signature) {
     const name = escapeHtml(signerNameOf(signature));
     const role = escapeHtml(signature.Usuario?.Cargo?.nombre || fallbackRole);
@@ -111,4 +122,4 @@ const signatureStyles = `
   .firma-fecha { font-size: 6pt; color: #7f7f7f; }
 `;
 
-module.exports = {signatureStages, validateSignature, saveSignature, getTripSignatures, getStatementSignatures, statementSignaturesForExport, signerNameOf, signatureDateOf, signatureBlockHtml, signatureStyles};
+module.exports = {managerNotRequiredText, signatureStages, validateSignature, saveSignature, getTripSignatures, getStatementSignatures, statementSignaturesForExport, signerNameOf, signatureDateOf, signatureBlockHtml, signatureStyles};
