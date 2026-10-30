@@ -131,4 +131,4 @@ const verifyDocument = async (rawCode) => {
   };
 };
 
-module.exports = {documentTypes, createSeal, sealHtml, sealStyles, withSeal, verifyDocument, formatCode};
+module.exports = {documentTypes, createSeal, sealHtml, sealStyles, withSeal, verifyDocument};

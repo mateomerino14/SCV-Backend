@@ -13,7 +13,11 @@ const run = async () => {
     console.error('No se pudo conectar a la base de datos. Revisa SUPABASE_URL y SUPABASE_KEY en el .env:', error.message || error);
     process.exit(1);
   }
-  console.log(dryRun ? 'Resumen de pendientes (modo prueba, no se envía nada):' : 'Enviando resumen de pendientes...');
+  let title = 'Enviando resumen de pendientes...';
+  if (dryRun) {
+    title = 'Resumen de pendientes (modo prueba, no se envía nada):';
+  }
+  console.log(title);
   const result = await reminderScheduleService.sendNow({dryRun});
   if (result.error) {
     console.error(result.error);
@@ -21,8 +25,11 @@ const run = async () => {
   }
   result.mensajes.forEach((message) => {
     let status = '[prueba]';
-    if (!dryRun) {
-      status = message.enviado ? '[enviado]' : `[error: ${message.error}]`;
+    if (!dryRun && message.enviado) {
+      status = '[enviado]';
+    }
+    else if (!dryRun) {
+      status = `[error: ${message.error}]`;
     }
     console.log(`${status} ${message.correo} | ${message.asunto}`);
     message.lineas.forEach((line) => console.log(`    - ${line}`));
