@@ -289,6 +289,7 @@ npm run resumen -- --prueba   # simula el resumen de pendientes
 \rowcolor{maxamFondo} \code{CORS_ORIGINS} & Opcional. Dominios del cliente permitidos, separados por coma \\
 \code{TRUST_PROXY} & Opcional. \code{true} detrás de un proxy (Nginx); en Render se detecta solo \\
 \rowcolor{maxamFondo} \code{PUPPETEER_EXECUTABLE_PATH} & Opcional. Ruta a un Chromium propio \\
+\code{REMINDERS_ENABLED} & Opcional. \code{false} apaga los recordatorios en ese servidor (develop, si comparte la base con producción) \\
 \end{xltabular}
 
 \begin{xltabular}{\textwidth}{L{3.4cm} L{3.6cm} L{3.3cm} Y}
@@ -703,7 +704,7 @@ Las aprobaciones que firman un documento piden \code{firma}, un PNG en base64 di
 \subsection{Resumen de pendientes}
 Un solo correo por persona con una línea por tipo de pendiente. Solo lo reciben quienes tienen algo pendiente; si falla el envío a una persona, se envía igual a las demás.
 
-\textbf{Programación configurable.} Los días y las horas los define el administrador en la pantalla \emph{Recordatorios}, que guarda la configuración en la tabla \code{Configuracion_Recordatorio} (una sola fila). \code{reminderScheduleService} crea un \code{node-cron} por cada hora, en la zona \code{America/La_Paz} sin importar la del servidor, y al guardar detiene los anteriores y crea los nuevos, sin reiniciar el servidor.
+\textbf{Programación configurable.} Los días y las horas los define el administrador en la pantalla \emph{Recordatorios}, que guarda la configuración en la tabla \code{Configuracion_Recordatorio} (una sola fila). \code{reminderScheduleService} crea un \code{node-cron} por cada hora, en la zona \code{America/La_Paz} sin importar la del servidor, y al guardar detiene los anteriores y crea los nuevos, sin reiniciar el servidor. Con \code{REMINDERS_ENABLED=false} el servidor no programa ningún envío: así, cuando develop y producción comparten la base, cada resumen sale una sola vez.
 
 \begin{itemize}
   \item Se puede activar o desactivar el envío.
