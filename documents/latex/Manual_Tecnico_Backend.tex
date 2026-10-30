@@ -302,6 +302,8 @@ npm run resumen -- --prueba   # simula el resumen de pendientes
 \rowcolor{maxamFondo} \code{TRUST_PROXY} & No se define & No se define & \code{true} \\
 \end{xltabular}
 
+En el piloto hay dos servicios en Render que comparten la misma base de Supabase y por eso llevan las mismas \code{SUPABASE_URL} y \code{SUPABASE_KEY}: \code{SCV-Backend} publica la rama \code{main} en \code{https://scv-backend.onrender.com} y atiende al entorno \emph{Production} de Vercel; \code{scv-backend} publica \code{develop} en \code{https://scv-backend-7yft.onrender.com} y atiende a los despliegues \emph{Preview}. El de develop lleva \code{REMINDERS_ENABLED=false} para que los recordatorios salgan una sola vez, y los dos tienen \code{FRONTEND_URL} con la web de producción, que es pública, para que los QR se puedan verificar. \code{SCV-Backend} está dentro de un proyecto de Render y se abre desde \emph{Projects}.
+
 \section{Base de datos}\label{sec:bd}
 
 \subsection{Scripts}

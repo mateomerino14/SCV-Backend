@@ -48,6 +48,15 @@ FRONTEND_URL=...
 
 Los correos salen por la API HTTPS de Brevo, no por SMTP, así que funcionan en Render aunque el plan gratuito bloquee los puertos de correo. Si Brevo rechaza un envío, el registro del servidor muestra la línea `[Brevo]` con el motivo exacto (por ejemplo, remitente sin verificar o IP no autorizada). Para probar la configuración: `npm run probar-correo -- destinatario@correo.com`.
 
+### Ambientes en Render y Vercel
+
+| Rama | Servicio en Render | Frontend en Vercel | Variables propias |
+|---|---|---|---|
+| `main` | `SCV-Backend` → `https://scv-backend.onrender.com` | Production (`https://scv-frontend.vercel.app`) | Envía los recordatorios |
+| `develop` | `scv-backend` → `https://scv-backend-7yft.onrender.com` | Preview (develop y ramas) | `REMINDERS_ENABLED=false` |
+
+Los dos servicios usan la misma base de Supabase y deben tener las mismas `SUPABASE_URL` y `SUPABASE_KEY`. `FRONTEND_URL` apunta en ambos a la web de producción, porque los despliegues preview de Vercel piden iniciar sesión y la página de verificación de los QR debe ser pública. El servicio `SCV-Backend` está dentro de un proyecto de Render, así que no aparece en la lista general de servicios: se abre desde *Projects*.
+
 En Render el servidor confía en el proxy de la plataforma (`trust proxy`) para leer la IP real de cada usuario; así el límite de intentos de ingreso se aplica por persona y no a todos juntos.
 
 ## Ejecución
