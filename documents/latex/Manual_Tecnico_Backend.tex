@@ -311,14 +311,15 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \endfirsthead
 \cabecera \tth{Archivo} & \tth{Contenido} \\
 \endhead
-\rowcolor{maxamFondo} \code{01_schema.sql} & Las 30 tablas, relaciones e índices \\
-\code{02_functions.sql} & Función \code{incrementar_correlativo_recibo(periodo)} (recibos por mes) y triggers \code{viaje_numero_anual} (código VIA por año) y \code{viaje_numero_rendicion} \\
-\rowcolor{maxamFondo} \code{03_seed.sql} & Roles, cargos, impuesto IVA, categorías de gasto y configuración de recordatorios \\
-\code{04_rls_hardening.sql} & Activa seguridad por fila (RLS) en todas las tablas \\
-\rowcolor{maxamFondo} \code{testing_00_borrar_todo.sql} & Elimina las 30 tablas (solo pruebas) \\
-\code{testing_01_limpieza_completa.sql} & Borra datos operativos, conserva catálogos \\
-\rowcolor{maxamFondo} \code{testing_02_organizacion_prueba.sql} & Organización de prueba con jerarquía completa y tres vehículos; la usan también las pruebas automáticas \\
-\code{demo_01_usuarios_ficticios.sql} & Demo con personas ficticias; solo empleado, aprobador y tesorera usan correos reales de prueba \\
+\rowcolor{maxamFondo} \code{01_esquema.sql} & Las 30 tablas, relaciones, restricciones e índices \\
+\code{02_funciones.sql} & Función \code{incrementar_correlativo_recibo(periodo)} (recibos por mes) y triggers \code{viaje_numero_anual} (código VIA por año) y \code{viaje_numero_rendicion} (rendición por mes) \\
+\rowcolor{maxamFondo} \code{03_datos_iniciales.sql} & Roles, cargos, impuesto IVA, categorías de gasto y configuración de recordatorios \\
+\code{04_seguridad_rls.sql} & Activa seguridad por fila (RLS) en todas las tablas \\
+\rowcolor{maxamFondo} \code{05_demo_usuarios_ficticios.sql} & Demo con personas ficticias y tres vehículos; solo empleado, aprobador y tesorera usan correos reales de prueba \\
+\code{reconstruir_base_completa.sql} & Todo junto (borrar y \code{01} a \code{05}) para pegar en Supabase; se genera con \code{npm run db:reconstruccion} y una prueba verifica que esté al día \\
+\rowcolor{maxamFondo} \code{mantenimiento/borrar_todo.sql} & Elimina las 30 tablas, las funciones y los triggers (solo pruebas) \\
+\code{mantenimiento/limpiar_datos.sql} & Borra datos operativos, conserva catálogos y vehículos \\
+\rowcolor{maxamFondo} \code{pruebas/organizacion_prueba.sql} & Organización de prueba con jerarquía completa y tres vehículos; la usan las pruebas automáticas \\
 \end{xltabular}
 
 \subsection{Tablas}
@@ -797,7 +798,7 @@ Una prueba automática es código que usa el sistema como lo haría una persona 
 De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, gasto internacional en soles pasado a USD y tipo de cambio a Bs obligatorio, número de recibo del sistema, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos solo en gastos internacionales, presupuesto con lo pagado, número de rendición, códigos de Oracle, exportación e importación de usuarios desde Excel (\code{tests/api/}); también vehículos de la empresa (solo los libres, se liberan al terminar el viaje), combustible y hospedaje, código de viaje por año y recibo por mes, moneda de rendición del gasto internacional, firmas dibujadas obligatorias al aprobar el viaje, enviar la rendición y darle el Vo/ Bo (también del reemplazo y del gerente en los gastos no deducibles, con la leyenda «No requiere Vo/ Bo de gerencia» cuando no pasa por él) y la verificación pública de documentos por su código; y el control de acceso por ruta directa (\code{accessControl.api.test.js}): sin sesión o con un token alterado nada responde, otro empleado no ve ni modifica viajes ni gastos ajenos, un empleado no entra a las rutas de otros roles y un supervisor de otra sección no abre viajes que no le corresponden & \code{npm run test:api} \\
 \end{xltabular}
 
-Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase y acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar; nunca se ejecutan contra la base real. En el estado actual pasan 74 pruebas unitarias y 36 de la API.
+Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{pruebas/organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase y acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar; nunca se ejecutan contra la base real. En el estado actual pasan 74 pruebas unitarias y 36 de la API.
 
 \subsection{Integración continua}
 El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio; si una prueba falla, GitHub la marca junto a la línea de código que falló. En las pruebas, los correos no se envían de verdad: se simulan y se revisa a quién se habrían mandado.

@@ -1,9 +1,9 @@
 -- ============================================================
--- CARGA DE ORGANIZACION DE PRUEBA (jerarquia real)
+-- SCV · PRUEBAS · ORGANIZACIÓN DE PRUEBA
 -- ============================================================
--- Lucia (revisor) > Pedro (aprobador) > Maria (Ventas) y Jorge (Logistica), supervisores de sus empleados
--- Sofia queda sin jefe y sin supervisor en su seccion: su viaje lo ven todos los supervisores
--- Contrasena de todos los usuarios de prueba: Prueba1234
+-- Lucía (revisor) > Pedro (aprobador) > María (Ventas) y Jorge (Logística), supervisores de sus empleados.
+-- Sofía queda sin jefe y sin supervisor en su sección: su viaje lo ven todos los supervisores.
+-- Incluye tres vehículos. La usan las pruebas automáticas. Contraseña de todos: Prueba1234
 -- ============================================================
 
 insert into "Cargo" (nombre, monto_diario, monto_diario_usd, activo) values

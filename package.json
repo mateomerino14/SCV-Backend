@@ -11,6 +11,7 @@
     "resumen": "node scripts/sendDigest.js",
     "limpiar-archivos": "node scripts/cleanStorage.js",
     "probar-correo": "node scripts/testEmail.js",
+    "db:reconstruccion": "node scripts/buildRebuildSql.js",
     "postinstall": "puppeteer browsers install chrome"
   },
   "repository": {

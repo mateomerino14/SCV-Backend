@@ -1,3 +1,10 @@
+-- ============================================================
+-- SCV · 01 ESQUEMA
+-- ============================================================
+-- Crea las 30 tablas del sistema con sus relaciones, restricciones e índices.
+-- Primer paso para crear la base desde cero; refleja siempre el esquema final completo.
+-- ============================================================
+
 -- ------------------------------------------------------------
 -- Catalogo
 -- ------------------------------------------------------------
@@ -391,8 +398,6 @@ create index if not exists idx_reemplazo_id_sustituto on "Solicitud_Reemplazo"(i
 create index if not exists idx_reemplazo_estado on "Solicitud_Reemplazo"(estado);
 
 -- ------------------------------------------------------------
--- Configuracion del resumen de pendientes (una sola fila)
--- ------------------------------------------------------------
 -- Firmas dibujadas y documentos verificables
 -- ------------------------------------------------------------
 
@@ -424,6 +429,9 @@ create table if not exists "Documento_Emitido" (
 );
 
 -- ------------------------------------------------------------
+-- Configuracion del resumen de pendientes (una sola fila)
+-- ------------------------------------------------------------
+
 -- Dias (0 domingo a 6 sabado) y horas (HH:MM, hora Bolivia) del resumen de pendientes
 
 create table if not exists "Configuracion_Recordatorio" (

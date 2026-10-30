@@ -2,36 +2,58 @@
 
 Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde cero.
 
-## Orden de ejecucion
+## Archivos
 
-1. `01_schema.sql` - crea las 24 tablas, relaciones e indices
-2. `02_functions.sql` - crea la funcion `incrementar_correlativo_recibo(periodo)`, usada por el backend para numerar recibos (el correlativo vuelve a 1 cada mes), el trigger `viaje_numero_anual`, que al crear un viaje le da el siguiente numero de su año para el codigo `VIA-numero/año` (`Viaje.numero_viaje` y `anio_viaje`), y el trigger `viaje_numero_rendicion`, que al quedar un viaje en `APROBADO_FINAL` le asigna el siguiente numero de rendicion del mes de su ultimo comprobante (`Viaje.numero_rendicion` y `periodo_rendicion`). Para empezar desde un numero, por ejemplo si contabilidad ya va por la 40: `insert into "Correlativo_Rendicion" (periodo, numero) values ('2026-10', 40) on conflict (periodo) do update set numero = 40;`
-3. `03_seed.sql` - datos iniciales: roles, cargos, impuesto de IVA, categorias de gasto y la configuracion de recordatorios por defecto
-4. `04_rls_hardening.sql` - activa seguridad por fila (RLS) en todas las tablas
+```
+database/
+├── 01_esquema.sql                  Las 30 tablas, relaciones, restricciones e índices
+├── 02_funciones.sql                Correlativos (recibos por mes, viajes por año, rendiciones por mes) y sus triggers
+├── 03_datos_iniciales.sql          Roles, cargos, impuesto IVA, plan de cuentas y recordatorios por defecto
+├── 04_seguridad_rls.sql            Seguridad por fila (RLS) en todas las tablas
+├── 05_demo_usuarios_ficticios.sql  Demo de MAXAM FANEXA con personas ficticias y tres vehículos
+├── reconstruir_base_completa.sql   Todo junto para pegar de una vez en Supabase (generado, no se edita)
+├── mantenimiento/
+│   ├── borrar_todo.sql             Elimina tablas, funciones y triggers para crear la base de nuevo
+│   └── limpiar_datos.sql           Borra usuarios y movimientos; conserva los catálogos
+└── pruebas/
+    └── organizacion_prueba.sql     Organización de prueba que usan las pruebas automáticas
+```
 
-Estos cuatro archivos reflejan siempre el estado final y completo del esquema: alcanza con correrlos en orden para levantar una base nueva desde cero, sin necesidad de aplicar ningun cambio adicional despues.
+## Orden de ejecución
 
-## Como correrlo en Supabase
+1. `01_esquema.sql` - crea las 30 tablas, relaciones e índices.
+2. `02_funciones.sql` - crea la función `incrementar_correlativo_recibo(periodo)`, usada por el backend para numerar recibos (el correlativo vuelve a 1 cada mes); el trigger `viaje_numero_anual`, que al crear un viaje le da el siguiente número de su año para el código `VIA-numero/año` (`Viaje.numero_viaje` y `anio_viaje`), y el trigger `viaje_numero_rendicion`, que al quedar un viaje en `APROBADO_FINAL` le asigna el siguiente número de rendición del mes de su último comprobante (`Viaje.numero_rendicion` y `periodo_rendicion`). Para empezar desde un número, por ejemplo si contabilidad ya va por la 40: `insert into "Correlativo_Rendicion" (periodo, numero) values ('2026-10', 40) on conflict (periodo) do update set numero = 40;`
+3. `03_datos_iniciales.sql` - roles, cargos, impuesto de IVA, categorías de gasto y la configuración de recordatorios por defecto.
+4. `04_seguridad_rls.sql` - activa la seguridad por fila (RLS) en todas las tablas.
+5. `05_demo_usuarios_ficticios.sql` - opcional: la demo con personas ficticias (ver más abajo).
 
-1. Entra a tu proyecto en supabase.com
-2. Ve a SQL Editor
-3. Pega el contenido de cada archivo en orden y ejecuta
+Los archivos `01` a `04` reflejan siempre el estado final y completo del esquema: alcanza con correrlos en orden para levantar una base nueva, sin aplicar ningún cambio adicional después.
 
-## Si ya tenes una base de datos existente
+## Cómo correrlo en Supabase
 
-Para el piloto la base se recrea desde cero: corre `testing_00_borrar_todo.sql` y luego `01` a `04`. Para una base con datos reales, **no vuelvas a correr `01_schema.sql`**: compara tu esquema contra este archivo y aplica manualmente (`alter table`, etc.) lo que falte. No se conservan scripts de migracion por separado, para no acumular archivos con el tiempo.
+1. Entra a tu proyecto en supabase.com y abre **SQL Editor**.
+2. Para crear la base de cero con la demo, pega `reconstruir_base_completa.sql` y ejecútalo. **Borra todo lo que haya.**
+3. Para una base vacía sin demo, pega `01` a `04` en orden.
 
-## Scripts de prueba
+`reconstruir_base_completa.sql` se genera con `npm run db:reconstruccion` a partir de `mantenimiento/borrar_todo.sql` y `01` a `05`; una prueba automática falla si alguien cambia un script y no lo vuelve a generar.
+
+## Si ya tenés una base de datos con datos reales
+
+**No corras `01_esquema.sql` ni `reconstruir_base_completa.sql`**: compara tu esquema contra `01_esquema.sql` y aplica a mano (`alter table`, etc.) lo que falte. No se guardan scripts de migración por separado, para no acumular archivos con el tiempo.
+
+## Demo con usuarios ficticios
+
+`05_demo_usuarios_ficticios.sql` carga una empleada, el Gerente General (aprobador y jefe directo de todos), la tesorera, un revisor, una administradora y un compañero para probar el reemplazo, con sus secciones de Oracle, la dependencia 900 y tres vehículos. Solo tres cuentas usan correos reales para recibir los avisos: empleado `mateomerino988@gmail.com`, aprobador `mateomerino14@gmail.com` y tesorera `202301308@est.umss.edu`; las demás usan `@example.com`. Contraseña de todos: `Viaticos2026`.
+
+## Mantenimiento y pruebas
 
 | Script | Uso |
 |---|---|
-| `testing_00_borrar_todo.sql` | Borra las 24 tablas (estructura y datos) para volver a crear la base desde cero con `01` a `04`. No se puede deshacer |
-| `testing_01_limpieza_completa.sql` | Borra usuarios, viajes, gastos, facturas y solicitudes. No toca los catalogos (Rol, Cargo, Seccion, Categoria_Gasto, Impuesto) y repone la configuracion de recordatorios por defecto |
-| `testing_02_organizacion_prueba.sql` | Carga una organizacion de prueba completa con jerarquia de jefe directo, lista para probar el flujo de revision. Contrasenia de todos los usuarios: `Prueba1234`. Tambien la usan las pruebas automaticas de la API y de extremo a extremo |
-| `demo_01_usuarios_ficticios.sql` | Carga la demo de MAXAM FANEXA con personas ficticias: empleada, Gerente General (aprobador y jefe directo de todos), tesorera, revisor, administradora y un compañero para el reemplazo, con sus secciones de Oracle, la dependencia 900 y tres vehiculos. Solo tres cuentas usan correos reales para recibir los avisos (empleado `mateomerino988@gmail.com`, aprobador `mateomerino14@gmail.com`, tesorera `202301308@est.umss.edu`); las demas usan `@example.com`. Se corre sobre una base recien creada o despues de `testing_01_limpieza_completa.sql`. Contrasenia de todos: `Viaticos2026` |
+| `mantenimiento/borrar_todo.sql` | Elimina las 30 tablas, las funciones y los triggers para volver a crear la base con `01` a `05`. No se puede deshacer |
+| `mantenimiento/limpiar_datos.sql` | Borra usuarios, viajes, gastos, facturas, firmas, documentos emitidos, solicitudes y auditoría. Conserva los catálogos (roles, cargos, secciones, categorías, impuestos y vehículos) y repone la configuración de recordatorios por defecto |
+| `pruebas/organizacion_prueba.sql` | Organización de prueba completa con jerarquía de jefe directo y tres vehículos. Contraseña de todos: `Prueba1234`. La usan las pruebas automáticas de la API y de extremo a extremo |
 
-Solo para entornos de prueba, nunca correr en produccion.
-
+Solo para entornos de prueba, nunca en una base con datos reales.
 
 ## Tablas del sistema
 
@@ -42,11 +64,12 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Seccion | Secciones/departamentos de la empresa; se usa como respaldo intermedio en la jerarquia de revision cuando falta el jefe directo. `codigo_seccion` (3 digitos, opcional) es su codigo de Oracle para la cuenta del gasto: 76.8.dependencia.cuenta.000000.seccion.000.000 |
 | Usuario | Usuarios del sistema; `codigo_dependencia` (3 digitos, opcional) es la dependencia de Oracle que llevan los gastos de quienes lo tienen como jefe directo (y los suyos si no tiene jefe) |
 | Codigo_Verificacion | Codigos temporales de verificacion por correo |
-| Viaje | Viajes registrados (motivo de hasta 500 caracteres), con su flujo de estados, revisores asignados y monto asignado (Bs y USD) |
+| Viaje | Viajes registrados (motivo de hasta 500 caracteres), con su flujo de estados, revisores asignados, monto asignado (Bs y USD, con la parte para combustible en `monto_combustible`), vehículo de la empresa (`id_vehiculo` y la placa de ese momento), gestión del hospedaje (`Empresa` o `Propio`) y número anual (`numero_viaje`, `anio_viaje`) |
+| Vehiculo | Flota de la empresa (placa única, descripción, activo); un índice único parcial impide que un vehículo esté en dos viajes activos |
 | Solicitud_Autorizacion_Plazo | Solicitudes de extension de plazo para seguir registrando gastos; las puede pedir el titular o su reemplazo (`id_empleado` es quien la pidio) |
 | Categoria_Gasto | Categorias de gasto: el plan de cuentas de la empresa (112 cuentas de la planilla de Castro mas OTROS), con su cuenta contable de Oracle y, en `descripcion`, la nota de cuando usarla |
 | Proveedor | Proveedores/emisores de facturas |
-| Gasto | Gastos individuales de un viaje, con sus retenciones impositivas; en los sin factura, el numero impreso del recibo en papel (`numero_recibo`, opcional); en los internacionales, la moneda de la factura, el monto en esa moneda (`monto_moneda_origen`), su tipo de cambio a USD (`tipo_cambio`) y el de USD a Bs (`tipo_cambio_bs`), con `monto_total` en USD |
+| Gasto | Gastos individuales de un viaje, con sus retenciones impositivas; en los sin factura, el numero impreso del recibo en papel (`numero_recibo`, opcional); en los internacionales, la moneda de la factura, el monto en esa moneda (`monto_moneda_origen`), su tipo de cambio a USD (`tipo_cambio`) y el de USD a Bs (`tipo_cambio_bs`), con `monto_total` en USD, y la moneda en que se rinde (`moneda_rendicion`: USD o BOB) |
 | Gasto_Subitem | Desglose de un gasto en varios conceptos |
 | Gasto_Tramo_Moneda | Conversion a USD de un gasto internacional en otra moneda (monto original, tipo de cambio y equivalente); los gastos antiguos pueden tener varios tramos |
 | Imagen | Imagenes/comprobantes asociados a un gasto (una por gasto) |
@@ -84,7 +107,7 @@ Solo para entornos de prueba, nunca correr en produccion.
 **Segundo flujo** - rendicion de gastos:
 
 6. EN_REVISION
-7. EN_REVISION_APROBADOR (solo si la rendicion tiene alcohol; en caso contrario se salta este paso)
+7. EN_REVISION_APROBADOR (solo si la rendición tiene gastos no deducibles: alcohol o propinas; en caso contrario se salta este paso)
 8. APROBADO_SUPERVISOR
 9. APROBADO_FINAL
 
@@ -126,7 +149,7 @@ Contar las tablas creadas:
 select count(*) from information_schema.tables where table_schema = 'public';
 ```
 
-Debe devolver 24.
+Debe devolver 30.
 
 Comprobar que las columnas temporales quedaron bien tipadas:
 
@@ -137,7 +160,7 @@ where table_schema = 'public' and data_type like 'timestamp%'
 order by table_name, column_name;
 ```
 
-Las doce filas deben indicar `timestamp with time zone`.
+Las quince filas deben indicar `timestamp with time zone`.
 
 ## Variables de entorno necesarias
 

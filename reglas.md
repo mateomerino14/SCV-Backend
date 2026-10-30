@@ -364,7 +364,7 @@ El backend es la única fuente de verdad: una validación presente solo en el cl
 - Toda columna de fecha y hora usa `timestamptz`.
 - Los valores calculados que deban permanecer estables ante cambios de configuración —como las retenciones impositivas— se persisten en el momento del registro en lugar de recalcularse.
 - Los índices se declaran sobre las columnas usadas como criterio de filtrado o unión.
-- Los cambios sobre bases existentes se aplican manualmente contra Supabase, y siempre se reflejan de inmediato en `01_schema.sql` (u otro archivo base que corresponda) para que una instalacion nueva quede igual sin necesidad de correr nada aparte. No se conservan scripts de migracion numerados por separado, para no acumular archivos con el tiempo.
+- Los cambios sobre bases existentes se aplican manualmente contra Supabase, y siempre se reflejan de inmediato en `01_esquema.sql` (u otro archivo base que corresponda) para que una instalacion nueva quede igual sin necesidad de correr nada aparte. No se conservan scripts de migracion numerados por separado, para no acumular archivos con el tiempo.
 
 ---
 
