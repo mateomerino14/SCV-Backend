@@ -7,6 +7,8 @@
 
 truncate table
   "Recibo",
+  "Firma",
+  "Documento_Emitido",
   "Correlativo_Rendicion",
   "Correlativo_Recibo",
   "Correlativo_Viaje",

@@ -1,5 +1,6 @@
 const supabase = require('../../config/supabase');
 const tripAccessService = require('./tripAccessService');
+const signatureService = require('../shared/signatureService');
 
 const maxTripsPerExport = 50;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -63,6 +64,10 @@ const getStatementsForExport = async (query, userId) => {
       gastos: (expenses || []).filter((expense) => expense.id_viaje === trip.id_viaje),
       comentarios: (comments || []).filter((comment) => comment.id_viaje === trip.id_viaje),
     }));
+  // Cada planilla lleva las firmas de sus tres casilleros para el Excel
+  for (const statement of statements) {
+    statement.firmas = await signatureService.statementSignaturesForExport(statement.viaje.id_viaje);
+  }
   return {statements};
 };
 

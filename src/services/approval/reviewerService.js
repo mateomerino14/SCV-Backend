@@ -9,6 +9,7 @@ const tripCodeUtil = require('../../utils/tripCode');
 const reviewLogService = require('./reviewLogService');
 const {escapeHtml} = require('../../utils/htmlEscape');
 const {hasUsdFund} = require('../../utils/expenseCurrency');
+const documentSealService = require('../shared/documentSealService');
 
 // Anexa el resumen de gastos y alertas a una lista de viajes
 const attachSummaryToTrips = (trips) => {
@@ -151,7 +152,8 @@ const notifyTreasurer = async (trip, reviewer, tripCode, expenses) => {
     return;
   }
   const to = treasurers.map((treasurer) => ({email: treasurer.email_corporativo, name: `${treasurer.nombre} ${treasurer.apellido_paterno}`}));
-  const renditionHtml = finalReviewDocumentService.generateRenditionHtml(trip, reviewer, tripCode, expenses);
+  const renditionSeal = await documentSealService.createSeal({type: documentSealService.documentTypes.finalReview, tripId: trip.id_viaje, summary: {codigo: tripCode, gastos: (expenses || []).length, resultado: 'Aprobación final'}});
+  const renditionHtml = documentSealService.withSeal(finalReviewDocumentService.generateRenditionHtml(trip, reviewer, tripCode, expenses), renditionSeal);
   const pdfBuffer = await finalReviewDocumentService.generatePdf(renditionHtml);
   const pdfBase64 = pdfBuffer.toString('base64');
   const attachments = [{content: pdfBase64, name: `Rendicion_Final_${tripCode.replace('/', '-')}.pdf`}];
@@ -183,7 +185,8 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
     exceedsUsd: usdBalance < 0,
     hasUsdFund: usdFund,
   };
-  const resultHtml = finalReviewDocumentService.generateEmployeeResultHtml(trip, tripCode, resultSummary);
+  const resultSeal = await documentSealService.createSeal({type: documentSealService.documentTypes.finalReview, tripId: trip.id_viaje, summary: {codigo: tripCode, saldo_bs: resultSummary.nationalBalance, saldo_usd: resultSummary.usdBalance}});
+  const resultHtml = documentSealService.withSeal(finalReviewDocumentService.generateEmployeeResultHtml(trip, tripCode, resultSummary), resultSeal);
   const pdfBuffer = await finalReviewDocumentService.generatePdf(resultHtml);
   const pdfBase64 = pdfBuffer.toString('base64');
   const attachments = [{content: pdfBase64, name: `Resultado_Rendicion_${tripCode.replace('/', '-')}.pdf`}];

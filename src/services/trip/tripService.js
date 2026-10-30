@@ -5,6 +5,7 @@ const substitutionService = require('../approval/substitutionService');
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService');
 const commentModerationService = require('../shared/commentModerationService');
 const vehicleService = require('../catalog/vehicleService');
+const signatureService = require('../shared/signatureService');
 
 const companyVehicle = 'Vehículo de Empresa';
 const lodgingOptions = ['Empresa', 'Propio'];
@@ -351,7 +352,7 @@ const submitToReview = async (tripId, userId) => {
 };
 
 // Confirma la finalizacion de un viaje y lo envia a revision de gastos
-const confirmCompletion = async (tripId, userId, justifications) => {
+const confirmCompletion = async (tripId, userId, justifications, {signature = null, ip = null} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(Cargo(monto_diario, monto_diario_usd))')
@@ -370,6 +371,11 @@ const confirmCompletion = async (tripId, userId, justifications) => {
   const isExpensePhaseRejection = trip.estado === 'RECHAZADO' && trip.fue_iniciado;
   if (trip.estado !== 'EN_CURSO' && !isExpensePhaseRejection) {
     return {error: 'Solo puedes finalizar viajes en curso o rechazados en la fase de gastos', status: 400};
+  }
+  // Quien envia la rendicion firma el casillero Preparado por de la planilla
+  const signatureError = signatureService.validateSignature(signature);
+  if (signatureError) {
+    return {error: signatureError, status: 400};
   }
   let justificationList = [];
   if (Array.isArray(justifications)) {
@@ -447,6 +453,7 @@ const confirmCompletion = async (tripId, userId, justifications) => {
     }
     return {error: 'El viaje ya fue enviado a revisión. Actualiza la página.', status: 409};
   }
+  await signatureService.saveSignature(tripId, signatureService.signatureStages.prepared, userId, {image: signature, ip});
   await hierarchyAssignmentService.assignNextReviewer(tripId, trip.id_usuario, 'SUPERVISOR', 'id_supervisor_asignado');
   // Las solicitudes de reemplazo o de plazo que quedaron sin responder ya no aplican
   await substitutionService.closePendingRequests([tripId]);

@@ -17,6 +17,8 @@ drop table if exists
   "Gasto_Tramo_Moneda",
   "Gasto_Subitem",
   "Gasto",
+  "Firma",
+  "Documento_Emitido",
   "Viaje",
   "Vehiculo",
   "Auditoria",

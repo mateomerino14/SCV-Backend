@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const pdfService = require('../shared/pdfService');
 const {escapeDeep} = require('../../utils/htmlEscape');
+const signatureService = require('../shared/signatureService');
+const documentSealService = require('../shared/documentSealService');
 
 const logoDataUri = `data:image/jpeg;base64,${fs.readFileSync(path.join(__dirname, '../../assets/logo-maxam-fanexa.jpg')).toString('base64')}`;
 const longDateFormat = {day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/La_Paz'};
@@ -73,18 +75,24 @@ const tripRowsOf = (trip) => {
 };
 
 // Genera el HTML del memorandum de aprobacion de un viaje con membrete de MAXAM FANEXA
-const generateMemoHtml = (rawTrip, rawApprover, rawTripCode) => {
+const generateMemoHtml = (rawTrip, rawApprover, rawTripCode, {signature = null, seal = null} = {}) => {
   const trip = escapeDeep(rawTrip);
   const approver = escapeDeep(rawApprover);
   const [tripCode] = escapeDeep([rawTripCode]);
   const employee = trip.Usuario || {};
   const today = new Date().toLocaleDateString('es-ES', longDateFormat);
   const rows = tripRowsOf(trip).map(([label, value]) => `<tr><th>${label}</th><td>${value}</td></tr>`).join('');
-  let signature = `<div class="firma-linea"></div>
+  let stroke = '<div class="firma-espacio"></div>';
+  let signedAt = '';
+  if (signature?.imagen && !signature.automatica) {
+    stroke = `<img class="firma-trazo" src="${signature.imagen}" alt="Firma">`;
+    signedAt = `<div class="firma-nota">Firmado electrónicamente el ${signatureService.signatureDateOf(signature)}</div>`;
+  }
+  let signatureHtml = `${stroke}<div class="firma-linea"></div>
       <div class="firma-nombre">${fullNameOf(approver)}</div>
-      <div class="firma-cargo">${approver?.Cargo?.nombre || 'Aprobador'}</div>`;
+      <div class="firma-cargo">${approver?.Cargo?.nombre || 'Aprobador'}</div>${signedAt}`;
   if (approver?.aprobacionAutomatica) {
-    signature = `<div class="firma-nombre">Aprobación automática</div>
+    signatureHtml = `<div class="firma-nombre">Aprobación automática</div>
       <div class="firma-cargo">Sistema de Control de Viáticos</div>
       <div class="firma-nota">El titular del viaje es el aprobador; esta etapa se aprobó automáticamente.</div>`;
   }
@@ -109,7 +117,10 @@ const generateMemoHtml = (rawTrip, rawApprover, rawTripCode) => {
   .datos { width: 100%; border-collapse: collapse; margin: 6px 0 16px; font-size: 9.5pt; }
   .datos th { width: 32%; text-align: left; font-weight: 700; color: #404040; background: #f5f5f5; padding: 7px 10px; border-bottom: 1px solid #e0e0e0; }
   .datos td { padding: 7px 10px; border-bottom: 1px solid #e0e0e0; }
-  .firma { margin-top: 46px; text-align: center; }
+  .firma { margin-top: 30px; text-align: center; }
+  .firma-trazo { display: block; height: 60px; max-width: 220px; margin: 0 auto 2px; object-fit: contain; }
+  .firma-espacio { height: 16px; }
+  ${documentSealService.sealStyles}
   .firma-linea { width: 220px; margin: 0 auto 6px; border-top: 1px solid #404040; }
   .firma-nombre { font-weight: 700; font-size: 10.5pt; }
   .firma-cargo { font-size: 9pt; color: #595959; text-transform: uppercase; letter-spacing: .5px; }
@@ -135,7 +146,8 @@ const generateMemoHtml = (rawTrip, rawApprover, rawTripCode) => {
     <p class="cuerpo">Se autoriza el viaje de <strong>${fullNameOf(employee)}</strong>${employee.Cargo?.nombre ? `, ${employee.Cargo.nombre}` : ''}, con motivo de ${trip.motivo}, con los siguientes datos:</p>
     <table class="datos">${rows}</table>
     <p class="cuerpo">${purchaseTextOf(trip)} Se solicita también la asignación del fondo a rendir indicado.</p>
-    <div class="firma">${signature}</div>
+    <div class="firma">${signatureHtml}</div>
+    ${documentSealService.sealHtml(seal)}
     <div class="pie"><span>MAXAM FANEXA — Documento generado por el Sistema de Control de Viáticos</span><span>${tripCode}</span></div>
   </div>
 </body>

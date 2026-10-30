@@ -1,6 +1,8 @@
 const supabase = require('../../config/supabase');
 const pdfService = require('../shared/pdfService');
 const tripCodeUtil = require('../../utils/tripCode');
+const signatureService = require('../shared/signatureService');
+const documentSealService = require('../shared/documentSealService');
 const {escapeDeep} = require('../../utils/htmlEscape');
 const {getExpenseRetentions, hasOriginCurrencyLines} = require('../../utils/retentions');
 const {formatReceiptNumber} = require('../expense/receiptNumberService');
@@ -192,7 +194,7 @@ const buildJustificationRows = (dayJustifications) => {
 };
 
 // Genera el HTML de la planilla de rendicion de cuentas
-const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
+const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications, {signatures = {}, seal = null} = {}) => {
   const trip = escapeDeep(rawTrip);
   const expenses = escapeDeep(rawExpenses);
   const dayJustifications = escapeDeep(rawJustifications);
@@ -319,10 +321,9 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   .justificaciones .justificaciones-titulo { background: #4a90d9; color: #fff; font-size: 8pt; }
   .justificaciones td { border: 1px solid #b0c4d4; padding: 3px 6px; font-size: 8pt; vertical-align: top; }
   .justificaciones .justificaciones-fecha { width: 70px; text-align: center; }
-  .firmas { display: flex; justify-content: space-between; margin-top: 30px; gap: 10px; }
-  .firma-bloque { flex: 1; text-align: center; }
-  .firma-linea { border-top: 1px solid #000; margin-top: 30px; padding-top: 4px; font-size: 7.5pt; font-weight: bold; }
-  .firma-rol { font-size: 7pt; }
+  .firmas { display: flex; justify-content: space-between; margin-top: 18px; gap: 10px; page-break-inside: avoid; }
+  ${signatureService.signatureStyles}
+  ${documentSealService.sealStyles}
 </style>
 </head>
 <body>
@@ -396,10 +397,11 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
       </table>
     </div>
     <div class="firmas">
-      <div class="firma-bloque"><div class="firma-linea">Preparado por</div><div class="firma-rol">Responsable</div></div>
-      <div class="firma-bloque"><div class="firma-linea">Vo/ Bo</div><div class="firma-rol">Jefe de Área</div></div>
-      <div class="firma-bloque"><div class="firma-linea">Vo/ Bo</div><div class="firma-rol">Gerente de Área</div></div>
+      ${signatureService.signatureBlockHtml(signatures.prepared, 'Preparado por', 'Responsable')}
+      ${signatureService.signatureBlockHtml(signatures.boss, 'Vo/ Bo', 'Jefe de Área')}
+      ${signatureService.signatureBlockHtml(signatures.manager, 'Vo/ Bo', 'Gerente de Área')}
     </div>
+    ${documentSealService.sealHtml(seal)}
   </div>
 </body>
 </html>`;
@@ -436,7 +438,14 @@ const generateStatementPdf = async (tripId) => {
     .eq('tipo', 'JUSTIFICACION')
     .order('fecha', {ascending: false});
   const dayJustifications = latestJustificationPerDay(comments || []);
-  const html = generateStatementHtml(trip, expenses || [], dayJustifications);
+  const signatures = await signatureService.getStatementSignatures(tripId);
+  const statementTotals = summarizeStatement(trip, expenses || []);
+  const seal = await documentSealService.createSeal({
+    type: documentSealService.documentTypes.statement,
+    tripId: trip.id_viaje,
+    summary: {codigo: tripCodeUtil.buildTripCode(trip), gastos: (expenses || []).length, saldos: statementTotals.balanceRows.map(([concepto, bs, usd]) => ({concepto, bs, usd}))},
+  });
+  const html = generateStatementHtml(trip, expenses || [], dayJustifications, {signatures, seal});
   const pdfBuffer = await pdfService.generatePdf(html);
   // Nombre de archivo solo con letras, numeros y guiones, como exige la cabecera de descarga
   const safeReason = (trip.motivo || 'viaje')

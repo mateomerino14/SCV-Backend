@@ -393,6 +393,37 @@ create index if not exists idx_reemplazo_estado on "Solicitud_Reemplazo"(estado)
 -- ------------------------------------------------------------
 -- Configuracion del resumen de pendientes (una sola fila)
 -- ------------------------------------------------------------
+-- Firmas dibujadas y documentos verificables
+-- ------------------------------------------------------------
+
+-- Firma dibujada en el momento de aprobar o enviar; no se reutiliza: cada aprobacion trae su propio trazo
+create table if not exists "Firma" (
+  id_firma serial primary key,
+  id_viaje integer not null references "Viaje"(id_viaje) on delete cascade,
+  -- MEMORANDUM: aprobador del viaje; PREPARADO: empleado al enviar la rendicion;
+  -- JEFE: jefe directo o supervisor al aprobar la rendicion (Vo/ Bo Jefe de Area);
+  -- GERENTE: aprobador al aprobar la revision adicional de la rendicion (Vo/ Bo Gerente de Area)
+  etapa varchar(15) not null check (etapa in ('MEMORANDUM', 'PREPARADO', 'JEFE', 'GERENTE')),
+  id_usuario integer not null references "Usuario"(id_usuario),
+  imagen text, -- PNG en base64; vacio cuando la etapa se aprobo automaticamente
+  automatica boolean not null default false,
+  ip varchar(60),
+  fecha timestamptz not null default now()
+);
+
+create index if not exists firma_viaje_etapa on "Firma"(id_viaje, etapa, fecha desc);
+
+-- Cada PDF que genera el sistema lleva un codigo y un QR para comprobar que es autentico
+create table if not exists "Documento_Emitido" (
+  codigo char(12) primary key,
+  tipo varchar(25) not null,
+  id_viaje integer references "Viaje"(id_viaje) on delete cascade,
+  id_gasto integer references "Gasto"(id_gasto) on delete set null,
+  resumen jsonb not null default '{}'::jsonb, -- datos clave del documento al emitirlo, para compararlos con el papel
+  fecha timestamptz not null default now()
+);
+
+-- ------------------------------------------------------------
 -- Dias (0 domingo a 6 sabado) y horas (HH:MM, hora Bolivia) del resumen de pendientes
 
 create table if not exists "Configuracion_Recordatorio" (

@@ -6,6 +6,7 @@ const {buildTripCode} = require('../../utils/tripCode');
 const {escapeDeep, escapeHtml: escapeText} = require('../../utils/htmlEscape');
 const {getExpenseRetentions, getExpenseLineBases, hasOriginCurrencyLines} = require('../../utils/retentions');
 const {formatReceiptNumber, getReceiptNumber} = require('./receiptNumberService');
+const documentSealService = require('../shared/documentSealService');
 
 // Los datos se escapan al entrar a cada plantilla (escapeDeep); aqui solo se normaliza el vacio
 const escapeHtml = (text) => text || '';
@@ -471,7 +472,8 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   if (numberError) {
     return {error: numberError, status: 500};
   }
-  const html = generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, buildTripCode(trip), trip.motivo, supervisor);
+  const seal = await documentSealService.createSeal({type: documentSealService.documentTypes.receipt, tripId, summary: {recibo: receiptNumber, agrupado: true, gastos: expenses.length, pagado: expenses.reduce((sum, expense) => sum + (parseFloat(expense.monto_total) || 0), 0)}});
+  const html = documentSealService.withSeal(generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, buildTripCode(trip), trip.motivo, supervisor), seal);
   const pdfBuffer = await pdfService.generatePdf(html);
   const pdfBase64 = pdfBuffer.toString('base64');
   let typeName = 'Compras';
@@ -538,7 +540,8 @@ const sendIndividualReceipt = async (expenseId) => {
   if (numberError) {
     return {error: numberError, status: 500};
   }
-  const html = generateIndividualReceiptHtml(expense, employee, receiptNumber, buildTripCode(expense.Viaje || {}), expense.Viaje?.motivo, supervisor);
+  const seal = await documentSealService.createSeal({type: documentSealService.documentTypes.receipt, tripId: expense.id_viaje, expenseId: expense.id_gasto, summary: {recibo: receiptNumber, pagado: parseFloat(expense.monto_total) || 0, fecha: expense.fecha_gasto}});
+  const html = documentSealService.withSeal(generateIndividualReceiptHtml(expense, employee, receiptNumber, buildTripCode(expense.Viaje || {}), expense.Viaje?.motivo, supervisor), seal);
   const pdfBuffer = await pdfService.generatePdf(html);
   const pdfBase64 = pdfBuffer.toString('base64');
   let typeName = 'Compra';

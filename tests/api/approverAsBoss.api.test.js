@@ -63,6 +63,10 @@ test('la rendición pasa del aprobador como jefe directo al revisor, aunque teng
   const trip = await tripOf(tripId);
   expect(trip.estado).toBe('APROBADO_SUPERVISOR');
   expect(trip.id_revisor_asignado).toBe(await idOf('lucia.revisora@maxam.com'));
+  // Su Vo/ Bo como jefe directo vale tambien para el casillero del Gerente de Area
+  const signatures = (await approver.get(`/trip/${tripId}/firmas-planilla`)).body;
+  expect(signatures.jefe.nombre).toBe('Pedro Aprobador');
+  expect(signatures.gerente.nombre).toBe('Pedro Aprobador');
 });
 
 // Como jefe directo, el aprobador observa y rechaza el viaje y la rendicion de su equipo

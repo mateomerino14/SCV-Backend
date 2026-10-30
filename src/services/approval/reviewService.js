@@ -4,6 +4,7 @@ const tripCommentService = require('../trip/tripCommentService');
 const emailService = require('../shared/emailService');
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService');
 const reviewLogService = require('./reviewLogService');
+const signatureService = require('../shared/signatureService');
 const tripAccessService = require('../trip/tripAccessService');
 
 // Lista los viajes pendientes de revision previa
@@ -154,7 +155,7 @@ const getTripReviewDetail = async (tripId, supervisorId) => {
 };
 
 // Aprueba un viaje en revision previa
-const approveTripReview = async (tripId, supervisorId) => {
+const approveTripReview = async (tripId, supervisorId, {signature = null, ip = null} = {}) => {
   const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_supervisor_asignado, estado').eq('id_viaje', tripId).single();
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404};
@@ -168,6 +169,14 @@ const approveTripReview = async (tripId, supervisorId) => {
   if (trip.estado !== 'EN_REVISION_VIAJE') {
     return {error: 'Este viaje no está en revisión previa', status: 400};
   }
+  // Si quien aprueba como jefe directo es el aprobador, su aprobacion genera el memorandum y debe firmarlo
+  const signsMemo = (await hierarchyAssignmentService.getUniqueRoleHolder('APROBADOR')) === supervisorId;
+  if (signsMemo) {
+    const signatureError = signatureService.validateSignature(signature);
+    if (signatureError) {
+      return {error: signatureError, status: 400};
+    }
+  }
   const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'APROBADO_VIAJE'}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_VIAJE').select('id_viaje');
   if (error) {
     return {error: error.message, status: 500};
@@ -177,6 +186,9 @@ const approveTripReview = async (tripId, supervisorId) => {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
     await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.tripReview, 'APROBADO');
+    if (signsMemo) {
+      await signatureService.saveSignature(tripId, signatureService.signatureStages.memo, supervisorId, {image: signature, ip});
+    }
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'APROBADOR', 'id_aprobador_asignado');
     await require('./selfReviewSkipService').advanceSelfReviewStages(tripId);
     return {message: 'Viaje aprobado por supervisor correctamente'};
@@ -414,7 +426,7 @@ const getExpenseReviewDetail = async (tripId, supervisorId) => {
 };
 
 // Aprueba los gastos de un viaje
-const approveExpenseReview = async (tripId, supervisorId) => {
+const approveExpenseReview = async (tripId, supervisorId, {signature = null, ip = null} = {}) => {
   const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_supervisor_asignado, estado, tiene_alcohol').eq('id_viaje', tripId).single();
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404};
@@ -431,6 +443,11 @@ const approveExpenseReview = async (tripId, supervisorId) => {
   if ((await hierarchyAssignmentService.getTripSubstituteIds(tripId)).includes(supervisorId)) {
     return {error: 'No puedes aprobar una rendición que registraste como reemplazo', status: 403};
   }
+  // El jefe directo o supervisor firma el Vo/ Bo de la planilla al aprobarla
+  const signatureError = signatureService.validateSignature(signature);
+  if (signatureError) {
+    return {error: signatureError, status: 400};
+  }
   let nextState = 'APROBADO_SUPERVISOR';
   if (trip.tiene_alcohol) {
     nextState = 'EN_REVISION_APROBADOR';
@@ -443,6 +460,7 @@ const approveExpenseReview = async (tripId, supervisorId) => {
     return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
   }
   await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.expenseReview, 'APROBADO');
+  await signatureService.saveSignature(tripId, signatureService.signatureStages.boss, supervisorId, {image: signature, ip});
   if (trip.tiene_alcohol) {
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'APROBADOR', 'id_aprobador_asignado');
     await require('./selfReviewSkipService').advanceSelfReviewStages(tripId);

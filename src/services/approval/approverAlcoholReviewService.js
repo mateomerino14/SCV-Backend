@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase');
+const signatureService = require('../shared/signatureService');
 const expenseSummaryService = require('./expenseSummaryService');
 const tripCommentService = require('../trip/tripCommentService');
 const emailService = require('../shared/emailService');
@@ -188,7 +189,7 @@ const getAlcoholReviewDetail = async (tripId, approverId) => {
 };
 
 // Aprueba la revision del aprobador; con selfStageSkip se aprueba sola si el viaje es suyo
-const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} = {}) => {
+const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false, signature = null, ip = null} = {}) => {
   const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_aprobador_asignado, estado').eq('id_viaje', tripId).single();
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404};
@@ -202,6 +203,13 @@ const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} 
   if (trip.id_aprobador_asignado !== approverId && !selfStageSkip) {
     return {error: 'No tienes permiso para aprobar este viaje', status: 403};
   }
+  // El gerente firma el Vo/ Bo de la planilla al aprobar la revision adicional
+  if (!selfStageSkip) {
+    const signatureError = signatureService.validateSignature(signature);
+    if (signatureError) {
+      return {error: signatureError, status: 400};
+    }
+  }
   const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'APROBADO_SUPERVISOR', id_aprobador_asignado: approverId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').select('id_viaje');
   if (error) {
     return {error: error.message, status: 500};
@@ -211,6 +219,12 @@ const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} 
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
     await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.alcoholReview, 'APROBADO', {automatic: selfStageSkip});
+    if (!selfStageSkip) {
+      await signatureService.saveSignature(tripId, signatureService.signatureStages.manager, approverId, {image: signature, ip});
+    }
+    else if (trip.id_usuario === approverId) {
+      await signatureService.saveSignature(tripId, signatureService.signatureStages.manager, approverId, {automatic: true});
+    }
     await hierarchyAssignmentService.assignNextReviewer(tripId, approverId, 'REVISOR', 'id_revisor_asignado');
     await require('./selfReviewSkipService').advanceSelfReviewStages(tripId);
     return {message: 'Revisión adicional aprobada, la rendición pasa al revisor final'};

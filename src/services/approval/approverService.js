@@ -1,4 +1,6 @@
 const supabase = require('../../config/supabase');
+const signatureService = require('../shared/signatureService');
+const documentSealService = require('../shared/documentSealService');
 const emailService = require('../shared/emailService');
 const approvalMemoService = require('./approvalMemoService');
 const textNormalizer = require('../../utils/textNormalizer');
@@ -55,7 +57,13 @@ const sendApprovalMemo = async (trip, approver, tripCode, allUsers) => {
     return;
   }
   const to = recipients.map((recipient) => ({email: recipient.email_corporativo, name: `${recipient.nombre} ${recipient.apellido_paterno}`}));
-  const memoHtml = approvalMemoService.generateMemoHtml(trip, approver, tripCode);
+  const signatures = await signatureService.getTripSignatures(trip.id_viaje);
+  const seal = await documentSealService.createSeal({
+    type: documentSealService.documentTypes.memo,
+    tripId: trip.id_viaje,
+    summary: {codigo: tripCode, ruta: `${trip.origen || ''} → ${trip.destino}`, fechas: `${trip.fecha_inicio} al ${trip.fecha_fin}`, fondo_bs: trip.monto_asignado, fondo_usd: trip.monto_asignado_usd, hospedaje: trip.gestion_hospedaje},
+  });
+  const memoHtml = approvalMemoService.generateMemoHtml(trip, approver, tripCode, {signature: signatures[signatureService.signatureStages.memo], seal});
   const pdfBuffer = await approvalMemoService.generateMemoPdf(memoHtml);
   const pdfBase64 = pdfBuffer.toString('base64');
   const attachments = [{content: pdfBase64, name: `Memorandum_${tripCode.replace('/', '-')}.pdf`}];
@@ -153,7 +161,7 @@ const getTripDetail = async (tripId) => {
 };
 
 // Aprueba un viaje en fase de aprobacion previa; con selfStageSkip se aprueba solo (es suyo o ya lo aprobo como jefe directo)
-const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedAsBoss = false} = {}) => {
+const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedAsBoss = false, signature = null, ip = null} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
@@ -171,6 +179,13 @@ const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedA
   if (trip.id_aprobador_asignado && trip.id_aprobador_asignado !== approverId && !selfStageSkip) {
     return {error: 'Este viaje ya está asignado a otro aprobador', status: 403};
   }
+  // El aprobador firma el memorandum al aprobar; si la etapa se aprueba sola no hay trazo
+  if (!selfStageSkip) {
+    const signatureError = signatureService.validateSignature(signature);
+    if (signatureError) {
+      return {error: signatureError, status: 400};
+    }
+  }
   const {data: updatedRows, error} = await supabase
     .from('Viaje')
     .update({estado: 'EN_REVISION_TESORERO', id_aprobador_asignado: approverId})
@@ -184,6 +199,12 @@ const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedA
     return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
   }
   await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.tripApproval, 'APROBADO', {automatic: selfStageSkip});
+  if (!selfStageSkip) {
+    await signatureService.saveSignature(tripId, signatureService.signatureStages.memo, approverId, {image: signature, ip});
+  }
+  else if (!approvedAsBoss) {
+    await signatureService.saveSignature(tripId, signatureService.signatureStages.memo, approverId, {automatic: true});
+  }
   const {data: approverData} = await supabase
     .from('Usuario').select('nombre, apellido_paterno, apellido_materno, email_corporativo, Cargo(nombre)').eq('id_usuario', approverId).single();
   // Si es el viaje del propio aprobador, el memorandum indica aprobacion automatica; si lo aprobo como jefe directo, lo firma el

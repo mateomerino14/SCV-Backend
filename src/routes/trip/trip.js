@@ -8,6 +8,7 @@ router.get('/history', authMiddleware, tripController.getHistory);
 router.get('/export/statements', authMiddleware, tripController.getStatementsForExport);
 router.get('/:id', authMiddleware, tripController.getTripDetail);
 router.get('/:id/rendicion-pdf', authMiddleware, tripController.downloadStatementPdf);
+router.get('/:id/firmas-planilla', authMiddleware, tripController.getStatementSignatures);
 router.post('/', authMiddleware, tripController.createTrip);
 router.put('/:id/edit', authMiddleware, tripController.editTrip);
 router.put('/:id/submit-review', authMiddleware, tripController.submitToReview);
