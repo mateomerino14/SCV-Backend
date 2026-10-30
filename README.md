@@ -42,6 +42,7 @@ FRONTEND_URL=...
 | `ABSTRACT_EMAIL_API_KEY` | Validación de existencia de direcciones de correo |
 | `FRONTEND_URL` | URL del cliente web, usada en el botón "Ingresar al sistema" de los correos |
 | `CORS_ORIGINS` | Opcional. Dominios del cliente web que pueden usar la API, separados por coma. Sin ella se aceptan `localhost:5173` y los dominios de Vercel del proyecto |
+| `REMINDERS_ENABLED` | Opcional. `false` apaga los recordatorios de pendientes en ese servidor. Se usa en el servidor de develop cuando comparte la base con el de producción, para que los correos no lleguen dos veces |
 | `TRUST_PROXY` | Opcional. `true` si el servidor está detrás de un proxy (en Render no hace falta: se detecta solo con la variable `RENDER`) |
 | `PUPPETEER_EXECUTABLE_PATH` | Opcional. Ruta a un Chrome/Chromium propio si no se usa el que descarga `puppeteer` al instalar |
 
@@ -60,7 +61,7 @@ npm run test:api   # pruebas de la API (necesitan una base de prueba; ver "Prueb
 
 Al arrancar, el servidor programa (`node-cron`) el **resumen de pendientes**: un correo para supervisores, aprobadores, revisor y tesorero, solo a quienes tengan algo pendiente. Cada supervisor recibe solo sus propios pendientes (los asignados y los sin asignar que le corresponden por jerarquía), y al revisor se le incluyen las solicitudes de ampliación de plazo y de reemplazo. Si el envío a una persona falla, igual se envía a las demás.
 
-**Los días y las horas los elige el administrador** en la pantalla *Recordatorios* (tabla `Configuracion_Recordatorio`): puede activarlos o desactivarlos, marcar los días de la semana y fijar hasta 4 horas por día. Al guardar, los envíos se reprograman en el momento, sin reiniciar el servidor. La configuración de fábrica es de lunes a viernes a las 08:00, 12:00 y 16:00. Las horas se calculan siempre en `America/La_Paz`, aunque el servidor esté en otra zona horaria.
+**Los días y las horas los elige el administrador** en la pantalla *Recordatorios* (tabla `Configuracion_Recordatorio`): puede activarlos o desactivarlos, marcar los días de la semana y fijar hasta 4 horas por día. Al guardar, los envíos se reprograman en el momento, sin reiniciar el servidor. La configuración de fábrica es de lunes a viernes a las 08:00, 12:00 y 16:00. Si dos servidores comparten la misma base (por ejemplo develop y producción), en uno se pone `REMINDERS_ENABLED=false` para que cada resumen se envíe una sola vez. Las horas se calculan siempre en `America/La_Paz`, aunque el servidor esté en otra zona horaria.
 
 Para enviarlo en el momento hay dos formas: los botones *Vista Previa* y *Enviar Ahora* de esa misma pantalla, o el comando (con el mismo `.env` del servidor):
 
@@ -311,7 +312,7 @@ tests/                        Pruebas: services/ (unitarias), api/ (de la API), 
 | `/supplier` | `expense/supplier.js` | Proveedores (solo administrador) |
 | `/review` | `approval/review.js` | Revisión previa y de gastos del supervisor |
 | `/approver` | `approval/approver.js` | Aprobación del viaje y revisión adicional de gastos no deducibles |
-| `/vehicle` | `catalog/vehicle.js` | Flota de la empresa: `GET /vehicle/available` (con `?viaje=` para editar) lista los activos y libres; el administrador registra, edita, suspende, activa y elimina (solo si nunca se usó) |
+| `/vehicle` | `catalog/vehicle.js` | Flota de la empresa: `GET /vehicle/available` (con `?viaje=` para editar) lista los activos y libres; el administrador registra, edita, suspende y activa (un vehículo no se elimina: se suspende para conservar el historial de los viajes) |
 | `/treasurer` | `approval/treasurer.js` | Asignación de fondos |
 | `/reviewer` | `approval/reviewer.js` | Revisión final |
 | `/deadline-authorization` | `approval/deadlineAuthorization.js` | Extensiones de plazo |

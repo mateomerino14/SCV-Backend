@@ -461,4 +461,4 @@ const confirmCompletion = async (tripId, userId, justifications, {signature = nu
   return {message: 'Viaje enviado a revisión de gastos correctamente'};
 };
 
-module.exports = {getDashboardData, getHistory, getTripDetail, createTrip, editTrip, submitToReview, confirmCompletion, validateTripData};
+module.exports = {getDashboardData, getHistory, getTripDetail, createTrip, editTrip, submitToReview, confirmCompletion};

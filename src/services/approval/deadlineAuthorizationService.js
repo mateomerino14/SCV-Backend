@@ -345,4 +345,4 @@ const rejectRequest = async (requestId, reviewerId, observation) => {
   return {message: 'Solicitud rechazada correctamente'};
 };
 
-module.exports = {closePendingRequests, requestableTripStates, createRequest, getRequestStatus, getPendingRequests, getRequestHistory, approveRequest, rejectRequest};
+module.exports = {closePendingRequests, createRequest, getRequestStatus, getPendingRequests, getRequestHistory, approveRequest, rejectRequest};

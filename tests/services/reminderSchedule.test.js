@@ -1,5 +1,9 @@
-jest.mock('../../src/config/supabase', () => ({}));
+jest.mock('../../src/config/supabase', () => ({
+  from: () => ({select: () => ({eq: () => ({maybeSingle: async () => ({data: {activo: true, dias: [1, 2, 3, 4, 5], horas: ['08:00', '12:00']}, error: null})})})}),
+}));
+jest.mock('node-cron', () => ({schedule: jest.fn(() => ({stop: jest.fn()}))}));
 jest.mock('../../src/services/shared/dailyDigestService', () => ({sendDailyDigest: jest.fn()}));
+const cron = require('node-cron');
 const reminderScheduleService = require('../../src/services/shared/reminderScheduleService');
 
 // Acepta una configuracion valida de dias y horas
@@ -30,4 +34,26 @@ test('rechaza mas de cuatro horas por dia', () => {
 test('acepta recordatorios desactivados', () => {
   const result = reminderScheduleService.validateSchedule({activo: false, dias: [], horas: []});
   expect(result).toBeNull();
+});
+
+// Sin la variable REMINDERS_ENABLED el servidor programa los recordatorios
+test('programa los recordatorios por defecto', async () => {
+  delete process.env.REMINDERS_ENABLED;
+  cron.schedule.mockClear();
+  jest.spyOn(console, 'log').mockImplementation(() => {});
+  await reminderScheduleService.startScheduler();
+  expect(reminderScheduleService.isEnabledOnThisServer()).toBe(true);
+  expect(cron.schedule).toHaveBeenCalledTimes(2);
+});
+
+// Con REMINDERS_ENABLED=false el servidor no programa ningun envio, para no duplicar los correos de otro servidor
+test('no programa recordatorios con REMINDERS_ENABLED=false', async () => {
+  process.env.REMINDERS_ENABLED = 'false';
+  cron.schedule.mockClear();
+  const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+  await reminderScheduleService.startScheduler();
+  expect(reminderScheduleService.isEnabledOnThisServer()).toBe(false);
+  expect(cron.schedule).not.toHaveBeenCalled();
+  expect(log).toHaveBeenCalledWith('Recordatorios de pendientes: desactivados en este servidor (REMINDERS_ENABLED=false)');
+  delete process.env.REMINDERS_ENABLED;
 });
