@@ -6,8 +6,10 @@ jest.setTimeout(90000);
 const employeeEmail = 'sofia.sincobertura@maxam.com';
 const approverEmail = 'pedro.aprobador@maxam.com';
 
+// Id del usuario con ese correo
 const idOf = async (email) => (await supabase.from('Usuario').select('id_usuario').eq('email_corporativo', email).single()).data.id_usuario;
 
+// Estado y asignaciones actuales del viaje
 const tripOf = async (tripId) => (await supabase.from('Viaje').select('estado, id_supervisor_asignado, id_aprobador_asignado, id_revisor_asignado').eq('id_viaje', tripId).single()).data;
 
 // Crea y envia a revision un viaje nacional de la empleada

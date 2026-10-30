@@ -45,7 +45,7 @@ test('verifica el memorándum por su código', async () => {
   expect((await request(app).get('/document/verify/123')).status).toBe(400);
 });
 
-// Enviar la rendicion pide la firma del empleado y aprobarla la del jefe; la planilla las muestra
+// Enviar la rendicion pide la firma del empleado y aprobarla la del jefe; sin gastos no deducibles el gerente no da su Vo/ Bo
 test('la planilla lleva las firmas de quien la preparó y del jefe', async () => {
   await api(await login('tesoro.prueba')).post(`/treasurer/${tripId}/approve`);
   await employee.postForm('/expense/register', {id_viaje: tripId, monto_total: 40, fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi', id_categoria_gasto: 1, es_gasto_internacional: false});
@@ -59,6 +59,7 @@ test('la planilla lleva las firmas de quien la preparó y del jefe', async () =>
   expect(signatures.jefe.nombre).toBe('María Supervisora');
   expect(signatures.jefe.imagen.startsWith('data:image/png;base64,')).toBe(true);
   expect(signatures.gerente).toBeNull();
+  expect(signatures.gerenteNoRequerido).toBe(true);
   const signatureService = require('../../src/services/shared/signatureService');
   const {generateStatementHtml} = require('../../src/services/trip/tripStatementService');
   const html = generateStatementHtml({id_viaje: tripId, tipo: 'Nacional', fecha_inicio: boliviaDate(), motivo: 'x', monto_asignado: 900, Usuario: {nombre: 'Juan'}}, [], [], {signatures: await signatureService.getStatementSignatures(tripId), seal: {code: 'ABCDEFGHJKMN', verifyUrl: 'https://scv.test/verificar/ABCDEFGHJKMN', qrDataUri: 'data:image/png;base64,AAAA'}});
@@ -66,4 +67,5 @@ test('la planilla lleva las firmas de quien la preparó y del jefe', async () =>
   expect(html).toContain('Firmado electrónicamente el');
   expect(html).toContain('ABCD-EFGH-JKMN');
   expect(html).toContain('Gerente de Área');
+  expect(html).toContain('No requiere Vo/ Bo de gerencia');
 });

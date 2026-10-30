@@ -1,5 +1,6 @@
 const expenseSummaryService = require('../../src/services/approval/expenseSummaryService');
 
+// Viaje de prueba con las tarifas diarias del cargo y los fondos indicados
 const tripWithDailyRate = (dailyRate, dailyRateUsd = 0, monto_asignado = 0, monto_asignado_usd = 0) => ({
   monto_asignado,
   monto_asignado_usd,

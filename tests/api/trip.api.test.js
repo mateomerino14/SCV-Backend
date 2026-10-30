@@ -1,5 +1,6 @@
 const {login, api, boliviaDate} = require('./helpers');
 
+// Datos de un viaje nacional de prueba, con los cambios que pida cada prueba
 const tripData = (overrides = {}) => ({
   motivo: 'Prueba de viaje',
   origen: 'La Paz',
