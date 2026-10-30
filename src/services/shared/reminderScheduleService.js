@@ -63,6 +63,9 @@ const validateSchedule = (schedule) => {
   return null;
 };
 
+// Indica si este servidor manda los recordatorios; REMINDERS_ENABLED=false los apaga (por ejemplo en develop)
+const isEnabledOnThisServer = () => process.env.REMINDERS_ENABLED !== 'false';
+
 // Detiene los envios programados y crea uno por cada hora configurada
 const applySchedule = (schedule) => {
   scheduledTasks.forEach((task) => {
@@ -72,7 +75,7 @@ const applySchedule = (schedule) => {
     }
   });
   scheduledTasks = [];
-  if (!schedule.activo || schedule.dias.length === 0) {
+  if (!isEnabledOnThisServer() || !schedule.activo || schedule.dias.length === 0) {
     return;
   }
   const days = schedule.dias.join(',');
@@ -90,7 +93,10 @@ const startScheduler = async () => {
   const schedule = await getSchedule();
   applySchedule(schedule);
   let description = 'desactivados';
-  if (schedule.activo) {
+  if (!isEnabledOnThisServer()) {
+    description = 'desactivados en este servidor (REMINDERS_ENABLED=false)';
+  }
+  else if (schedule.activo) {
     description = `días ${schedule.dias.join(',')} a las ${schedule.horas.join(', ')} (hora Bolivia)`;
   }
   console.log(`Recordatorios de pendientes: ${description}`);
@@ -141,4 +147,4 @@ const sendNow = async ({dryRun = false} = {}) => {
   }
 };
 
-module.exports = {getSchedule, updateSchedule, startScheduler, sendNow, validateSchedule, maxTimes};
+module.exports = {getSchedule, updateSchedule, startScheduler, sendNow, validateSchedule, isEnabledOnThisServer, maxTimes};
