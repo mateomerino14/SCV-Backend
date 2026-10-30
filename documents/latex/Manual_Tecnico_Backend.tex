@@ -647,7 +647,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \ep{GET}{/document/verify/:code}{Público}{Verifica un documento emitido por su código}
 \epf{GET}{/vehicle/available?viaje=}{Sesión}{Vehículos activos y libres; el del viaje que se edita cuenta como libre}
 \ep{GET POST PUT}{/vehicle}{Administrador}{Lista la flota con el viaje que ocupa cada vehículo, registra y edita}
-\epf{PATCH DELETE}{/vehicle/:id/suspend, /activate, /:id}{Administrador}{Suspende (no si está en un viaje), activa o elimina uno nunca usado}
+\epf{PATCH}{/vehicle/:id/suspend, /activate}{Administrador}{Suspende (no si está en un viaje) o activa}
 \end{xltabular}}
 
 \section{Servicios transversales}
