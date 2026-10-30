@@ -457,8 +457,6 @@ create index if not exists idx_reemplazo_id_sustituto on "Solicitud_Reemplazo"(i
 create index if not exists idx_reemplazo_estado on "Solicitud_Reemplazo"(estado);
 
 -- ------------------------------------------------------------
--- Configuracion del resumen de pendientes (una sola fila)
--- ------------------------------------------------------------
 -- Firmas dibujadas y documentos verificables
 -- ------------------------------------------------------------
 
@@ -490,6 +488,9 @@ create table if not exists "Documento_Emitido" (
 );
 
 -- ------------------------------------------------------------
+-- Configuracion del resumen de pendientes (una sola fila)
+-- ------------------------------------------------------------
+
 -- Dias (0 domingo a 6 sabado) y horas (HH:MM, hora Bolivia) del resumen de pendientes
 
 create table if not exists "Configuracion_Recordatorio" (
@@ -831,7 +832,7 @@ where schemaname = 'public'
     'Auditoria', 'Cargo', 'Categoria_Gasto', 'Codigo_Verificacion', 'Comentario',
     'Correlativo_Recibo', 'Correlativo_Rendicion', 'Correlativo_Viaje', 'Recibo', 'Revision_Viaje', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Imagen_Respaldo', 'Impuesto', 'Proveedor',
-    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Configuracion_Recordatorio'
+    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Firma', 'Documento_Emitido', 'Configuracion_Recordatorio'
   );
 
 -- >>>>> 05_demo_usuarios_ficticios.sql
