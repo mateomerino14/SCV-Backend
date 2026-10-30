@@ -311,11 +311,11 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \endfirsthead
 \cabecera \tth{Archivo} & \tth{Contenido} \\
 \endhead
-\rowcolor{maxamFondo} \code{01_schema.sql} & Las 28 tablas, relaciones e índices \\
+\rowcolor{maxamFondo} \code{01_schema.sql} & Las 30 tablas, relaciones e índices \\
 \code{02_functions.sql} & Función \code{incrementar_correlativo_recibo(periodo)} (recibos por mes) y triggers \code{viaje_numero_anual} (código VIA por año) y \code{viaje_numero_rendicion} \\
 \rowcolor{maxamFondo} \code{03_seed.sql} & Roles, cargos, impuesto IVA, categorías de gasto y configuración de recordatorios \\
 \code{04_rls_hardening.sql} & Activa seguridad por fila (RLS) en todas las tablas \\
-\rowcolor{maxamFondo} \code{testing_00_borrar_todo.sql} & Elimina las 28 tablas (solo pruebas) \\
+\rowcolor{maxamFondo} \code{testing_00_borrar_todo.sql} & Elimina las 30 tablas (solo pruebas) \\
 \code{testing_01_limpieza_completa.sql} & Borra datos operativos, conserva catálogos \\
 \rowcolor{maxamFondo} \code{testing_02_organizacion_prueba.sql} & Organización de prueba con jerarquía completa y tres vehículos; la usan también las pruebas automáticas \\
 \code{demo_01_usuarios_ficticios.sql} & Demo con personas ficticias; solo empleado, aprobador y tesorera usan correos reales de prueba \\
@@ -335,6 +335,8 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \rowcolor{maxamFondo} \code{Codigo_Verificacion} & Códigos de recuperación de contraseña (5 minutos) \\
 \code{Viaje} & Viajes, estado, revisores asignados, monto asignado en Bs y USD (calculado con las tarifas del cargo; incluye el fondo para combustible, que se guarda aparte en \code{monto_combustible}), vehículo de la empresa (\code{id_vehiculo} y la placa de ese momento), gestión del hospedaje (\code{Empresa} o \code{Propio}), número anual (\code{numero_viaje}, \code{anio_viaje}) y ciclo de revisión \\
 \rowcolor{maxamFondo} \code{Vehiculo} & Flota de la empresa (placa única, descripción, activo). Un índice único parcial sobre \code{Viaje(id_vehiculo)} impide que un vehículo esté en dos viajes activos (en revisión, aprobado, en tesorería o en curso); se libera cuando el empleado termina el viaje \\
+\rowcolor{maxamFondo} \code{Firma} & Firma dibujada en el momento de aprobar o enviar: etapa (MEMORANDUM, PREPARADO, JEFE, GERENTE), trazo PNG, usuario, fecha e IP; las etapas automáticas no llevan trazo \\
+\code{Documento_Emitido} & Código de 12 caracteres y datos clave de cada PDF emitido; el QR del documento lleva a la página pública de verificación \\
 \code{Correlativo_Viaje} & Último número de viaje de cada año, para el código \code{VIA-numero/año} que vuelve a 1 cada año \\
 \rowcolor{maxamFondo} \code{Solicitud_Autorizacion_Plazo} & Ampliaciones de plazo; las pide el titular o su reemplazo \\
 \code{Solicitud_Reemplazo} & Solicitudes para que otra persona rinda el viaje \\
@@ -640,6 +642,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \ep{GET PUT}{/admin/reminders}{Administrador}{Lee o guarda los días y horas del resumen}
 \epf{GET}{/admin/reminders/preview}{Administrador}{A quién le llegaría el resumen, sin enviar}
 \ep{POST}{/admin/reminders/send-now}{Administrador}{Envía el resumen en el momento}
+\ep{GET}{/document/verify/:code}{Público}{Verifica un documento emitido por su código}
 \epf{GET}{/vehicle/available?viaje=}{Sesión}{Vehículos activos y libres; el del viaje que se edita cuenta como libre}
 \ep{GET POST PUT}{/vehicle}{Administrador}{Lista la flota con el viaje que ocupa cada vehículo, registra y edita}
 \epf{PATCH DELETE}{/vehicle/:id/suspend, /activate, /:id}{Administrador}{Suspende (no si está en un viaje), activa o elimina uno nunca usado}
@@ -685,6 +688,9 @@ Rendición final & Aprobación final & Revisor y empleado, con saldo por moneda 
 \end{xltabular}
 
 Todo texto escrito por usuarios se escapa (\code{htmlEscape}) antes de insertarse en correos y PDF. En el resultado final, cada moneda tiene su propia línea: en un viaje internacional puede corresponder devolver dólares y recibir un reembolso en bolivianos.
+
+\subsection{Firmas y verificación}
+Las aprobaciones que firman un documento piden \code{firma}, un PNG en base64 dibujado en ese momento (\code{signatureService}): el aprobador al aprobar el viaje (o al aprobarlo como jefe directo), el empleado al enviar la rendición, el jefe directo o supervisor al aprobarla y el gerente al aprobar la revisión de gastos no deducibles. Sin un trazo válido la respuesta es 400 y no cambia nada. La planilla tiene tres casilleros: Preparado por, Vo/ Bo Jefe de Área y Vo/ Bo Gerente de Área; si el jefe directo es el gerente, su firma vale para los dos. Cada PDF se registra en \code{Documento_Emitido} (\code{documentSealService}) y lleva un QR con su código; \code{GET /document/verify/:code} es público, limitado por IP, y devuelve el tipo de documento, la fecha, el viaje, los datos clave al emitirlo y quién firmó, sin el trazo.
 
 \subsection{Correos inmediatos}
 \begin{itemize}

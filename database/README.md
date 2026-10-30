@@ -58,6 +58,8 @@ Solo para entornos de prueba, nunca correr en produccion.
 | Comentario | Observaciones sobre un viaje o gasto especifico, y justificaciones (una por dia excedido) |
 | Auditoria | Registro de auditoria (ingreso, salida, cambio de clave) |
 | Correlativo_Recibo | Ultimo numero de recibo de cada mes (AAAA-MM); el recibo se muestra como `000012/10-2026` |
+| Firma | Firma dibujada en el momento de aprobar o enviar (MEMORANDUM, PREPARADO, JEFE, GERENTE): trazo PNG, usuario, fecha, IP o aprobación automática |
+| Documento_Emitido | Código y datos clave de cada PDF emitido, para verificarlo con su QR |
 | Correlativo_Viaje | Ultimo numero de viaje de cada año, para el codigo `VIA-numero/año` que vuelve a 1 cada año |
 | Correlativo_Rendicion | Ultimo numero de rendicion de cada mes (AAAA-MM) para la descripcion de Oracle (10-40); lo usa el trigger `viaje_numero_rendicion`; el incremento es atomico (`insert ... on conflict do update`) y un indice unico sobre `Viaje(periodo_rendicion, numero_rendicion)` impide repetir numeros aunque se aprueben varias a la vez |
 | Recibo | Numero del sistema (con su mes en `periodo`, unico por mes) de cada gasto sin factura, asignado al registrarlo, y de cada recibo agrupado; `enviado` indica si ya se mando al empleado |
