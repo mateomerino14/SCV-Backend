@@ -61,7 +61,7 @@ const sendApprovalMemo = async (trip, approver, tripCode, allUsers) => {
   const seal = await documentSealService.createSeal({
     type: documentSealService.documentTypes.memo,
     tripId: trip.id_viaje,
-    summary: {codigo: tripCode, ruta: `${trip.origen || ''} → ${trip.destino}`, fechas: `${trip.fecha_inicio} al ${trip.fecha_fin}`, fondo_bs: trip.monto_asignado, fondo_usd: trip.monto_asignado_usd, hospedaje: trip.gestion_hospedaje},
+    summary: {codigo: tripCode, ruta: `${trip.origen || ''} → ${trip.destino}`, fechas: `${trip.fecha_inicio.split('-').reverse().join('/')} al ${trip.fecha_fin.split('-').reverse().join('/')}`, fondo_bs: trip.monto_asignado, fondo_usd: trip.monto_asignado_usd, hospedaje: trip.gestion_hospedaje},
   });
   const memoHtml = approvalMemoService.generateMemoHtml(trip, approver, tripCode, {signature: signatures[signatureService.signatureStages.memo], seal});
   const pdfBuffer = await approvalMemoService.generateMemoPdf(memoHtml);
