@@ -6,8 +6,10 @@ jest.setTimeout(90000);
 const employeeEmail = 'sofia.sincobertura@maxam.com';
 const approverEmail = 'pedro.aprobador@maxam.com';
 
+// Id del usuario con ese correo
 const idOf = async (email) => (await supabase.from('Usuario').select('id_usuario').eq('email_corporativo', email).single()).data.id_usuario;
 
+// Estado y asignaciones actuales del viaje
 const tripOf = async (tripId) => (await supabase.from('Viaje').select('estado, id_supervisor_asignado, id_aprobador_asignado, id_revisor_asignado').eq('id_viaje', tripId).single()).data;
 
 // Crea y envia a revision un viaje nacional de la empleada
@@ -63,6 +65,10 @@ test('la rendición pasa del aprobador como jefe directo al revisor, aunque teng
   const trip = await tripOf(tripId);
   expect(trip.estado).toBe('APROBADO_SUPERVISOR');
   expect(trip.id_revisor_asignado).toBe(await idOf('lucia.revisora@maxam.com'));
+  // Su Vo/ Bo como jefe directo vale tambien para el casillero del Gerente de Area
+  const signatures = (await approver.get(`/trip/${tripId}/firmas-planilla`)).body;
+  expect(signatures.jefe.nombre).toBe('Pedro Aprobador');
+  expect(signatures.gerente.nombre).toBe('Pedro Aprobador');
 });
 
 // Como jefe directo, el aprobador observa y rechaza el viaje y la rendicion de su equipo

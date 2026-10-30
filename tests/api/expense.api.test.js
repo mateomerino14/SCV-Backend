@@ -54,6 +54,18 @@ test('pasa a USD un gasto escrito en soles con su tipo de cambio', async () => {
   expect(parseFloat(segment.monto_usd)).toBe(40);
 });
 
+// El empleado elige rendir el gasto en soles convertido a Bs; sin eleccion queda la del fondo y una moneda invalida se ignora
+test('guarda la moneda en que se rinde el gasto internacional', async () => {
+  const base = {id_viaje: tripId, monto_moneda_origen: 75, moneda: 'PEN', tipo_cambio: 3.75, tipo_cambio_bs: 6.96, fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi en Lima', id_categoria_gasto: 1, es_gasto_internacional: true};
+  const inBs = await employee.postForm('/expense/register', {...base, moneda_rendicion: 'BOB'});
+  expect((await employee.get(`/expense/${inBs.body.gasto.id_gasto}/detail`)).body.moneda_rendicion).toBe('BOB');
+  const invalid = await employee.postForm('/expense/register', {...base, moneda_rendicion: 'EUR'});
+  expect((await employee.get(`/expense/${invalid.body.gasto.id_gasto}/detail`)).body.moneda_rendicion).toBeNull();
+  const {spentAgainstFunds} = require('../../src/utils/expenseCurrency');
+  const spent = spentAgainstFunds({monto_asignado_usd: 40}, [{es_gasto_internacional: true, monto_total: 20, tipo_cambio_bs: 6.96, moneda_rendicion: 'BOB'}, {es_gasto_internacional: true, monto_total: 10, tipo_cambio_bs: 6.96}]);
+  expect(spent).toMatchObject({spentBs: 139.2, spentUsd: 10});
+});
+
 // Los subgastos van en la moneda de la factura y su suma se pasa a USD
 test('suma los subgastos en soles y guarda el total en USD', async () => {
   const response = await employee.postForm('/expense/register', {

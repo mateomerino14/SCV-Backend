@@ -17,7 +17,10 @@ drop table if exists
   "Gasto_Tramo_Moneda",
   "Gasto_Subitem",
   "Gasto",
+  "Firma",
+  "Documento_Emitido",
   "Viaje",
+  "Vehiculo",
   "Auditoria",
   "Codigo_Verificacion",
   "Usuario",
@@ -29,6 +32,7 @@ drop table if exists
   "Rol",
   "Recibo",
   "Correlativo_Rendicion",
+  "Correlativo_Viaje",
   "Revision_Viaje",
   "Correlativo_Recibo"
 cascade;

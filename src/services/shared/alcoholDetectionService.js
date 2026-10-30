@@ -2,7 +2,9 @@ const supabase = require('../../config/supabase');
 const textNormalizer = require('../../utils/textNormalizer');
 const geminiService = require('./geminiService');
 
+// Palabras de gastos no deducibles: bebidas alcoholicas y propinas
 const alcoholKeywords = [
+  'propina', 'propinas', 'tip', 'tips',
   'cerveza', 'cervezas', 'beer',
   'vino', 'vinos', 'wine',
   'whisky', 'whiskey', 'bourbon',
@@ -102,7 +104,7 @@ const analyzeAlcohol = async (details) => {
   }
   try {
     const productList = ambiguousProducts.join(', ');
-    const prompt = `Analiza esta lista de productos de facturas bolivianas y responde SOLO con "true" si alguno es claramente una bebida alcohólica (cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago o cualquier bebida con alcohol). Las abreviaturas de surtidor como "G.ESPECIAL+", "G.PREMIUM" o "D.OIL" son combustible, no alcohol. Si no es claramente alcohol, responde "false". Responde SOLO "true" o "false", sin explicación. Lista: ${productList}`;
+    const prompt = `Analiza esta lista de productos de facturas bolivianas y responde SOLO con "true" si alguno es claramente una bebida alcohólica (cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago o cualquier bebida con alcohol) o una propina. Las abreviaturas de surtidor como "G.ESPECIAL+", "G.PREMIUM" o "D.OIL" son combustible, no alcohol. Si no es claramente alcohol ni propina, responde "false". Responde SOLO "true" o "false", sin explicación. Lista: ${productList}`;
     const response = (await geminiService.generateText(prompt, {taskName: 'deteccion de alcohol', maxAttempts: 2})).toLowerCase();
     return response === 'true';
   }
@@ -125,7 +127,7 @@ const analyzeAlcoholText = async (text) => {
     return false;
   }
   try {
-    const prompt = `Analiza este texto de un gasto de viaje y responde SOLO con "true" si menciona claramente bebidas alcohólicas (cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago o cualquier bebida con alcohol). Si no es claramente alcohol, responde "false". Responde SOLO "true" o "false", sin explicación. Texto: ${text}`;
+    const prompt = `Analiza este texto de un gasto de viaje y responde SOLO con "true" si menciona claramente bebidas alcohólicas (cerveza, vino, licor, chicha, singani, aguardiente, cóctel, trago o cualquier bebida con alcohol) o una propina. Si no es claramente alcohol ni propina, responde "false". Responde SOLO "true" o "false", sin explicación. Texto: ${text}`;
     const response = (await geminiService.generateText(prompt, {taskName: 'deteccion de alcohol en texto', maxAttempts: 2})).toLowerCase();
     return response === 'true';
   }

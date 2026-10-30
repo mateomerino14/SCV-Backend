@@ -6,6 +6,7 @@ const {buildTripCode} = require('../../utils/tripCode');
 const {escapeDeep, escapeHtml: escapeText} = require('../../utils/htmlEscape');
 const {getExpenseRetentions, getExpenseLineBases, hasOriginCurrencyLines} = require('../../utils/retentions');
 const {formatReceiptNumber, getReceiptNumber} = require('./receiptNumberService');
+const documentSealService = require('../shared/documentSealService');
 
 // Los datos se escapan al entrar a cada plantilla (escapeDeep); aqui solo se normaliza el vacio
 const escapeHtml = (text) => text || '';
@@ -61,7 +62,7 @@ const systemReceiptText = (expense) => {
   if (!ownReceipt) {
     return '';
   }
-  return `Recibo Nº ${formatReceiptNumber(ownReceipt.numero)}`;
+  return `Recibo Nº ${formatReceiptNumber(ownReceipt.numero, ownReceipt.periodo)}`;
 };
 
 // Referencia al recibo en papel del gasto, si el empleado anoto su numero
@@ -424,7 +425,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   }
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad)')
+    .select('id_viaje, numero_viaje, anio_viaje, fecha_inicio, motivo, estado, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -448,7 +449,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Recibo(numero)')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Recibo(numero, periodo)')
     .eq('id_viaje', tripId)
     .eq('tipo', type)
     .eq('es_gasto_internacional', isInternational)
@@ -471,7 +472,8 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   if (numberError) {
     return {error: numberError, status: 500};
   }
-  const html = generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, buildTripCode(trip), trip.motivo, supervisor);
+  const seal = await documentSealService.createSeal({type: documentSealService.documentTypes.receipt, tripId, summary: {recibo: receiptNumber, agrupado: true, gastos: expenses.length, pagado: expenses.reduce((sum, expense) => sum + (parseFloat(expense.monto_total) || 0), 0)}});
+  const html = documentSealService.withSeal(generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, buildTripCode(trip), trip.motivo, supervisor), seal);
   const pdfBuffer = await pdfService.generatePdf(html);
   const pdfBase64 = pdfBuffer.toString('base64');
   let typeName = 'Compras';
@@ -509,7 +511,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
 const sendIndividualReceipt = async (expenseId) => {
   const {data: expense, error: expenseError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, motivo, estado, fecha_inicio, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad))')
+    .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Viaje(id_viaje, numero_viaje, anio_viaje, motivo, estado, fecha_inicio, id_usuario, id_supervisor_asignado, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, email_corporativo, id_seccion, Seccion(nombre), carnet_identidad))')
     .eq('id_gasto', expenseId)
     .single();
   if (expenseError) {
@@ -538,7 +540,8 @@ const sendIndividualReceipt = async (expenseId) => {
   if (numberError) {
     return {error: numberError, status: 500};
   }
-  const html = generateIndividualReceiptHtml(expense, employee, receiptNumber, buildTripCode(expense.Viaje || {}), expense.Viaje?.motivo, supervisor);
+  const seal = await documentSealService.createSeal({type: documentSealService.documentTypes.receipt, tripId: expense.id_viaje, expenseId: expense.id_gasto, summary: {recibo: receiptNumber, pagado: parseFloat(expense.monto_total) || 0, fecha: expense.fecha_gasto}});
+  const html = documentSealService.withSeal(generateIndividualReceiptHtml(expense, employee, receiptNumber, buildTripCode(expense.Viaje || {}), expense.Viaje?.motivo, supervisor), seal);
   const pdfBuffer = await pdfService.generatePdf(html);
   const pdfBase64 = pdfBuffer.toString('base64');
   let typeName = 'Compra';

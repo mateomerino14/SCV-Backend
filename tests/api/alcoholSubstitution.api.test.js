@@ -3,10 +3,13 @@ const {login, api, boliviaDate} = require('./helpers');
 
 jest.setTimeout(120000);
 
+// Id del usuario con ese correo
 const idOf = async (email) => (await supabase.from('Usuario').select('id_usuario').eq('email_corporativo', email).single()).data.id_usuario;
 
+// Estado, alcohol y asignaciones actuales del viaje
 const tripOf = async (tripId) => (await supabase.from('Viaje').select('estado, tiene_alcohol, id_aprobador_asignado, id_revisor_asignado').eq('id_viaje', tripId).single()).data;
 
+// Lista de la respuesta, venga sola o dentro de un objeto
 const listOf = (body) => {
   if (Array.isArray(body)) {
     return body;
@@ -51,10 +54,16 @@ test('la rendición con alcohol pasa por el aprobador antes del revisor', async 
   expect(atApprover.estado).toBe('EN_REVISION_APROBADOR');
   expect(atApprover.id_aprobador_asignado).toBe(await idOf('pedro.aprobador@maxam.com'));
   expect(listOf((await approver.get('/approver/alcohol-review/mine')).body).map((trip) => trip.id_viaje)).toContain(tripId);
+  expect((await approver.post(`/approver/alcohol-review/${tripId}/approve`, {firma: null})).status).toBe(400);
   expect((await approver.post(`/approver/alcohol-review/${tripId}/approve`)).status).toBe(200);
   const atReviewer = await tripOf(tripId);
   expect(atReviewer.estado).toBe('APROBADO_SUPERVISOR');
   expect(atReviewer.id_revisor_asignado).toBe(await idOf('lucia.revisora@maxam.com'));
+  // El gerente que reviso los gastos no deducibles firma el Vo/ Bo Gerente de Area
+  const signatures = (await employee.get(`/trip/${tripId}/firmas-planilla`)).body;
+  expect(signatures.jefe.nombre).toBe('Jorge Supervisor');
+  expect(signatures.gerente.nombre).toBe('Pedro Aprobador');
+  expect(signatures.gerenteNoRequerido).toBe(false);
 });
 
 // Si el aprobador la rechaza y el empleado quita el gasto con alcohol, la rendicion ya no vuelve al aprobador
@@ -123,4 +132,25 @@ test('la solicitud pendiente se cierra sola al enviar la rendición', async () =
   expect(request.estado).toBe('RECHAZADA');
   expect(request.id_revisor).toBeNull();
   expect((await reviewer.post(`/substitution/${requestId}/approve`)).status).toBe(409);
+});
+
+// El reemplazo aprobado firma al enviar la rendicion: queda como quien la preparo, y el viaje sigue siendo del titular
+test('el reemplazo firma al enviar la rendición del titular', async () => {
+  const owner = api(await login('juan.empleado'));
+  const reviewer = api(await login('lucia.revisora'));
+  const substitute = api(await login('ana.empleada'));
+  const boss = api(await login('maria.supervisora'));
+  const tripId = await startedTrip(owner, 'Viaje que rinde el reemplazo');
+  const created = await owner.post(`/substitution/trip/${tripId}/request`, {id_sustituto: await idOf('ana.empleada@maxam.com')});
+  expect((await reviewer.post(`/substitution/${created.body.solicitud.id_solicitud}/approve`)).status).toBe(200);
+  expect((await registerTaxi(substitute, tripId)).status).toBe(200);
+  expect((await substitute.put(`/trip/${tripId}/confirm-completion`, {justificaciones: [], firma: 'data:image/png;base64,AAAA'})).status).toBe(400);
+  expect((await substitute.put(`/trip/${tripId}/confirm-completion`, {justificaciones: []})).status).toBe(200);
+  expect((await boss.post(`/review/expense-review/${tripId}/approve`)).status).toBe(200);
+  const signatures = (await owner.get(`/trip/${tripId}/firmas-planilla`)).body;
+  expect(signatures.preparado.nombre).toBe('Ana Empleada');
+  expect(signatures.jefe.nombre).toBe('María Supervisora');
+  expect(signatures.gerenteNoRequerido).toBe(true);
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario').eq('id_viaje', tripId).single();
+  expect(trip.id_usuario).toBe(await idOf('juan.empleado@maxam.com'));
 });

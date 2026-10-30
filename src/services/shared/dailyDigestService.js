@@ -147,7 +147,7 @@ const sendDailyDigest = async ({dryRun = false} = {}) => {
         approverLines.push(countLine(counts.pendingApproverReviews, 'viaje espera', 'viajes esperan', 'tu aprobación antes de pasar a tesorería.'));
       }
       if (counts.pendingAlcoholReviews > 0) {
-        approverLines.push(countLine(counts.pendingAlcoholReviews, 'rendición con alcohol espera', 'rendiciones con alcohol esperan', 'tu revisión adicional.'));
+        approverLines.push(countLine(counts.pendingAlcoholReviews, 'rendición con gastos no deducibles espera', 'rendiciones con gastos no deducibles esperan', 'tu revisión adicional.'));
       }
       await sendDigestToGroup([approver], 'Resumen de Pendientes — Aprobación', approverLines, report, dryRun);
     }

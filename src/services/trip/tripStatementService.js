@@ -1,10 +1,12 @@
 const supabase = require('../../config/supabase');
 const pdfService = require('../shared/pdfService');
 const tripCodeUtil = require('../../utils/tripCode');
+const signatureService = require('../shared/signatureService');
+const documentSealService = require('../shared/documentSealService');
 const {escapeDeep} = require('../../utils/htmlEscape');
 const {getExpenseRetentions, hasOriginCurrencyLines} = require('../../utils/retentions');
 const {formatReceiptNumber} = require('../expense/receiptNumberService');
-const {amountInBsOf, originalAmountLinesOf, summarizeStatement} = require('../../utils/expenseCurrency');
+const {amountInBsOf, originalAmountLinesOf, summarizeStatement, isRenderedInUsd} = require('../../utils/expenseCurrency');
 
 const vatRate = 0.13;
 
@@ -141,11 +143,11 @@ const documentNumberOf = (expense, tripReceipts) => {
   }
   const ownReceipt = (expense.Recibo || [])[0];
   if (ownReceipt) {
-    return {number: formatReceiptNumber(ownReceipt.numero), isSystem: true};
+    return {number: formatReceiptNumber(ownReceipt.numero, ownReceipt.periodo), isSystem: true};
   }
   const grouped = (tripReceipts || []).find((receipt) => !receipt.id_gasto && receipt.tipo === expense.tipo && !!receipt.es_gasto_internacional === !!expense.es_gasto_internacional);
   if (grouped) {
-    return {number: formatReceiptNumber(grouped.numero), isSystem: true};
+    return {number: formatReceiptNumber(grouped.numero, grouped.periodo), isSystem: true};
   }
   return {number: '', isSystem: false};
 };
@@ -192,7 +194,7 @@ const buildJustificationRows = (dayJustifications) => {
 };
 
 // Genera el HTML de la planilla de rendicion de cuentas
-const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
+const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications, {signatures = {}, seal = null} = {}) => {
   const trip = escapeDeep(rawTrip);
   const expenses = escapeDeep(rawExpenses);
   const dayJustifications = escapeDeep(rawJustifications);
@@ -208,6 +210,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   let totalIue = 0;
   let totalIt = 0;
   let totalCostBs = 0;
+  let totalUsd = 0;
 
   const rows = expenses.map((expense, index) => {
     const amount = parseFloat(expense.monto_total) || 0;
@@ -222,10 +225,13 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
     if (isInternational) {
       rowClass = 'fila-internacional';
     }
-    // Un gasto internacional antiguo sin tipo de cambio a Bs se muestra en USD y no entra en las sumas en Bs
+    // El gasto internacional rendido en USD (o antiguo sin tipo de cambio a Bs) se muestra en USD y no entra en las sumas en Bs
     let amountText = `${amount.toFixed(2)} USD`;
     let costText = amountText;
-    if (amountBs !== null) {
+    if (isRenderedInUsd(trip, expense)) {
+      totalUsd += amount;
+    }
+    else {
       amountText = amountBs.toFixed(2);
       costText = cost.toFixed(2);
       if (isInternational) {
@@ -261,7 +267,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
     </tr>`;
   }).join('');
 
-  const {internationalUsd, balanceRows} = summarizeStatement(trip, expenses);
+  const {balanceRows} = summarizeStatement(trip, expenses);
   const [, fundBs, fundUsd] = balanceRows[0];
   const fundRows = buildFundRows(isInternationalTrip, fundBs, fundUsd);
 
@@ -315,10 +321,9 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
   .justificaciones .justificaciones-titulo { background: #4a90d9; color: #fff; font-size: 8pt; }
   .justificaciones td { border: 1px solid #b0c4d4; padding: 3px 6px; font-size: 8pt; vertical-align: top; }
   .justificaciones .justificaciones-fecha { width: 70px; text-align: center; }
-  .firmas { display: flex; justify-content: space-between; margin-top: 30px; gap: 10px; }
-  .firma-bloque { flex: 1; text-align: center; }
-  .firma-linea { border-top: 1px solid #000; margin-top: 30px; padding-top: 4px; font-size: 7.5pt; font-weight: bold; }
-  .firma-rol { font-size: 7pt; }
+  .firmas { display: flex; justify-content: space-between; margin-top: 18px; gap: 10px; page-break-inside: avoid; }
+  ${signatureService.signatureStyles}
+  ${documentSealService.sealStyles}
 </style>
 </head>
 <body>
@@ -364,8 +369,8 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
         </tr>
         ${isInternationalTrip ? `
         <tr class="totales-fila">
-          <td colspan="7">Gastos internacionales en USD, para Oracle</td>
-          <td>${internationalUsd.toFixed(2)} USD</td>
+          <td colspan="7">Gastos internacionales rendidos en USD</td>
+          <td>${totalUsd.toFixed(2)} USD</td>
           <td></td>
           <td>${fundUsd.toFixed(2)} USD</td>
           <td colspan="5"></td>
@@ -392,12 +397,11 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
       </table>
     </div>
     <div class="firmas">
-      <div class="firma-bloque"><div class="firma-linea">Preparado por</div><div class="firma-rol">Responsable</div></div>
-      <div class="firma-bloque"><div class="firma-linea">Vo/ Bo</div><div class="firma-rol">Jefe de Área</div></div>
-      <div class="firma-bloque"><div class="firma-linea">Vo/ Bo</div><div class="firma-rol">Gerente de Área</div></div>
-      <div class="firma-bloque"><div class="firma-linea">Verificado por</div><div class="firma-rol">Contabilidad</div></div>
-      <div class="firma-bloque"><div class="firma-linea">Aprobado por</div><div class="firma-rol">Gerencia Administrativa</div></div>
+      ${signatureService.signatureBlockHtml(signatures.prepared, 'Preparado por', 'Responsable')}
+      ${signatureService.signatureBlockHtml(signatures.boss, 'Vo/ Bo', 'Jefe de Área')}
+      ${signatureService.signatureBlockHtml(signatures.manager, 'Vo/ Bo', 'Gerente de Área', {notRequired: signatures.managerNotRequired})}
     </div>
+    ${documentSealService.sealHtml(seal)}
   </div>
 </body>
 </html>`;
@@ -407,7 +411,7 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications) => {
 const generateStatementPdf = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, Seccion(nombre), Cargo(nombre)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
+    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, Seccion(nombre), Cargo(nombre)), Recibo(numero, periodo, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -421,7 +425,7 @@ const generateStatementPdf = async (tripId) => {
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)')
+    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero, periodo)')
     .eq('id_viaje', tripId)
     .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   if (expensesError) {
@@ -434,7 +438,14 @@ const generateStatementPdf = async (tripId) => {
     .eq('tipo', 'JUSTIFICACION')
     .order('fecha', {ascending: false});
   const dayJustifications = latestJustificationPerDay(comments || []);
-  const html = generateStatementHtml(trip, expenses || [], dayJustifications);
+  const signatures = await signatureService.getStatementSignatures(tripId);
+  const statementTotals = summarizeStatement(trip, expenses || []);
+  const seal = await documentSealService.createSeal({
+    type: documentSealService.documentTypes.statement,
+    tripId: trip.id_viaje,
+    summary: {codigo: tripCodeUtil.buildTripCode(trip), gastos: (expenses || []).length, saldos: statementTotals.balanceRows.map(([concepto, bs, usd]) => ({concepto, bs, usd}))},
+  });
+  const html = generateStatementHtml(trip, expenses || [], dayJustifications, {signatures, seal});
   const pdfBuffer = await pdfService.generatePdf(html);
   // Nombre de archivo solo con letras, numeros y guiones, como exige la cabecera de descarga
   const safeReason = (trip.motivo || 'viaje')

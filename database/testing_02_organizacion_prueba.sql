@@ -17,6 +17,12 @@ insert into "Seccion" (nombre, activo) values
   ('Sin Cobertura', true)
 on conflict (nombre) do nothing;
 
+insert into "Vehiculo" (placa, descripcion) values
+  ('2345-ABC', 'Camioneta Toyota Hilux'),
+  ('3456-BCD', 'Vagoneta Nissan Patrol'),
+  ('4567-CDE', 'Camioneta Mitsubishi L200')
+on conflict (placa) do nothing;
+
 insert into "Usuario" (email_corporativo, nombre, apellido_paterno, contrasenia, activo, id_seccion, id_cargo, id_rol) values
   ('admin.prueba@maxam.com', 'Admin', 'Prueba', '$2b$10$9fflRI7SntFdGUQ/.k8iMuoUoOqRoq7IHEOba119yQx8lILTURQfa', true, null,
     (select id_cargo from "Cargo" where nombre = 'Gerente RRHH'), 1),

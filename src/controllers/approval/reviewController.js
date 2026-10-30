@@ -67,7 +67,7 @@ const getTripReviewDetail = async (req, res) => {
 const approveTripReview = async (req, res) => {
   const {tripId} = req.params;
   const supervisorId = req.user.id_usuario;
-  const result = await reviewService.approveTripReview(tripId, supervisorId);
+  const result = await reviewService.approveTripReview(tripId, supervisorId, {signature: req.body?.firma, ip: req.ip});
   if (result.error) {
     return res.status(result.status).json({error: result.error});
   }
@@ -170,7 +170,7 @@ const getExpenseReviewDetail = async (req, res) => {
 const approveExpenseReview = async (req, res) => {
   const {tripId} = req.params;
   const supervisorId = req.user.id_usuario;
-  const result = await reviewService.approveExpenseReview(tripId, supervisorId);
+  const result = await reviewService.approveExpenseReview(tripId, supervisorId, {signature: req.body?.firma, ip: req.ip});
   if (result.error) {
     return res.status(result.status).json({error: result.error});
   }
