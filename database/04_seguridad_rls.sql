@@ -1,7 +1,9 @@
 -- ============================================================
--- Activacion de Row Level Security en todas las tablas
+-- SCV · 04 SEGURIDAD (RLS)
 -- ============================================================
--- Deja las tablas en denegar por defecto; el backend usa service_role y no se ve afectado
+-- Activa la seguridad por fila en todas las tablas: nadie con la llave pública lee ni escribe.
+-- El backend usa la llave de servicio y no se ve afectado. Se corre después de 03_datos_iniciales.sql.
+-- ============================================================
 
 do $block$
 declare

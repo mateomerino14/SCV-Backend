@@ -1,7 +1,7 @@
 -- ============================================================
--- USUARIOS DE LA DEMO (MAXAM FANEXA) - personas ficticias
+-- SCV · 05 DEMO CON USUARIOS FICTICIOS
 -- ============================================================
--- Correr despues de reconstruir la base (testing_00_borrar_todo.sql y luego 01 a 04)
+-- Se corre después de 01 a 04 sobre una base recién creada (o tras mantenimiento/limpiar_datos.sql)
 -- Los nombres son ficticios; solo tres cuentas usan correos reales para recibir los avisos de prueba:
 --   empleado    mateomerino988@gmail.com  (Comercial, EXPORT SALES 220)
 --   aprobador   mateomerino14@gmail.com   (Gerente General, REGIONAL BUSINESS MANAGEMENT 240), jefe directo de todos
@@ -20,7 +20,7 @@ insert into "Cargo" (nombre, monto_diario, monto_diario_usd, activo) values
   ('Analista de Finanzas y Administracion', 300, 100, true)
 on conflict (nombre) do nothing;
 
--- Tesoreria es un cargo unico que ya crea 03_seed.sql; se reconoce por el nombre exacto del cargo
+-- Tesoreria es un cargo unico que ya crea 03_datos_iniciales.sql; se reconoce por el nombre exacto del cargo
 update "Cargo" set monto_diario = 300, monto_diario_usd = 100 where nombre = 'Asistente de Caja y Tesoreria';
 
 insert into "Seccion" (nombre, codigo_seccion, activo) values

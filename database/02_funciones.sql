@@ -1,5 +1,8 @@
 -- ============================================================
--- Funciones usadas por el backend via supabase.rpc()
+-- SCV · 02 FUNCIONES Y TRIGGERS
+-- ============================================================
+-- Correlativo de recibos por mes, número de viaje por año y número de rendición del mes.
+-- Se corre después de 01_esquema.sql.
 -- ============================================================
 
 -- Incrementa y devuelve el correlativo de recibos del mes indicado (search_path fijo por seguridad)
