@@ -11,6 +11,7 @@
     "resumen": "node scripts/sendDigest.js",
     "limpiar-archivos": "node scripts/cleanStorage.js",
     "probar-correo": "node scripts/testEmail.js",
+    "db:reconstruccion": "node scripts/buildRebuildSql.js",
     "postinstall": "puppeteer browsers install chrome"
   },
   "repository": {
@@ -39,6 +40,7 @@
     "multer": "^2.1.1",
     "node-cron": "^4.6.0",
     "puppeteer": "^25.16.0",
+    "qrcode": "^1.5.4",
     "sib-api-v3-sdk": "^8.5.0"
   },
   "devDependencies": {

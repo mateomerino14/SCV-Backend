@@ -1,5 +1,8 @@
 -- ============================================================
--- Datos iniciales: roles, cargos, impuesto y categorias de gasto
+-- SCV · 03 DATOS INICIALES
+-- ============================================================
+-- Roles, cargos, impuesto IVA, plan de cuentas (categorías de gasto) y recordatorios por defecto.
+-- Se corre después de 02_funciones.sql.
 -- ============================================================
 
 -- Ids fijos: el cliente exige el rol 2 para supervisor y el 4 para revisor

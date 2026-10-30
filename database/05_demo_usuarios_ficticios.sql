@@ -1,13 +1,15 @@
 -- ============================================================
--- USUARIOS DE LA DEMO (MAXAM)
+-- SCV · 05 DEMO CON USUARIOS FICTICIOS
 -- ============================================================
--- Correr despues de testing_01_limpieza_completa.sql, que deja la base sin usuarios ni viajes
--- Jorge Luis Valencia (Gerente General) es el aprobador y el jefe directo de todos:
---   revisa como jefe directo el viaje y la rendicion de Shanayna, y su aprobacion vale tambien como aprobador
--- Flujo del viaje: Shanayna > Jorge Luis (jefe directo y aprobador) > Sonia (tesoreria, asigna el fondo)
--- Flujo de la rendicion: Shanayna > Jorge Luis (jefe directo) > Luis (revisor, aprobacion final)
--- Diego Demo es compañero de Shanayna en EXPORT SALES, para mostrar la solicitud de reemplazo (el correo es un alias de prueba)
--- Contrasena de todos: Viaticos2026 (cada uno puede cambiarla en Ajustes de Cuenta)
+-- Se corre después de 01 a 04 sobre una base recién creada (o tras mantenimiento/limpiar_datos.sql)
+-- Los nombres son ficticios; solo tres cuentas usan correos reales para recibir los avisos de prueba:
+--   empleado    mateomerino988@gmail.com  (Comercial, EXPORT SALES 220)
+--   aprobador   mateomerino14@gmail.com   (Gerente General, REGIONAL BUSINESS MANAGEMENT 240), jefe directo de todos
+--   tesorera    202301308@est.umss.edu    (Asistente de Caja y Tesoreria, FINANCE AND ADMINISTRATION 120)
+-- El revisor, el administrador y el compañero del empleado usan correos ficticios (@example.com, no reciben correo)
+-- Flujo del viaje: empleado > aprobador (jefe directo, su aprobacion vale tambien como aprobador) > tesoreria
+-- Flujo de la rendicion: empleado > aprobador (jefe directo) > revisor (aprobacion final)
+-- Todos en la dependencia 900 (SEDE). Contrasena de todos: Viaticos2026 (se cambia en Ajustes de Cuenta)
 -- Las tarifas diarias son de prueba: se cambian desde Cargos en el panel del administrador
 -- ============================================================
 
@@ -18,7 +20,7 @@ insert into "Cargo" (nombre, monto_diario, monto_diario_usd, activo) values
   ('Analista de Finanzas y Administracion', 300, 100, true)
 on conflict (nombre) do nothing;
 
--- Tesoreria es un cargo unico que ya crea 03_seed.sql; se le ponen las mismas tarifas de prueba
+-- Tesoreria es un cargo unico que ya crea 03_datos_iniciales.sql; se reconoce por el nombre exacto del cargo
 update "Cargo" set monto_diario = 300, monto_diario_usd = 100 where nombre = 'Asistente de Caja y Tesoreria';
 
 insert into "Seccion" (nombre, codigo_seccion, activo) values
@@ -28,30 +30,36 @@ insert into "Seccion" (nombre, codigo_seccion, activo) values
   ('FINANCE AND ADMINISTRATION', '120', true)
 on conflict (nombre) do update set codigo_seccion = excluded.codigo_seccion, activo = true;
 
+insert into "Vehiculo" (placa, descripcion) values
+  ('2345-ABC', 'Camioneta Toyota Hilux'),
+  ('3456-BCD', 'Vagoneta Nissan Patrol'),
+  ('4567-CDE', 'Camioneta Mitsubishi L200')
+on conflict (placa) do nothing;
+
 -- Roles: 1 administrador, 3 empleado, 4 revisor, 5 aprobador; la tesorera es empleada con el cargo de tesoreria
 insert into "Usuario" (email_corporativo, nombre, apellido_paterno, apellido_materno, contrasenia, activo, codigo_dependencia, id_seccion, id_cargo, id_rol) values
-  ('jvalencia@maxamcorp.com', 'Jorge Luis', 'Valencia', 'Vargas', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
+  ('mateomerino14@gmail.com', 'Ricardo', 'Salinas', 'Paredes', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
     (select id_seccion from "Seccion" where nombre = 'REGIONAL BUSINESS MANAGEMENT'),
     (select id_cargo from "Cargo" where nombre = 'Gerente General'), 5),
-  ('spardo@maxamcorp.com', 'Shanayna', 'Pardo', 'Amezaga', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
+  ('mateomerino988@gmail.com', 'Valeria', 'Quiroga', 'Mendez', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
     (select id_seccion from "Seccion" where nombre = 'EXPORT SALES'),
     (select id_cargo from "Cargo" where nombre = 'Comercial'), 3),
-  ('smoya@maxamcorp.com', 'Sonia Rita', 'Moya', 'Caballero', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
+  ('202301308@est.umss.edu', 'Lucia', 'Fernandez', 'Rocha', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
     (select id_seccion from "Seccion" where nombre = 'FINANCE AND ADMINISTRATION'),
     (select id_cargo from "Cargo" where nombre = 'Asistente de Caja y Tesoreria'), 3),
-  ('lasoliz@maxamcorp.com', 'Luis Alfredo', 'Soliz', 'Siles', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
+  ('revisor@example.com', 'Andres', 'Villarroel', 'Gutierrez', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
     (select id_seccion from "Seccion" where nombre = 'ADMINISTRACION'),
     (select id_cargo from "Cargo" where nombre = 'Jefe de Administracion'), 4),
-  ('aarraya@maxamcorp.com', 'Annel', 'Arraya', 'Vargas', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
+  ('admin@example.com', 'Paola', 'Arce', 'Terrazas', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
     (select id_seccion from "Seccion" where nombre = 'FINANCE AND ADMINISTRATION'),
     (select id_cargo from "Cargo" where nombre = 'Analista de Finanzas y Administracion'), 1),
-  ('mateomerino14+reemplazo@gmail.com', 'Diego', 'Demo', 'Reemplazo', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
+  ('companero@example.com', 'Diego', 'Camacho', 'Lopez', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
     (select id_seccion from "Seccion" where nombre = 'EXPORT SALES'),
     (select id_cargo from "Cargo" where nombre = 'Comercial'), 3)
 on conflict (email_corporativo) do nothing;
 
-update "Usuario" set id_jefe_directo = (select id_usuario from "Usuario" where email_corporativo = 'jvalencia@maxamcorp.com')
-  where email_corporativo in ('spardo@maxamcorp.com', 'smoya@maxamcorp.com', 'lasoliz@maxamcorp.com', 'aarraya@maxamcorp.com', 'mateomerino14+reemplazo@gmail.com');
+update "Usuario" set id_jefe_directo = (select id_usuario from "Usuario" where email_corporativo = 'mateomerino14@gmail.com')
+  where email_corporativo in ('mateomerino988@gmail.com', '202301308@est.umss.edu', 'revisor@example.com', 'admin@example.com', 'companero@example.com');
 
 select
   u.nombre || ' ' || u.apellido_paterno as usuario,

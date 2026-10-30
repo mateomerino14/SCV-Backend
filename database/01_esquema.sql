@@ -1,3 +1,10 @@
+-- ============================================================
+-- SCV · 01 ESQUEMA
+-- ============================================================
+-- Crea las 30 tablas del sistema con sus relaciones, restricciones e índices.
+-- Primer paso para crear la base desde cero; refleja siempre el esquema final completo.
+-- ============================================================
+
 -- ------------------------------------------------------------
 -- Catalogo
 -- ------------------------------------------------------------
@@ -88,6 +95,19 @@ create table if not exists "Auditoria" (
 );
 
 -- ------------------------------------------------------------
+-- Vehiculos de la empresa
+-- ------------------------------------------------------------
+
+-- Flota que el administrador registra; al crear un viaje solo se ofrecen los activos que no estan en otro viaje
+create table if not exists "Vehiculo" (
+  id_vehiculo serial primary key,
+  placa varchar(20) not null unique,
+  descripcion varchar(100),
+  activo boolean not null default true,
+  fecha_creacion timestamptz not null default now()
+);
+
+-- ------------------------------------------------------------
 -- Viajes
 -- ------------------------------------------------------------
 
@@ -101,7 +121,13 @@ create table if not exists "Viaje" (
   tipo varchar(15) not null check (tipo in ('Nacional', 'Internacional')),
   transporte text default 'Terrestre',
   placa_vehiculo varchar(20),
+  -- vehiculo de la empresa usado en el viaje; placa_vehiculo guarda la placa que tenia en ese momento
+  id_vehiculo integer references "Vehiculo"(id_vehiculo),
+  -- monto_asignado es el fondo total; monto_combustible es la parte para combustible del vehiculo de la empresa
   monto_asignado decimal(10, 2) not null,
+  monto_combustible numeric(10, 2) not null default 0,
+  -- quien gestiona el hospedaje: la empresa lo reserva o el propio empleado
+  gestion_hospedaje varchar(10) not null default 'Propio' check (gestion_hospedaje in ('Empresa', 'Propio')),
   monto_asignado_usd numeric(10, 2) default 0,
   estado varchar(25) not null default 'BORRADOR' constraint viaje_estado_check check (estado in (
     'BORRADOR', 'EN_REVISION_VIAJE', 'APROBADO_VIAJE', 'EN_REVISION_TESORERO', 'EN_CURSO',
@@ -113,6 +139,9 @@ create table if not exists "Viaje" (
   -- numero de rendicion del mes para Oracle (10-40): lo asigna un trigger al quedar APROBADO_FINAL
   numero_rendicion integer,
   periodo_rendicion char(7),
+  -- codigo VIA-numero/año: el numero vuelve a 1 cada año, lo asigna un trigger al crear el viaje
+  numero_viaje integer,
+  anio_viaje smallint,
   id_usuario integer not null,
   id_supervisor_asignado integer,
   id_aprobador_asignado integer,
@@ -156,6 +185,8 @@ create table if not exists "Gasto" (
   tipo_cambio numeric(10, 4) default 1, -- unidades de la moneda del gasto por 1 USD
   monto_moneda_origen numeric(10, 2) default 0,
   tipo_cambio_bs numeric(10, 4), -- bolivianos por 1 USD de un gasto internacional, para la planilla en Bs
+  -- moneda en la que se rinde el gasto internacional (USD o BOB), elegida por el empleado; null toma la del fondo del viaje
+  moneda_rendicion char(3) check (moneda_rendicion in ('USD', 'BOB')),
   base_imponible numeric(10, 2) default 0,
   retencion_rc_iva numeric(10, 2) default 0,
   retencion_iue numeric(10, 2) default 0,
@@ -247,14 +278,23 @@ create table if not exists "Comentario" (
 -- Contador de recibos
 -- ------------------------------------------------------------
 
+-- Ultimo numero de recibo emitido en cada mes (AAAA-MM): el correlativo vuelve a 1 cada mes
 create table if not exists "Correlativo_Recibo" (
-  id serial primary key,
+  periodo char(7) primary key,
   numero integer not null default 0
 );
 
-insert into "Correlativo_Recibo" (numero)
-select 0
-where not exists (select 1 from "Correlativo_Recibo" where id = 1);
+-- Ultimo numero de viaje asignado en cada año, para el codigo VIA-numero/año
+create table if not exists "Correlativo_Viaje" (
+  anio smallint primary key,
+  numero integer not null default 0
+);
+
+-- Un vehiculo esta ocupado mientras su viaje se revisa o esta en curso; se libera cuando el empleado lo termina
+create unique index if not exists viaje_vehiculo_ocupado_unique on "Viaje"(id_vehiculo)
+where id_vehiculo is not null and estado in ('EN_REVISION_VIAJE', 'APROBADO_VIAJE', 'EN_REVISION_TESORERO', 'EN_CURSO');
+
+create unique index if not exists viaje_numero_anual_unique on "Viaje"(anio_viaje, numero_viaje) where numero_viaje is not null;
 
 -- Ultimo numero de rendicion asignado en cada mes (AAAA-MM), para la descripcion de Oracle
 create table if not exists "Correlativo_Rendicion" (
@@ -268,7 +308,9 @@ create unique index if not exists viaje_numero_rendicion_unique on "Viaje"(perio
 -- Numero de cada recibo emitido (por gasto o agrupado por viaje), para conservarlo al reenviar
 create table if not exists "Recibo" (
   id_recibo serial primary key,
-  numero integer not null unique,
+  numero integer not null,
+  -- mes (AAAA-MM) del correlativo: el numero solo se repite entre meses distintos
+  periodo char(7) not null,
   id_viaje integer not null references "Viaje"(id_viaje) on delete cascade,
   id_gasto integer references "Gasto"(id_gasto) on delete cascade,
   tipo char(1) not null check (tipo in ('C', 'S')),
@@ -278,6 +320,7 @@ create table if not exists "Recibo" (
   fecha_emision timestamptz not null default now()
 );
 
+create unique index if not exists recibo_numero_periodo_unique on "Recibo"(periodo, numero);
 create unique index if not exists recibo_individual_unique on "Recibo"(id_gasto) where id_gasto is not null;
 create unique index if not exists recibo_agrupado_unique on "Recibo"(id_viaje, tipo, es_gasto_internacional) where id_gasto is null;
 
@@ -355,8 +398,40 @@ create index if not exists idx_reemplazo_id_sustituto on "Solicitud_Reemplazo"(i
 create index if not exists idx_reemplazo_estado on "Solicitud_Reemplazo"(estado);
 
 -- ------------------------------------------------------------
+-- Firmas dibujadas y documentos verificables
+-- ------------------------------------------------------------
+
+-- Firma dibujada en el momento de aprobar o enviar; no se reutiliza: cada aprobacion trae su propio trazo
+create table if not exists "Firma" (
+  id_firma serial primary key,
+  id_viaje integer not null references "Viaje"(id_viaje) on delete cascade,
+  -- MEMORANDUM: aprobador del viaje; PREPARADO: empleado al enviar la rendicion;
+  -- JEFE: jefe directo o supervisor al aprobar la rendicion (Vo/ Bo Jefe de Area);
+  -- GERENTE: aprobador al aprobar la revision adicional de la rendicion (Vo/ Bo Gerente de Area)
+  etapa varchar(15) not null check (etapa in ('MEMORANDUM', 'PREPARADO', 'JEFE', 'GERENTE')),
+  id_usuario integer not null references "Usuario"(id_usuario),
+  imagen text, -- PNG en base64; vacio cuando la etapa se aprobo automaticamente
+  automatica boolean not null default false,
+  ip varchar(60),
+  fecha timestamptz not null default now()
+);
+
+create index if not exists firma_viaje_etapa on "Firma"(id_viaje, etapa, fecha desc);
+
+-- Cada PDF que genera el sistema lleva un codigo y un QR para comprobar que es autentico
+create table if not exists "Documento_Emitido" (
+  codigo char(12) primary key,
+  tipo varchar(25) not null,
+  id_viaje integer references "Viaje"(id_viaje) on delete cascade,
+  id_gasto integer references "Gasto"(id_gasto) on delete set null,
+  resumen jsonb not null default '{}'::jsonb, -- datos clave del documento al emitirlo, para compararlos con el papel
+  fecha timestamptz not null default now()
+);
+
+-- ------------------------------------------------------------
 -- Configuracion del resumen de pendientes (una sola fila)
 -- ------------------------------------------------------------
+
 -- Dias (0 domingo a 6 sabado) y horas (HH:MM, hora Bolivia) del resumen de pendientes
 
 create table if not exists "Configuracion_Recordatorio" (

@@ -1,9 +1,13 @@
 -- ============================================================
--- Funciones usadas por el backend via supabase.rpc()
+-- SCV · 02 FUNCIONES Y TRIGGERS
+-- ============================================================
+-- Correlativo de recibos por mes, número de viaje por año y número de rendición del mes.
+-- Se corre después de 01_esquema.sql.
 -- ============================================================
 
--- Incrementa y devuelve el correlativo de recibos (search_path fijo por seguridad)
-create or replace function incrementar_correlativo_recibo()
+-- Incrementa y devuelve el correlativo de recibos del mes indicado (search_path fijo por seguridad)
+drop function if exists incrementar_correlativo_recibo();
+create or replace function incrementar_correlativo_recibo(p_periodo char(7))
 returns integer
 language plpgsql
 security definer
@@ -12,13 +16,34 @@ as $$
 declare
   nuevo_numero integer;
 begin
-  update "Correlativo_Recibo"
-  set numero = numero + 1
-  where id = 1
+  insert into "Correlativo_Recibo" (periodo, numero) values (p_periodo, 1)
+  on conflict (periodo) do update set numero = "Correlativo_Recibo".numero + 1
   returning numero into nuevo_numero;
   return nuevo_numero;
 end;
 $$;
+
+-- Al crear el viaje se le da el siguiente numero de su año (hora de Bolivia), para el codigo VIA-numero/año
+create or replace function asignar_numero_viaje()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.numero_viaje is null then
+    new.anio_viaje := extract(year from (now() at time zone 'America/La_Paz'));
+    insert into "Correlativo_Viaje" (anio, numero) values (new.anio_viaje, 1)
+    on conflict (anio) do update set numero = "Correlativo_Viaje".numero + 1
+    returning numero into new.numero_viaje;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists viaje_numero_anual on "Viaje";
+create trigger viaje_numero_anual
+before insert on "Viaje"
+for each row execute function asignar_numero_viaje();
 
 -- Al quedar aprobada del todo, la rendicion recibe el siguiente numero de su mes (el del ultimo comprobante)
 create or replace function asignar_numero_rendicion()

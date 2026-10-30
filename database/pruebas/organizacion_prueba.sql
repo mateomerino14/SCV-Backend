@@ -1,9 +1,9 @@
 -- ============================================================
--- CARGA DE ORGANIZACION DE PRUEBA (jerarquia real)
+-- SCV · PRUEBAS · ORGANIZACIÓN DE PRUEBA
 -- ============================================================
--- Lucia (revisor) > Pedro (aprobador) > Maria (Ventas) y Jorge (Logistica), supervisores de sus empleados
--- Sofia queda sin jefe y sin supervisor en su seccion: su viaje lo ven todos los supervisores
--- Contrasena de todos los usuarios de prueba: Prueba1234
+-- Lucía (revisor) > Pedro (aprobador) > María (Ventas) y Jorge (Logística), supervisores de sus empleados.
+-- Sofía queda sin jefe y sin supervisor en su sección: su viaje lo ven todos los supervisores.
+-- Incluye tres vehículos. La usan las pruebas automáticas. Contraseña de todos: Prueba1234
 -- ============================================================
 
 insert into "Cargo" (nombre, monto_diario, monto_diario_usd, activo) values
@@ -16,6 +16,12 @@ insert into "Seccion" (nombre, activo) values
   ('Logistica', true),
   ('Sin Cobertura', true)
 on conflict (nombre) do nothing;
+
+insert into "Vehiculo" (placa, descripcion) values
+  ('2345-ABC', 'Camioneta Toyota Hilux'),
+  ('3456-BCD', 'Vagoneta Nissan Patrol'),
+  ('4567-CDE', 'Camioneta Mitsubishi L200')
+on conflict (placa) do nothing;
 
 insert into "Usuario" (email_corporativo, nombre, apellido_paterno, contrasenia, activo, id_seccion, id_cargo, id_rol) values
   ('admin.prueba@maxam.com', 'Admin', 'Prueba', '$2b$10$9fflRI7SntFdGUQ/.k8iMuoUoOqRoq7IHEOba119yQx8lILTURQfa', true, null,

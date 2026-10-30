@@ -54,7 +54,7 @@ jobs:
       - run: npm ci
       - name: Crear la base de prueba
         run: |
-          for script in 01_schema 02_functions 03_seed 04_rls_hardening testing_02_organizacion_prueba; do
+          for script in 01_esquema 02_funciones 03_datos_iniciales 04_seguridad_rls pruebas/organizacion_prueba; do
             psql -h localhost -U postgres -d scv_test -v ON_ERROR_STOP=1 -q -f database/$script.sql
           done
       - name: Levantar PostgREST y el proxy de Supabase

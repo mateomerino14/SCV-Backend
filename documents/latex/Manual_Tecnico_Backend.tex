@@ -162,7 +162,7 @@ helmet y cors & Cabeceras de seguridad y control de orígenes permitidos \\
 \rowcolor{maxamFondo} express-rate-limit & Límite de intentos de ingreso, recuperación de contraseña y extracción de facturas \\
 multer & Recepción de imágenes de comprobantes y fotos de perfil \\
 \rowcolor{maxamFondo} Puppeteer 25 & Conversión de HTML a PDF (memorándum, recibos, rendiciones); se carga con \code{import()} al generar el primer PDF \\
-@google/generative-ai & Modelo Gemini para extracción de comprobantes y detección de alcohol \\
+@google/generative-ai & Modelo Gemini para extracción de comprobantes y detección de gastos no deducibles (alcohol y propinas) \\
 \rowcolor{maxamFondo} sib-api-v3-sdk (Brevo) & Envío de correo transaccional \\
 node-cron & Resumen de pendientes por correo en los días y horas que configura el administrador \\
 \rowcolor{maxamFondo} Jest y Supertest & Pruebas unitarias y de la API \\
@@ -282,7 +282,7 @@ npm run resumen -- --prueba   # simula el resumen de pendientes
 \code{SUPABASE_KEY} & Clave \code{service_role} (acceso completo; nunca se publica) \\
 \rowcolor{maxamFondo} \code{JWT_SECRET} & Firma del token de acceso \\
 \code{JWT_REFRESH_SECRET} & Firma del token de renovación \\
-\rowcolor{maxamFondo} \code{GEMINI_API_KEY} & Extracción de comprobantes y detección de alcohol \\
+\rowcolor{maxamFondo} \code{GEMINI_API_KEY} & Extracción de comprobantes y detección de gastos no deducibles \\
 \code{BREVO_API_KEY} & Envío de correos \\
 \rowcolor{maxamFondo} \code{ABSTRACT_EMAIL_API_KEY} & Verifica que un correo exista antes de enviar el código de recuperación \\
 \code{FRONTEND_URL} & Enlace del botón ``Ingresar al sistema'' de los correos \\
@@ -311,13 +311,15 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \endfirsthead
 \cabecera \tth{Archivo} & \tth{Contenido} \\
 \endhead
-\rowcolor{maxamFondo} \code{01_schema.sql} & Las 24 tablas, relaciones e índices \\
-\code{02_functions.sql} & Función \code{incrementar_correlativo_recibo()} para numerar recibos \\
-\rowcolor{maxamFondo} \code{03_seed.sql} & Roles, cargos, impuesto IVA, categorías de gasto y configuración de recordatorios \\
-\code{04_rls_hardening.sql} & Activa seguridad por fila (RLS) en todas las tablas \\
-\rowcolor{maxamFondo} \code{testing_00_borrar_todo.sql} & Elimina las 24 tablas (solo pruebas) \\
-\code{testing_01_limpieza_completa.sql} & Borra datos operativos, conserva catálogos \\
-\rowcolor{maxamFondo} \code{testing_02_organizacion_prueba.sql} & Organización de prueba con jerarquía completa; la usan también las pruebas automáticas \\
+\rowcolor{maxamFondo} \code{01_esquema.sql} & Las 30 tablas, relaciones, restricciones e índices \\
+\code{02_funciones.sql} & Función \code{incrementar_correlativo_recibo(periodo)} (recibos por mes) y triggers \code{viaje_numero_anual} (código VIA por año) y \code{viaje_numero_rendicion} (rendición por mes) \\
+\rowcolor{maxamFondo} \code{03_datos_iniciales.sql} & Roles, cargos, impuesto IVA, categorías de gasto y configuración de recordatorios \\
+\code{04_seguridad_rls.sql} & Activa seguridad por fila (RLS) en todas las tablas \\
+\rowcolor{maxamFondo} \code{05_demo_usuarios_ficticios.sql} & Demo con personas ficticias y tres vehículos; solo empleado, aprobador y tesorera usan correos reales de prueba \\
+\code{reconstruir_base_completa.sql} & Todo junto (borrar y \code{01} a \code{05}) para pegar en Supabase; se genera con \code{npm run db:reconstruccion} y una prueba verifica que esté al día \\
+\rowcolor{maxamFondo} \code{mantenimiento/borrar_todo.sql} & Elimina las 30 tablas, las funciones y los triggers (solo pruebas) \\
+\code{mantenimiento/limpiar_datos.sql} & Borra datos operativos, conserva catálogos y vehículos \\
+\rowcolor{maxamFondo} \code{pruebas/organizacion_prueba.sql} & Organización de prueba con jerarquía completa y tres vehículos; la usan las pruebas automáticas \\
 \end{xltabular}
 
 \subsection{Tablas}
@@ -332,12 +334,16 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \rowcolor{maxamFondo} \code{Seccion} & Secciones de la empresa; respaldo en la jerarquía de revisión. Guarda su código de Oracle (\code{codigo_seccion}, 3 dígitos) para la cuenta del gasto; la dependencia va en el usuario (\code{Usuario.codigo_dependencia}) y se toma del jefe directo del que viaja, o la suya si no tiene jefe; el backend los valida y solo acepta los campos editables \\
 \code{Usuario} & Usuarios, jefe directo, estado de contraseña y sesión \\
 \rowcolor{maxamFondo} \code{Codigo_Verificacion} & Códigos de recuperación de contraseña (5 minutos) \\
-\code{Viaje} & Viajes, estado, revisores asignados, monto asignado en Bs y USD (calculado con las tarifas del cargo) y ciclo de revisión \\
+\code{Viaje} & Viajes, estado, revisores asignados, monto asignado en Bs y USD (calculado con las tarifas del cargo; incluye el fondo para combustible, que se guarda aparte en \code{monto_combustible}), vehículo de la empresa (\code{id_vehiculo} y la placa de ese momento), gestión del hospedaje (\code{Empresa} o \code{Propio}), número anual (\code{numero_viaje}, \code{anio_viaje}) y ciclo de revisión \\
+\rowcolor{maxamFondo} \code{Vehiculo} & Flota de la empresa (placa única, descripción, activo). Un índice único parcial sobre \code{Viaje(id_vehiculo)} impide que un vehículo esté en dos viajes activos (en revisión, aprobado, en tesorería o en curso); se libera cuando el empleado termina el viaje \\
+\rowcolor{maxamFondo} \code{Firma} & Firma dibujada en el momento de aprobar o enviar: etapa (MEMORANDUM, PREPARADO, JEFE, GERENTE), trazo PNG, usuario, fecha e IP; las etapas automáticas no llevan trazo \\
+\code{Documento_Emitido} & Código de 12 caracteres y datos clave de cada PDF emitido; el QR del documento lleva a la página pública de verificación \\
+\code{Correlativo_Viaje} & Último número de viaje de cada año, para el código \code{VIA-numero/año} que vuelve a 1 cada año \\
 \rowcolor{maxamFondo} \code{Solicitud_Autorizacion_Plazo} & Ampliaciones de plazo; las pide el titular o su reemplazo \\
 \code{Solicitud_Reemplazo} & Solicitudes para que otra persona rinda el viaje \\
 \rowcolor{maxamFondo} \code{Categoria_Gasto} & Plan de cuentas de la empresa (112 cuentas de la planilla de Castro más OTROS), con la cuenta contable de Oracle en el nombre y una nota de cuándo usarla (\code{descripcion}) \\
 \code{Proveedor} & Emisores de facturas \\
-\rowcolor{maxamFondo} \code{Gasto} & Gastos con sus retenciones impositivas; en los sin factura, el número impreso del recibo en papel (\code{numero_recibo}, opcional); en los internacionales, la moneda de la factura, su monto, el tipo de cambio a USD y el de USD a Bs (\code{tipo_cambio_bs}) \\
+\rowcolor{maxamFondo} \code{Gasto} & Gastos con sus retenciones impositivas; en los sin factura, el número impreso del recibo en papel (\code{numero_recibo}, opcional); en los internacionales, la moneda de la factura, su monto, el tipo de cambio a USD y el de USD a Bs (\code{tipo_cambio_bs}), y la moneda en que el empleado lo rinde (\code{moneda_rendicion}: USD o BOB) \\
 \code{Gasto_Subitem} & Desglose de un gasto en varios conceptos \\
 \rowcolor{maxamFondo} \code{Gasto_Tramo_Moneda} & Conversión a USD de un gasto internacional en otra moneda (monto original, tipo de cambio y equivalente) \\
 \code{Imagen} & Comprobante asociado a un gasto \\
@@ -347,7 +353,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \rowcolor{maxamFondo} \code{Impuesto} y \code{Factura_Impuestos} & Catálogo de impuestos y su relación con facturas \\
 \code{Comentario} & Observaciones de revisión y justificaciones de exceso \\
 \rowcolor{maxamFondo} \code{Auditoria} & Ingresos, salidas y cambios de contraseña \\
-\code{Correlativo_Recibo} y \code{Recibo} & Numeración de recibos: cada gasto sin factura recibe su número al registrarlo (\code{receiptNumberService}, \code{enviado} falso hasta mandarlo) y es el N° DOCUMENTO de la planilla cuando no hay recibo original (si lo hay, va el original), marcado en lila; si el gasto tiene número de recibo en papel, el recibo del sistema muestra los dos (``Recibo Nº … · Recibo original Nº …'') y el ``Son'' va en letras con el importe a cancelar \\
+\code{Correlativo_Recibo} y \code{Recibo} & Numeración de recibos por mes (el correlativo vuelve a 1 cada mes y el número se muestra con su mes, por ejemplo \code{000012/10-2026}): cada gasto sin factura recibe su número al registrarlo (\code{receiptNumberService}, \code{enviado} falso hasta mandarlo) y es el N° DOCUMENTO de la planilla cuando no hay recibo original (si lo hay, va el original), marcado en lila; si el gasto tiene número de recibo en papel, el recibo del sistema muestra los dos (``Recibo Nº … · Recibo original Nº …'') y el ``Son'' va en letras con el importe a cancelar \\
 \rowcolor{maxamFondo} \code{Correlativo_Rendicion} & Último número de rendición de cada mes; el trigger \code{viaje_numero_rendicion} asigna el siguiente al viaje (\code{numero_rendicion}, \code{periodo_rendicion}) cuando queda aprobado del todo, según el mes de su último comprobante \\
 \rowcolor{maxamFondo} \code{Revision_Viaje} & Historial de aprobaciones y rechazos por persona y etapa \\
 \code{Configuracion_Recordatorio} & Una sola fila con los días y horas del resumen de pendientes \\
@@ -364,7 +370,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 2 & SUPERVISOR & Revisión previa del viaje y revisión de la rendición \\
 \rowcolor{maxamFondo} 3 & EMPLEADO & Registra viajes y gastos \\
 4 & REVISOR & Revisión final, ampliaciones de plazo y reemplazos (rol único) \\
-\rowcolor{maxamFondo} 5 & APROBADOR & Aprobación del viaje y revisión adicional por alcohol (rol único) \\
+\rowcolor{maxamFondo} 5 & APROBADOR & Aprobación del viaje y revisión adicional de gastos no deducibles (rol único) \\
 --- & Tesorero & No es un rol: se identifica por el cargo ``asistente de caja y tesorería'' \\
 \end{xltabular}
 
@@ -478,7 +484,7 @@ Aprobador y revisor son roles únicos: todo viaje de su etapa les corresponde. E
 \node[est,below=of av] (rt) {EN\_REVISION\_TESORERO};
 \node[fin,below=of rt] (ec) {EN\_CURSO};
 \node[est,right=2.2cm of b] (er) {EN\_REVISION};
-\node[est,below=of er] (ea) {EN\_REVISION\_APROBADOR\\(solo con alcohol)};
+\node[est,below=of er] (ea) {EN\_REVISION\_APROBADOR\\(solo con no deducibles)};
 \node[est,below=of ea] (as) {APROBADO\_SUPERVISOR};
 \node[fin,below=of as] (af) {APROBADO\_FINAL};
 \node[rech,below=1.1cm of af] (r) {RECHAZADO};
@@ -506,13 +512,13 @@ Aprobador y revisor son roles únicos: todo viaje de su etapa les corresponde. E
 Al registrar o editar un viaje, el monto se calcula con las tarifas del cargo del empleado y se envía en \code{monto_asignado} y \code{monto_asignado_usd}. En un viaje nacional es \emph{días × tarifa en Bs}. En uno internacional, el día de salida y el de regreso se calculan con la tarifa en Bs y los días intermedios con la tarifa en USD. Tesorería revisa el monto y lo ajusta al asignar los fondos.
 
 \subsection{Control de gasto diario}
-El presupuesto se controla por día y por moneda. En un viaje nacional, lo gastado en bolivianos cada día no puede superar el \code{monto_diario} del cargo. En uno internacional, cada día se controla con las dos tarifas por separado: lo gastado en bolivianos contra \code{monto_diario} y lo gastado en dólares contra \code{monto_diario_usd}. Los hoteles quedan fuera del control diario y se comparan contra el total asignado. Cada día excedido, y el exceso en hoteles, exige una justificación en \code{Comentario.fecha_justificada}; las justificaciones con palabras inapropiadas se rechazan.
+El presupuesto se controla por día y por moneda. En un viaje nacional, lo gastado en bolivianos cada día no puede superar el \code{monto_diario} del cargo. En uno internacional, cada día se controla con las dos tarifas por separado: lo gastado en bolivianos contra \code{monto_diario} y lo gastado en dólares contra \code{monto_diario_usd}. Los hoteles quedan fuera del control diario y se comparan contra el total asignado; si el viaje tiene fondo para combustible, la gasolina, el diésel y el gas (cuentas 628020, 628021 y 628022) también quedan fuera. En un viaje internacional con fondo en USD, el gasto internacional se compara con la tarifa en USD por su monto en dólares. Si el fondo se entregó solo en Bs, todo el día se controla en Bs: los gastos del exterior suman su equivalente en Bs, el día de salida y el de regreso usan \code{monto_diario} y los días intermedios la tarifa en USD por el tipo de cambio de los gastos de ese día (o el promedio del viaje). Cada día lleva \code{limiteBs}, \code{limiteUsd}, \code{soloBs} y \code{tipoCambio}. Cada día excedido, y el exceso en hoteles, exige una justificación en \code{Comentario.fecha_justificada}; las justificaciones con palabras inapropiadas se rechazan.
 
 \subsection{Moneda en viajes internacionales}
-En un viaje internacional se puede registrar gastos en bolivianos o en dólares cualquier día. Un gasto internacional se escribe en la moneda de su factura y su \code{monto_total} se guarda en dólares; los gastos internacionales no llevan impuestos.
+En un viaje internacional se puede registrar gastos en bolivianos o en dólares cualquier día. Un gasto internacional se escribe en la moneda de su factura y su \code{monto_total} se guarda en dólares; los gastos internacionales no llevan impuestos. El empleado elige si lo rinde en USD o en Bs (\code{moneda_rendicion}); sin elección se usa la del fondo del viaje (USD si tiene fondo en dólares, Bs si no). La elección decide de qué fondo se descuenta, en qué moneda aparece en la planilla y la moneda de la factura en Oracle (\code{utils/expenseCurrency.js}: \code{renditionCurrencyOf}, \code{isRenderedInUsd}).
 
 \subsection{Tipo de cambio}
-El gasto internacional trae \code{moneda} (USD, EUR, PEN, ARS, BRL, CLP, COP o MXN), el monto en esa moneda (\code{monto_moneda_origen}, o la suma de los subgastos, que van en la misma moneda), \code{tipo_cambio} (unidades por 1 USD, obligatorio si no es USD) y \code{tipo_cambio_bs} (bolivianos por 1 USD, siempre obligatorio). El backend calcula \code{monto_total} = monto $\div$ \code{tipo_cambio}, redondeado a centavos, y en otra moneda deja la conversión en \code{Gasto_Tramo_Moneda}. La planilla en PDF sigue el formato de la empresa: una primera fila ``SALDO ANTERIOR FONDO RECIBIDO'' con lo recibido en la columna IMPORTE (en un viaje internacional, una en Bs y otra en USD) y el importe de cada gasto en IMPORTE FACT./REC.; la columna IMPORTE queda en blanco en los gastos. Va toda en Bs (\code{utils/expenseCurrency.js}): importe = \code{monto_total} $\times$ \code{tipo_cambio_bs}, con una columna MONTO ORIGINAL, una fila con el total internacional en USD para Oracle y saldos por fondo: un gasto internacional se descuenta del fondo en USD si el viaje lo tiene, o del fondo en Bs si solo se entregaron bolivianos. Un gasto antiguo sin \code{tipo_cambio_bs} se muestra en USD marcado ``Sin T/C a Bs''.
+El gasto internacional trae \code{moneda} (USD, EUR, PEN, ARS, BRL, CLP, COP o MXN), el monto en esa moneda (\code{monto_moneda_origen}, o la suma de los subgastos, que van en la misma moneda), \code{tipo_cambio} (unidades por 1 USD, obligatorio si no es USD) y \code{tipo_cambio_bs} (bolivianos por 1 USD, siempre obligatorio). El backend calcula \code{monto_total} = monto $\div$ \code{tipo_cambio}, redondeado a centavos, y en otra moneda deja la conversión en \code{Gasto_Tramo_Moneda}. La planilla en PDF sigue el formato de la empresa: una primera fila ``SALDO ANTERIOR FONDO RECIBIDO'' con lo recibido en la columna IMPORTE (en un viaje internacional, una en Bs y otra en USD) y el importe de cada gasto en IMPORTE FACT./REC.; la columna IMPORTE queda en blanco en los gastos. Va toda en Bs (\code{utils/expenseCurrency.js}): importe = \code{monto_total} $\times$ \code{tipo_cambio_bs}, con una columna MONTO ORIGINAL, una fila con el total de los gastos rendidos en USD y saldos por fondo; los gastos rendidos en USD van en dólares y fuera de las sumas en Bs. Al pie solo firman Preparado por (Responsable) y Vo/ Bo del Jefe y del Gerente de Área. Un gasto antiguo sin \code{tipo_cambio_bs} se muestra en USD marcado ``Sin T/C a Bs''.
 
 \subsection{Retenciones impositivas}
 \begin{xltabular}{\textwidth}{L{1.4cm} L{5.2cm} Y}
@@ -526,7 +532,7 @@ El gasto internacional trae \code{moneda} (USD, EUR, PEN, ARS, BRL, CLP, COP o M
 \code{S} & Servicio o alquiler sin factura & RC-IVA 13\% e IT 3\% sobre la base incrementada (pagado $\div$ 0.84) \\
 \end{xltabular}
 
-En la factura (\code{F}) el IVA es el 13\% del total y se resta de él, igual que las retenciones: subtotal = total $-$ IVA. Al empleado se le reconoce el total; en la planilla, en PDF y en Excel, el IVA va en su columna como crédito fiscal y el importe costo/gasto es el total menos el IVA (por ejemplo, 305.00 $-$ 39.65 = 265.35). El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. En los gastos sin factura la empresa asume los impuestos (base incrementada): el empleado registra lo que pagó; el RC-IVA o IUE y el IT se calculan cada uno con su porcentaje sobre lo pagado $\div$ 0.84 en servicios ($\div$ 0.92 en compras), sin redondear esa división, y cada retención se redondea a centavos; la base es pagado + retenciones, como lo calcula contabilidad. Por ejemplo, con 50.00 pagados en un servicio el RC-IVA es 7.74, el IT 1.79 y la base 59.53. Si el gasto tiene subgastos, cada uno se calcula aparte y se suman, como en el recibo de papel: cuatro taxis de 50, 80, 60 y 50 dan 285.73, con RC-IVA 37.15 e IT 8.58. Calcular sobre el total de 240 de una vez daría 285.71, que no coincide con la suma de las líneas del recibo. Todos los importes se redondean a centavos con \code{roundCents}, que redondea bien los medios centavos (1.005 $\rightarrow$ 1.01), algo en lo que \code{toFixed} falla por la coma flotante. Lo pagado cuenta para el presupuesto y la base es el importe costo/gasto de la planilla. Los gastos internacionales quedan exentos. Los gastos con alcohol pierden toda retención y crédito fiscal y se imputan íntegros como costo.
+En la factura (\code{F}) el IVA es el 13\% del total y se resta de él, igual que las retenciones: subtotal = total $-$ IVA. Al empleado se le reconoce el total; en la planilla, en PDF y en Excel, el IVA va en su columna como crédito fiscal y el importe costo/gasto es el total menos el IVA (por ejemplo, 305.00 $-$ 39.65 = 265.35). El recibo (\code{R}) no lleva IVA: subtotal y total son iguales, y la planilla en PDF y en Excel muestra IVA 0. En los gastos sin factura la empresa asume los impuestos (base incrementada): el empleado registra lo que pagó; el RC-IVA o IUE y el IT se calculan cada uno con su porcentaje sobre lo pagado $\div$ 0.84 en servicios ($\div$ 0.92 en compras), sin redondear esa división, y cada retención se redondea a centavos; la base es pagado + retenciones, como lo calcula contabilidad. Por ejemplo, con 50.00 pagados en un servicio el RC-IVA es 7.74, el IT 1.79 y la base 59.53. Si el gasto tiene subgastos, cada uno se calcula aparte y se suman, como en el recibo de papel: cuatro taxis de 50, 80, 60 y 50 dan 285.73, con RC-IVA 37.15 e IT 8.58. Calcular sobre el total de 240 de una vez daría 285.71, que no coincide con la suma de las líneas del recibo. Todos los importes se redondean a centavos con \code{roundCents}, que redondea bien los medios centavos (1.005 $\rightarrow$ 1.01), algo en lo que \code{toFixed} falla por la coma flotante. Lo pagado cuenta para el presupuesto y la base es el importe costo/gasto de la planilla. Los gastos internacionales quedan exentos. Los gastos no deducibles (alcohol o propinas) pierden toda retención y crédito fiscal y se imputan íntegros como costo.
 
 \subsection{Plazos de registro}
 Tras el fin del viaje hay cuatro días de tolerancia para cargar gastos. Vencido el margen, se debe pedir una ampliación al revisor, que otorga cuatro días desde su respuesta. El plazo es del viaje: la ampliación vale para el titular y para su reemplazo aprobado, cualquiera de los dos puede pedirla y la respuesta se avisa a ambos. El plazo no corre mientras el viaje está rechazado. La ampliación extiende el margen de carga, no el rango de fechas: la fecha del gasto debe pertenecer al periodo del viaje.
@@ -574,7 +580,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \ep{GET}{/trip/history}{Sesión}{Historial paginado con filtro}
 \epf{GET}{/trip/:id}{Acceso al viaje}{Detalle con gastos y resumen}
 \ep{GET}{/trip/:id/rendicion-pdf}{Acceso al viaje}{Planilla de rendición en PDF}
-\epf{POST}{/trip}{Sesión}{Crea un viaje}
+\epf{POST}{/trip}{Sesión}{Crea un viaje; con vehículo de la empresa exige \code{id_vehiculo} libre y acepta \code{monto_combustible}; \code{gestion_hospedaje} es Empresa o Propio}
 \ep{PUT}{/trip/:id/edit}{Dueño}{Edita un borrador o un viaje rechazado}
 \epf{PUT}{/trip/:id/submit-review}{Dueño}{Envía a revisión previa}
 \ep{PUT}{/trip/:id/confirm-completion}{Dueño o reemplazo}{Finaliza y envía la rendición}
@@ -602,7 +608,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \epf{GET}{/review/expense-review/*}{Supervisor}{Mismas operaciones para la rendición}
 \ep{GET}{/approver/pending-trips}{Aprobador}{Viajes por aprobar}
 \epf{POST}{/approver/trip/:tripId/approve}{Aprobador}{Aprueba y genera el memorándum}
-\ep{POST}{/approver/alcohol-review/:tripId/*}{Aprobador}{Revisión adicional por alcohol}
+\ep{POST}{/approver/alcohol-review/:tripId/*}{Aprobador}{Revisión adicional de gastos no deducibles}
 \epf{GET}{/treasurer/pending-trips}{Tesorero}{Viajes esperando fondos}
 \ep{PUT}{/treasurer/:tripId/amounts}{Tesorero}{Ajusta los montos asignados}
 \epf{POST}{/treasurer/:tripId/approve}{Tesorero}{Aprueba fondos y envía la confirmación}
@@ -637,6 +643,10 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \ep{GET PUT}{/admin/reminders}{Administrador}{Lee o guarda los días y horas del resumen}
 \epf{GET}{/admin/reminders/preview}{Administrador}{A quién le llegaría el resumen, sin enviar}
 \ep{POST}{/admin/reminders/send-now}{Administrador}{Envía el resumen en el momento}
+\ep{GET}{/document/verify/:code}{Público}{Verifica un documento emitido por su código}
+\epf{GET}{/vehicle/available?viaje=}{Sesión}{Vehículos activos y libres; el del viaje que se edita cuenta como libre}
+\ep{GET POST PUT}{/vehicle}{Administrador}{Lista la flota con el viaje que ocupa cada vehículo, registra y edita}
+\epf{PATCH DELETE}{/vehicle/:id/suspend, /activate, /:id}{Administrador}{Suspende (no si está en un viaje), activa o elimina uno nunca usado}
 \end{xltabular}}
 
 \section{Servicios transversales}
@@ -649,7 +659,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \code{tripAccessService} & Permisos de lectura y de emisión de recibos \\
 \rowcolor{maxamFondo} \code{deadlineService} & Valida fecha del gasto y plazo de carga con ampliaciones \\
 \code{expenseSummaryService} & Gasto diario, exceso en hoteles y alertas \\
-\rowcolor{maxamFondo} \code{alcoholDetectionService} & Detecta bebidas alcohólicas por gasto y por viaje: compara palabras completas, trata el combustible y sus abreviaturas de surtidor (G.ESPECIAL+) como inocuos y solo consulta a la IA los productos dudosos \\
+\rowcolor{maxamFondo} \code{alcoholDetectionService} & Detecta gastos no deducibles (bebidas alcohólicas y propinas) por gasto y por viaje: compara palabras completas, trata el combustible y sus abreviaturas de surtidor (G.ESPECIAL+) como inocuos y solo consulta a la IA los productos dudosos \\
 \code{commentModerationService} & Rechaza términos prohibidos \\
 \rowcolor{maxamFondo} \code{geminiService} & Modelo de IA con reintentos y modelo de respaldo \\
 \code{reviewLogService} & Historial de revisión por persona y etapa \\
@@ -671,7 +681,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \endfirsthead
 \cabecera \tth{Documento} & \tth{Momento} & \tth{Destinatario} \\
 \endhead
-\rowcolor{maxamFondo} Memorándum de aprobación & Aprobación del aprobador & Empleado \\
+\rowcolor{maxamFondo} Memorándum de aprobación & Aprobación del aprobador & Empleado, tesorería y los cargos del memorándum; con membrete y logo de MAXAM FANEXA, dice ``Se autoriza el viaje de\ldots'', pide la compra de pasajes aéreos o terrestres (o el uso del vehículo y su combustible) e indica quién gestiona el hospedaje \\
 Confirmación de fondo & Aprobación de tesorería & Empleado (incluye origen y destino) \\
 \rowcolor{maxamFondo} Recibos de compra y servicio & A pedido & Empleado; muestran la base incrementada como total, las retenciones y lo pagado como importe a cancelar; con subgastos, cada línea lleva su importe calculado por separado y el total es su suma; el número se reutiliza al reenviar \\
 Rendición final & Aprobación final & Revisor y empleado, con saldo por moneda \\
@@ -679,6 +689,9 @@ Rendición final & Aprobación final & Revisor y empleado, con saldo por moneda 
 \end{xltabular}
 
 Todo texto escrito por usuarios se escapa (\code{htmlEscape}) antes de insertarse en correos y PDF. En el resultado final, cada moneda tiene su propia línea: en un viaje internacional puede corresponder devolver dólares y recibir un reembolso en bolivianos.
+
+\subsection{Firmas y verificación}
+Las aprobaciones que firman un documento piden \code{firma}, un PNG en base64 dibujado en ese momento (\code{signatureService}): el aprobador al aprobar el viaje (o al aprobarlo como jefe directo), el empleado al enviar la rendición, el jefe directo o supervisor al aprobarla y el gerente al aprobar la revisión de gastos no deducibles. Sin un trazo válido la respuesta es 400 y no cambia nada. La planilla tiene tres casilleros: Preparado por, Vo/ Bo Jefe de Área y Vo/ Bo Gerente de Área; si el jefe directo es el gerente, su firma vale para los dos. La rendición pasa por el gerente solo si tiene gastos no deducibles o si él es el jefe directo; si no pasó por él, su casillero dice ``No requiere Vo/ Bo de gerencia''. Cada PDF se registra en \code{Documento_Emitido} (\code{documentSealService}) y lleva un QR con su código; \code{GET /document/verify/:code} es público, limitado por IP, y devuelve el tipo de documento, la fecha, el viaje, los datos clave al emitirlo y quién firmó, sin el trazo.
 
 \subsection{Correos inmediatos}
 \begin{itemize}
@@ -705,7 +718,7 @@ Un solo correo por persona con una línea por tipo de pendiente. Solo lo reciben
 \cabecera \tth{Rol} & \tth{Contenido} \\
 \endhead
 \rowcolor{maxamFondo} Supervisor & Viajes en revisión previa y rendiciones, solo de su alcance \\
-Aprobador & Viajes por aprobar y rendiciones con alcohol \\
+Aprobador & Viajes por aprobar y rendiciones con gastos no deducibles \\
 \rowcolor{maxamFondo} Revisor & Rendiciones finales y solicitudes de plazo y reemplazo vigentes \\
 Tesorero & Viajes esperando asignación de fondos \\
 \end{xltabular}
@@ -781,11 +794,11 @@ Una prueba automática es código que usa el sistema como lo haría una persona 
 \endfirsthead
 \cabecera \tth{Tipo} & \tth{Qué prueba} & \tth{Comando} \\
 \endhead
-\rowcolor{maxamFondo} Unitarias & Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, planilla en Bs con el monto original, las filas del fondo recibido, el número de recibo original o del sistema y los saldos por fondo, subgastos en moneda extranjera pasados a USD, cantidades con decimales, control diario por moneda, exportación, recordatorios, jerarquía, moderación, retenciones por subgasto y validación de la importación de usuarios (\code{tests/services/}) & \code{npm test} \\
-De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, gasto internacional en soles pasado a USD y tipo de cambio a Bs obligatorio, número de recibo del sistema, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos solo en gastos internacionales, presupuesto con lo pagado, número de rendición, códigos de Oracle, exportación e importación de usuarios desde Excel (\code{tests/api/}) & \code{npm run test:api} \\
+\rowcolor{maxamFondo} Unitarias & Funciones sueltas: retenciones, IVA de factura y recibo en la planilla, planilla en Bs con el monto original, las filas del fondo recibido, el número de recibo original o del sistema y los saldos por fondo, subgastos en moneda extranjera pasados a USD, cantidades con decimales, control diario por moneda, exportación, recordatorios, jerarquía, moderación, retenciones por subgasto y validación de la importación de usuarios (\code{tests/services/}); también el control diario en Bs con fondo solo en bolivianos y sin la gasolina cuando hay fondo de combustible, propinas como gasto no deducible y el código de viaje anual & \code{npm test} \\
+De la API & Endpoints completos contra una base de prueba: ingreso, permisos por rol, monto del viaje, gastos en ambas monedas, gasto internacional en soles pasado a USD y tipo de cambio a Bs obligatorio, número de recibo del sistema, recibo sin IVA con cantidad decimal, CUF de la factura, respaldos solo en gastos internacionales, presupuesto con lo pagado, número de rendición, códigos de Oracle, exportación e importación de usuarios desde Excel (\code{tests/api/}); también vehículos de la empresa (solo los libres, se liberan al terminar el viaje), combustible y hospedaje, código de viaje por año y recibo por mes, moneda de rendición del gasto internacional, firmas dibujadas obligatorias al aprobar el viaje, enviar la rendición y darle el Vo/ Bo (también del reemplazo y del gerente en los gastos no deducibles, con la leyenda «No requiere Vo/ Bo de gerencia» cuando no pasa por él) y la verificación pública de documentos por su código; y el control de acceso por ruta directa (\code{accessControl.api.test.js}): sin sesión o con un token alterado nada responde, otro empleado no ve ni modifica viajes ni gastos ajenos, un empleado no entra a las rutas de otros roles y un supervisor de otra sección no abre viajes que no le corresponden & \code{npm run test:api} \\
 \end{xltabular}
 
-Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{testing_02_organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase y acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar; nunca se ejecutan contra la base real. En el estado actual pasan 74 pruebas unitarias y 36 de la API.
+Las pruebas de la API necesitan una base PostgreSQL de prueba creada con los scripts de \code{database/} (\code{01} a \code{04} y \code{pruebas/organizacion_prueba.sql}), servida por PostgREST y por el proxy \code{tests/support/supabaseProxy.js}, que imita la ruta \code{/rest/v1} de Supabase y acepta las subidas a Storage sin guardarlas y anota los archivos que se piden borrar; nunca se ejecutan contra la base real. En el estado actual pasan 74 pruebas unitarias y 36 de la API.
 
 \subsection{Integración continua}
 El archivo \code{.github/workflows/pruebas.yml} ejecuta las pruebas en GitHub Actions en cada envío y en cada pull request: un trabajo corre las unitarias y otro levanta una base PostgreSQL temporal, PostgREST y el proxy, y corre las de la API. El resultado aparece como aprobado o fallido junto a cada commit, en la pestaña \emph{Actions} del repositorio; si una prueba falla, GitHub la marca junto a la línea de código que falló. En las pruebas, los correos no se envían de verdad: se simulan y se revisa a quién se habrían mandado.

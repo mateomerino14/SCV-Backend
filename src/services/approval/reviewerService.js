@@ -9,6 +9,7 @@ const tripCodeUtil = require('../../utils/tripCode');
 const reviewLogService = require('./reviewLogService');
 const {escapeHtml} = require('../../utils/htmlEscape');
 const {hasUsdFund} = require('../../utils/expenseCurrency');
+const documentSealService = require('../shared/documentSealService');
 
 // Anexa el resumen de gastos y alertas a una lista de viajes
 const attachSummaryToTrips = (trips) => {
@@ -107,7 +108,7 @@ const getMyReviews = async (reviewerId, filters) => {
 const getReviewDetail = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, periodo, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -118,7 +119,7 @@ const getReviewDetail = async (tripId) => {
   }
   const {data: expenses} = await supabase
     .from('Gasto')
-    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)')
+    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero, periodo)')
     .eq('id_viaje', tripId)
     .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   const {data: comments} = await supabase
@@ -151,7 +152,8 @@ const notifyTreasurer = async (trip, reviewer, tripCode, expenses) => {
     return;
   }
   const to = treasurers.map((treasurer) => ({email: treasurer.email_corporativo, name: `${treasurer.nombre} ${treasurer.apellido_paterno}`}));
-  const renditionHtml = finalReviewDocumentService.generateRenditionHtml(trip, reviewer, tripCode, expenses);
+  const renditionSeal = await documentSealService.createSeal({type: documentSealService.documentTypes.finalReview, tripId: trip.id_viaje, summary: {codigo: tripCode, gastos: (expenses || []).length, resultado: 'Aprobación final'}});
+  const renditionHtml = documentSealService.withSeal(finalReviewDocumentService.generateRenditionHtml(trip, reviewer, tripCode, expenses), renditionSeal);
   const pdfBuffer = await finalReviewDocumentService.generatePdf(renditionHtml);
   const pdfBase64 = pdfBuffer.toString('base64');
   const attachments = [{content: pdfBase64, name: `Rendicion_Final_${tripCode.replace('/', '-')}.pdf`}];
@@ -183,7 +185,8 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
     exceedsUsd: usdBalance < 0,
     hasUsdFund: usdFund,
   };
-  const resultHtml = finalReviewDocumentService.generateEmployeeResultHtml(trip, tripCode, resultSummary);
+  const resultSeal = await documentSealService.createSeal({type: documentSealService.documentTypes.finalReview, tripId: trip.id_viaje, summary: {codigo: tripCode, saldo_bs: resultSummary.nationalBalance, saldo_usd: resultSummary.usdBalance}});
+  const resultHtml = documentSealService.withSeal(finalReviewDocumentService.generateEmployeeResultHtml(trip, tripCode, resultSummary), resultSeal);
   const pdfBuffer = await finalReviewDocumentService.generatePdf(resultHtml);
   const pdfBase64 = pdfBuffer.toString('base64');
   const attachments = [{content: pdfBase64, name: `Resultado_Rendicion_${tripCode.replace('/', '-')}.pdf`}];

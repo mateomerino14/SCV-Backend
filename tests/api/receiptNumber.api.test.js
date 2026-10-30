@@ -31,15 +31,25 @@ test('asigna el número de recibo del sistema al registrar y lo conserva al edit
   const first = await employee.postForm('/expense/register', expenseData({numero_recibo: '0003431'}));
   const second = await employee.postForm('/expense/register', expenseData({tipo: 'C', descripcion: 'Compra de agua'}));
   expect(first.status).toBe(200);
-  expect(first.body.gasto.numero_recibo_sistema).toMatch(/^\d{6}$/);
+  expect(first.body.gasto.numero_recibo_sistema).toMatch(/^\d{6}\/\d{2}-\d{4}$/);
   expect(second.body.gasto.numero_recibo_sistema).not.toBe(first.body.gasto.numero_recibo_sistema);
   const expenseId = first.body.gasto.id_gasto;
   let detail = (await employee.get(`/expense/${expenseId}/detail`)).body;
   const assigned = detail.Recibo[0].numero;
-  expect(String(assigned).padStart(6, '0')).toBe(first.body.gasto.numero_recibo_sistema);
+  const [year, month] = detail.Recibo[0].periodo.split('-');
+  expect(`${String(assigned).padStart(6, '0')}/${month}-${year}`).toBe(first.body.gasto.numero_recibo_sistema);
   expect(detail.numero_recibo).toBe('0003431');
   const edited = await employee.putForm(`/expense/${expenseId}/update`, expenseData({tipo: 'C', monto_total: 45}));
   expect(edited.status).toBe(200);
   detail = (await employee.get(`/expense/${expenseId}/detail`)).body;
-  expect(detail.Recibo).toEqual([{numero: assigned}]);
+  expect(detail.Recibo).toEqual([{numero: assigned, periodo: `${year}-${month}`}]);
+});
+
+// El correlativo de recibos es de cada mes: un mes nuevo empieza en 1
+test('el correlativo de recibos vuelve a 1 en cada mes', async () => {
+  const supabase = require('../../src/config/supabase');
+  const first = await supabase.rpc('incrementar_correlativo_recibo', {p_periodo: '2099-01'});
+  const second = await supabase.rpc('incrementar_correlativo_recibo', {p_periodo: '2099-01'});
+  const otherMonth = await supabase.rpc('incrementar_correlativo_recibo', {p_periodo: '2099-02'});
+  expect([first.data, second.data, otherMonth.data]).toEqual([1, 2, 1]);
 });

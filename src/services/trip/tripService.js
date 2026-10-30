@@ -4,6 +4,11 @@ const expenseSummaryService = require('../approval/expenseSummaryService');
 const substitutionService = require('../approval/substitutionService');
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService');
 const commentModerationService = require('../shared/commentModerationService');
+const vehicleService = require('../catalog/vehicleService');
+const signatureService = require('../shared/signatureService');
+
+const companyVehicle = 'Vehículo de Empresa';
+const lodgingOptions = ['Empresa', 'Propio'];
 
 const tripStateCategories = {
   draft: ['BORRADOR'],
@@ -105,7 +110,7 @@ const getTripDetail = async (tripId, requesterId) => {
   }
   const {data: expenses, error: expensesError} = await supabase
     .from('Gasto')
-    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)')
+    .select('*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero, periodo)')
     .eq('id_viaje', tripId)
     .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   if (expensesError) {
@@ -178,7 +183,81 @@ const validateTripData = (tripData) => {
   if (tripData.transporte && String(tripData.transporte).length > 50) {
     return 'El transporte no es válido';
   }
+  if (tripData.gestion_hospedaje && !lodgingOptions.includes(tripData.gestion_hospedaje)) {
+    return 'La gestión del hospedaje debe ser Empresa o Propio';
+  }
+  if (tripData.monto_combustible !== undefined && tripData.monto_combustible !== null && tripData.monto_combustible !== '' && !isValidAmount(tripData.monto_combustible)) {
+    return 'El monto para combustible debe ser un número mayor o igual a cero';
+  }
+  if (parseFloat(tripData.monto_combustible || 0) > parseFloat(tripData.monto_asignado || 0)) {
+    return 'El monto para combustible no puede superar el monto total del viaje';
+  }
   return null;
+};
+
+// Valida el viaje y arma los campos a guardar: el vehiculo de la empresa debe estar libre y el combustible solo va con el
+const prepareTripFields = async (tripData, tripId = null) => {
+  const tripDataError = validateTripData(tripData);
+  if (tripDataError) {
+    return {error: tripDataError, status: 400};
+  }
+  const usesCompanyVehicle = tripData.transporte === companyVehicle;
+  if (usesCompanyVehicle && tripData.tipo === 'Internacional') {
+    return {error: 'El vehículo de empresa solo está disponible para viajes nacionales', status: 400};
+  }
+  if (usesCompanyVehicle && !tripData.id_vehiculo) {
+    return {error: 'Elige el vehículo de la empresa', status: 400};
+  }
+  let vehicle = null;
+  if (usesCompanyVehicle) {
+    const check = await vehicleService.checkVehicleAvailable(tripData.id_vehiculo, tripId);
+    if (check.error) {
+      return {error: check.error, status: 400};
+    }
+    vehicle = check.vehicle;
+  }
+  let fuelAmount = 0;
+  if (usesCompanyVehicle) {
+    fuelAmount = parseFloat(tripData.monto_combustible || 0);
+  }
+  return {
+    fields: {
+      motivo: tripData.motivo.trim(),
+      origen: tripData.origen?.trim() || null,
+      destino: tripData.destino.trim(),
+      fecha_inicio: tripData.fecha_inicio,
+      fecha_fin: tripData.fecha_fin,
+      tipo: tripData.tipo,
+      transporte: tripData.transporte || 'Terrestre',
+      id_vehiculo: vehicle?.id_vehiculo || null,
+      placa_vehiculo: vehicle?.placa || null,
+      monto_asignado: tripData.monto_asignado,
+      monto_asignado_usd: tripData.monto_asignado_usd || 0,
+      monto_combustible: fuelAmount,
+      gestion_hospedaje: tripData.gestion_hospedaje || 'Propio',
+    },
+  };
+};
+
+// Traduce el choque del indice de vehiculo ocupado a un mensaje para el empleado
+const vehicleConflictError = (error) => {
+  if (error?.code === '23505' && String(error.message).includes('viaje_vehiculo_ocupado_unique')) {
+    return {error: 'El vehículo elegido ya está ocupado en otro viaje; edita el viaje y elige otro', status: 409};
+  }
+  return {error: error.message, status: 500};
+};
+
+// Crea un viaje en borrador con los datos validados
+const createTrip = async (userId, tripData) => {
+  const prepared = await prepareTripFields(tripData);
+  if (prepared.error) {
+    return prepared;
+  }
+  const {data, error} = await supabase.from('Viaje').insert({...prepared.fields, estado: 'BORRADOR', id_usuario: userId}).select().single();
+  if (error) {
+    return {error: error.message, status: 500};
+  }
+  return {trip: data};
 };
 
 // Reedita un viaje en borrador o rechazado
@@ -199,32 +278,11 @@ const editTrip = async (tripId, userId, tripData) => {
   if (trip.estado !== 'BORRADOR' && !isEditableRejection) {
     return {error: 'Solo puedes editar viajes en borrador o rechazados antes de iniciarse', status: 400};
   }
-  const tripDataError = validateTripData(tripData);
-  if (tripDataError) {
-    return {error: tripDataError, status: 400};
+  const prepared = await prepareTripFields(tripData, tripId);
+  if (prepared.error) {
+    return prepared;
   }
-  if (tripData.transporte === 'Vehículo de Empresa' && !tripData.placa_vehiculo?.trim()) {
-    return {error: 'La placa del vehículo es requerida', status: 400};
-  }
-  if (tripData.transporte === 'Vehículo de Empresa' && tripData.tipo === 'Internacional') {
-    return {error: 'El vehículo de empresa solo está disponible para viajes nacionales', status: 400};
-  }
-  let vehiclePlate = null;
-  if (tripData.transporte === 'Vehículo de Empresa') {
-    vehiclePlate = tripData.placa_vehiculo.trim();
-  }
-  const updateData = {
-    motivo: tripData.motivo,
-    origen: tripData.origen || null,
-    destino: tripData.destino,
-    fecha_inicio: tripData.fecha_inicio,
-    fecha_fin: tripData.fecha_fin,
-    tipo: tripData.tipo,
-    transporte: tripData.transporte || 'Terrestre',
-    placa_vehiculo: vehiclePlate,
-    monto_asignado: tripData.monto_asignado,
-    monto_asignado_usd: tripData.monto_asignado_usd || 0,
-  };
+  const updateData = {...prepared.fields};
   const wasRejected = trip.estado === 'RECHAZADO';
   if (wasRejected) {
     updateData.estado = 'EN_REVISION_VIAJE';
@@ -241,7 +299,7 @@ const editTrip = async (tripId, userId, tripData) => {
     .eq('estado', trip.estado)
     .select('id_viaje');
   if (error) {
-    return {error: error.message, status: 500};
+    return vehicleConflictError(error);
   }
   if (!updatedRows?.length) {
     return {error: 'El viaje cambió de estado mientras lo editabas. Actualiza la página.', status: 409};
@@ -258,7 +316,7 @@ const editTrip = async (tripId, userId, tripData) => {
 const submitToReview = async (tripId, userId) => {
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('estado, id_usuario')
+    .select('estado, id_usuario, id_vehiculo')
     .eq('id_viaje', tripId)
     .single();
   if (!trip) {
@@ -270,6 +328,12 @@ const submitToReview = async (tripId, userId) => {
   if (trip.estado !== 'BORRADOR') {
     return {error: 'Solo puedes enviar a revisión un viaje que esté en borrador', status: 400};
   }
+  if (trip.id_vehiculo) {
+    const check = await vehicleService.checkVehicleAvailable(trip.id_vehiculo, tripId);
+    if (check.error) {
+      return {error: `${check.error}. Edita el borrador antes de enviarlo.`, status: 409};
+    }
+  }
   const {data: updatedRows, error} = await supabase
     .from('Viaje')
     .update({estado: 'EN_REVISION_VIAJE'})
@@ -277,7 +341,7 @@ const submitToReview = async (tripId, userId) => {
     .eq('estado', 'BORRADOR')
     .select('id_viaje');
   if (error) {
-    return {error: error.message, status: 500};
+    return vehicleConflictError(error);
   }
   // Un doble clic no debe asignar revisor dos veces
   if (!updatedRows?.length) {
@@ -288,7 +352,7 @@ const submitToReview = async (tripId, userId) => {
 };
 
 // Confirma la finalizacion de un viaje y lo envia a revision de gastos
-const confirmCompletion = async (tripId, userId, justifications) => {
+const confirmCompletion = async (tripId, userId, justifications, {signature = null, ip = null} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(Cargo(monto_diario, monto_diario_usd))')
@@ -307,6 +371,11 @@ const confirmCompletion = async (tripId, userId, justifications) => {
   const isExpensePhaseRejection = trip.estado === 'RECHAZADO' && trip.fue_iniciado;
   if (trip.estado !== 'EN_CURSO' && !isExpensePhaseRejection) {
     return {error: 'Solo puedes finalizar viajes en curso o rechazados en la fase de gastos', status: 400};
+  }
+  // Quien envia la rendicion firma el casillero Preparado por de la planilla
+  const signatureError = signatureService.validateSignature(signature);
+  if (signatureError) {
+    return {error: signatureError, status: 400};
   }
   let justificationList = [];
   if (Array.isArray(justifications)) {
@@ -384,6 +453,7 @@ const confirmCompletion = async (tripId, userId, justifications) => {
     }
     return {error: 'El viaje ya fue enviado a revisión. Actualiza la página.', status: 409};
   }
+  await signatureService.saveSignature(tripId, signatureService.signatureStages.prepared, userId, {image: signature, ip});
   await hierarchyAssignmentService.assignNextReviewer(tripId, trip.id_usuario, 'SUPERVISOR', 'id_supervisor_asignado');
   // Las solicitudes de reemplazo o de plazo que quedaron sin responder ya no aplican
   await substitutionService.closePendingRequests([tripId]);
@@ -391,4 +461,4 @@ const confirmCompletion = async (tripId, userId, justifications) => {
   return {message: 'Viaje enviado a revisión de gastos correctamente'};
 };
 
-module.exports = {getDashboardData, getHistory, getTripDetail, editTrip, submitToReview, confirmCompletion, validateTripData};
+module.exports = {getDashboardData, getHistory, getTripDetail, createTrip, editTrip, submitToReview, confirmCompletion, validateTripData};

@@ -1,13 +1,18 @@
 -- ============================================================
--- LIMPIEZA COMPLETA PARA PRUEBAS
+-- SCV · MANTENIMIENTO · LIMPIAR DATOS
 -- ============================================================
--- Borra usuarios, viajes, gastos, facturas, solicitudes y auditoria; conserva los catalogos
--- ADVERTENCIA: no se puede deshacer. Solo en pruebas, nunca en produccion
+-- Borra usuarios, viajes, gastos, facturas, firmas, documentos, solicitudes y auditoría;
+-- conserva los catálogos (roles, cargos, secciones, categorías, impuestos y vehículos).
+-- ADVERTENCIA: no se puede deshacer. Nunca en una base con datos reales.
 -- ============================================================
 
 truncate table
   "Recibo",
+  "Firma",
+  "Documento_Emitido",
   "Correlativo_Rendicion",
+  "Correlativo_Recibo",
+  "Correlativo_Viaje",
   "Revision_Viaje",
   "Comentario",
   "Solicitud_Reemplazo",
@@ -26,8 +31,6 @@ truncate table
   "Proveedor",
   "Usuario"
 restart identity cascade;
-
-update "Correlativo_Recibo" set numero = 0;
 
 -- La limpieza borra en cascada la configuracion de recordatorios: se repone la de fabrica
 insert into "Configuracion_Recordatorio" (id) values (1)

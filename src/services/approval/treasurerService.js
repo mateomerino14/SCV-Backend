@@ -6,6 +6,7 @@ const tripCodeUtil = require('../../utils/tripCode');
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService');
 const reviewLogService = require('./reviewLogService');
 const {escapeHtml} = require('../../utils/htmlEscape');
+const documentSealService = require('../shared/documentSealService');
 
 // Lista los viajes pendientes de aprobacion de fondos
 const getPendingTrips = async (treasurerId, filters) => {
@@ -151,7 +152,8 @@ const approveTrip = async (tripId, treasurerId, {selfStageSkip = false} = {}) =>
   try {
     const employee = trip.Usuario;
     if (employee?.email_corporativo) {
-      const confirmationHtml = treasuryDocumentService.generateFundConfirmationHtml(trip, treasurer, tripCode);
+      const fundSeal = await documentSealService.createSeal({type: documentSealService.documentTypes.fund, tripId: trip.id_viaje, summary: {codigo: tripCode, fondo_bs: trip.monto_asignado, fondo_usd: trip.monto_asignado_usd}});
+      const confirmationHtml = documentSealService.withSeal(treasuryDocumentService.generateFundConfirmationHtml(trip, treasurer, tripCode), fundSeal);
       const pdfBuffer = await treasuryDocumentService.generatePdf(confirmationHtml);
       const pdfBase64 = pdfBuffer.toString('base64');
       const attachments = [{content: pdfBase64, name: `Confirmacion_Fondo_${tripCode.replace('/', '-')}.pdf`}];

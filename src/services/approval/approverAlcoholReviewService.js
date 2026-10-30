@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase');
+const signatureService = require('../shared/signatureService');
 const expenseSummaryService = require('./expenseSummaryService');
 const tripCommentService = require('../trip/tripCommentService');
 const emailService = require('../shared/emailService');
@@ -148,7 +149,7 @@ const returnAlcoholReview = async (tripId, approverId) => {
 const getAlcoholReviewDetail = async (tripId, approverId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, periodo, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -163,7 +164,7 @@ const getAlcoholReviewDetail = async (tripId, approverId) => {
   }
   const {data: expenses} = await supabase
     .from('Gasto')
-    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)')
+    .select('*, Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Categoria_Gasto(nombre), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Imagen(url_archivo), Imagen_Respaldo(id_respaldo, url_archivo), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero, periodo)')
     .eq('id_viaje', tripId)
     .order('fecha_gasto', {ascending: true}).order('id_gasto', {ascending: true});
   const {data: comments} = await supabase
@@ -188,7 +189,7 @@ const getAlcoholReviewDetail = async (tripId, approverId) => {
 };
 
 // Aprueba la revision del aprobador; con selfStageSkip se aprueba sola si el viaje es suyo
-const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} = {}) => {
+const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false, signature = null, ip = null} = {}) => {
   const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_aprobador_asignado, estado').eq('id_viaje', tripId).single();
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404};
@@ -202,6 +203,13 @@ const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} 
   if (trip.id_aprobador_asignado !== approverId && !selfStageSkip) {
     return {error: 'No tienes permiso para aprobar este viaje', status: 403};
   }
+  // El gerente firma el Vo/ Bo de la planilla al aprobar la revision adicional
+  if (!selfStageSkip) {
+    const signatureError = signatureService.validateSignature(signature);
+    if (signatureError) {
+      return {error: signatureError, status: 400};
+    }
+  }
   const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'APROBADO_SUPERVISOR', id_aprobador_asignado: approverId}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_APROBADOR').select('id_viaje');
   if (error) {
     return {error: error.message, status: 500};
@@ -211,6 +219,12 @@ const approveAlcoholReview = async (tripId, approverId, {selfStageSkip = false} 
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
     await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.alcoholReview, 'APROBADO', {automatic: selfStageSkip});
+    if (!selfStageSkip) {
+      await signatureService.saveSignature(tripId, signatureService.signatureStages.manager, approverId, {image: signature, ip});
+    }
+    else if (trip.id_usuario === approverId) {
+      await signatureService.saveSignature(tripId, signatureService.signatureStages.manager, approverId, {automatic: true});
+    }
     await hierarchyAssignmentService.assignNextReviewer(tripId, approverId, 'REVISOR', 'id_revisor_asignado');
     await require('./selfReviewSkipService').advanceSelfReviewStages(tripId);
     return {message: 'Revisión adicional aprobada, la rendición pasa al revisor final'};

@@ -22,3 +22,10 @@ test('compara palabras completas y no pedazos de otras palabras', () => {
 test('detecta la cerveza Paceña Especial', async () => {
   expect(await alcoholDetectionService.analyzeAlcohol([{nombre_producto: 'PACEÑA ESPECIAL 620ML'}])).toBe(true);
 });
+
+// Las propinas tambien son gastos no deducibles, sin confundirse con palabras como "tipo"
+test('detecta propinas como gasto no deducible', async () => {
+  expect(await alcoholDetectionService.analyzeAlcohol([{nombre_producto: 'PROPINA SERVICIO'}])).toBe(true);
+  expect(await alcoholDetectionService.analyzeAlcoholText('Propina al mesero')).toBe(true);
+  expect(alcoholDetectionService.containsAlcoholKeyword('Cambio de tipo de habitacion')).toBe(false);
+});

@@ -1,5 +1,6 @@
 const expenseSummaryService = require('../../src/services/approval/expenseSummaryService');
 
+// Viaje de prueba con las tarifas diarias del cargo y los fondos indicados
 const tripWithDailyRate = (dailyRate, dailyRateUsd = 0, monto_asignado = 0, monto_asignado_usd = 0) => ({
   monto_asignado,
   monto_asignado_usd,
@@ -114,7 +115,7 @@ test('controla cada dia con la tarifa de cada moneda por separado', () => {
   ];
   const trip = tripWithDailyRate(250, 80, 1000, 500);
   const result = expenseSummaryService.calculateExpenseSummary(expenses, trip);
-  expect(result.dailyBreakdown).toEqual([
+  expect(result.dailyBreakdown).toMatchObject([
     {fecha: '2026-01-01', montoBs: 280, montoUsd: 70, excedeBs: true, excedeUsd: false},
     {fecha: '2026-01-02', montoBs: 0, montoUsd: 90, excedeBs: false, excedeUsd: true},
   ]);
@@ -140,16 +141,23 @@ test('descuenta los gastos internacionales del fondo en Bs cuando no hay fondo e
   expect(result.exceedsBudgetUsd).toBe(false);
 });
 
-// Verifica que el tope diario en USD del cargo se siga controlando aunque el fondo se haya entregado en Bs
-test('mantiene el tope diario en USD cuando el fondo es solo en Bs', () => {
+// Con fondo en USD el control diario va por moneda; con fondo solo en Bs todo se controla en Bs
+test('controla en Bs el viaje internacional con fondo solo en Bs', () => {
   const expenses = [
+    {monto_total: '20', tipo_cambio_bs: '10', fecha_gasto: '2026-01-01', es_gasto_internacional: true},
     {monto_total: '120', tipo_cambio_bs: '10', fecha_gasto: '2026-01-02', es_gasto_internacional: true},
+    {monto_total: '150', fecha_gasto: '2026-01-03', es_gasto_internacional: false},
   ];
-  const trip = tripWithDailyRate(300, 100, 5000, 0);
-  const result = expenseSummaryService.calculateExpenseSummary(expenses, trip);
-  expect(result.accumulatedExpense).toBe(1200);
-  expect(result.totalExceeds).toBe(false);
-  expect(result.exceededDays[0].excedeUsd).toBe(true);
+  const onlyBs = {...tripWithDailyRate(300, 100, 5000, 0), tipo: 'Internacional', fecha_inicio: '2026-01-01', fecha_fin: '2026-01-04'};
+  const result = expenseSummaryService.calculateExpenseSummary(expenses, onlyBs);
+  expect(result.accumulatedExpense).toBe(1550);
+  expect(result.dailyBreakdown).toMatchObject([
+    {fecha: '2026-01-01', montoBs: 200, montoUsd: 0, limiteBs: 300, soloBs: true, excedeBs: false},
+    {fecha: '2026-01-02', montoBs: 1200, montoUsd: 0, limiteBs: 1000, tipoCambio: 10, excedeBs: true},
+    {fecha: '2026-01-03', montoBs: 150, limiteBs: 1000, tipoCambio: 10, excedeBs: false},
+  ]);
+  const withUsd = expenseSummaryService.calculateExpenseSummary(expenses, {...onlyBs, monto_asignado_usd: 200});
+  expect(withUsd.dailyBreakdown[1]).toMatchObject({montoBs: 0, montoUsd: 120, limiteBs: 300, limiteUsd: 100, soloBs: false, excedeUsd: true});
 });
 
 // Verifica que con fondo en USD los gastos internacionales sigan saliendo de ese fondo
@@ -162,4 +170,19 @@ test('sigue usando el fondo en USD cuando el viaje lo tiene', () => {
   expect(result.accumulatedExpense).toBe(0);
   expect(result.accumulatedExpenseUsd).toBe(50);
   expect(result.totalExceedsUsd).toBe(true);
+});
+
+const fuelTrip = {monto_asignado: 1100, monto_asignado_usd: 0, Usuario: {Cargo: {monto_diario: 300}}};
+const fuelExpenses = [
+  {fecha_gasto: '2026-11-03', monto_total: 200, Categoria_Gasto: {nombre: '626040 MANUTENCION (VIAJE)'}},
+  {fecha_gasto: '2026-11-03', monto_total: 400, Categoria_Gasto: {nombre: '628021 GASOLINA'}},
+];
+
+// Con fondo aparte para combustible la gasolina no suma a la cuota diaria; sin el, si
+test('la gasolina no cuenta en el control diario si el viaje tiene fondo de combustible', () => {
+  const withFuel = expenseSummaryService.calculateExpenseSummary(fuelExpenses, {...fuelTrip, monto_combustible: 500});
+  expect(withFuel.dailyBreakdown[0]).toMatchObject({montoBs: 200, excedeBs: false});
+  expect(withFuel.accumulatedExpense).toBe(600);
+  const withoutFuel = expenseSummaryService.calculateExpenseSummary(fuelExpenses, {...fuelTrip, monto_combustible: 0});
+  expect(withoutFuel.dailyBreakdown[0]).toMatchObject({montoBs: 600, excedeBs: true});
 });

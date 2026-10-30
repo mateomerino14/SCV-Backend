@@ -1,11 +1,12 @@
 const supabase = require('../../config/supabase');
 const tripAccessService = require('./tripAccessService');
+const signatureService = require('../shared/signatureService');
 
 const maxTripsPerExport = 50;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const exportRoles = ['ADMINISTRADOR', 'REVISOR'];
-const tripColumns = '*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, apellido_materno, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, tipo, es_gasto_internacional, id_gasto)';
-const expenseColumns = '*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero)';
+const tripColumns = '*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, apellido_materno, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, periodo, tipo, es_gasto_internacional, id_gasto)';
+const expenseColumns = '*, Categoria_Gasto(nombre), Proveedor(nombre, numero_doc_fiscal, tipo_doc_fiscal), Factura(numero_factura, fecha_emision, monto_parcial, cuf, Detalle_Factura(nombre_producto, cantidad, precio)), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Gasto_Subitem(id_subitem, descripcion, monto), Recibo(numero, periodo)';
 
 // Convierte la lista de ids recibida ("1,2,3") en numeros validos y sin repetir
 const parseTripIds = (idsText) => [...new Set(String(idsText || '').split(',').map((id) => parseInt(id, 10)).filter((id) => id > 0))];
@@ -63,6 +64,10 @@ const getStatementsForExport = async (query, userId) => {
       gastos: (expenses || []).filter((expense) => expense.id_viaje === trip.id_viaje),
       comentarios: (comments || []).filter((comment) => comment.id_viaje === trip.id_viaje),
     }));
+  // Cada planilla lleva las firmas de sus tres casilleros para el Excel
+  for (const statement of statements) {
+    statement.firmas = await signatureService.statementSignaturesForExport(statement.viaje.id_viaje);
+  }
   return {statements};
 };
 
