@@ -75,3 +75,31 @@ test('deja rendir el viaje al reemplazo aprobado y al titular, y a nadie más', 
   expect(detail.status).toBe(200);
   expect(detail.body.viaje.Usuario.nombre).toBe('Juan');
 });
+
+// Si rechazan la rendicion que envio el reemplazo, quien revisa ve que la envio el reemplazo y este la puede corregir y reenviar
+test('el reemplazo corrige y reenvía la rendición que le rechazaron', async () => {
+  const owner = api(await login('juan.empleado'));
+  const substitute = api(await login('ana.empleada'));
+  const boss = api(await login('maria.supervisora'));
+  const reviewer = api(await login('lucia.revisora'));
+  const tripId = await createTrip(owner, 'Rendición del reemplazo rechazada');
+  await supabase.from('Viaje').update({estado: 'EN_CURSO', fue_iniciado: true}).eq('id_viaje', tripId);
+  const {data: ana} = await supabase.from('Usuario').select('id_usuario').eq('email_corporativo', 'ana.empleada@maxam.com').single();
+  await owner.post(`/substitution/trip/${tripId}/request`, {id_sustituto: ana.id_usuario});
+  const request = listOf((await reviewer.get('/substitution/pending')).body).find((item) => item.id_viaje === tripId);
+  await reviewer.post(`/substitution/${request.id_solicitud}/approve`);
+  const expense = {id_viaje: tripId, monto_total: 20, fecha_gasto: boliviaDate(), tipo: 'C', descripcion: 'Compra del reemplazo', id_categoria_gasto: 1, es_gasto_internacional: false};
+  const registered = await substitute.postForm('/expense/register', expense);
+  expect((await substitute.put(`/trip/${tripId}/confirm-completion`, {justificaciones: []})).status).toBe(200);
+
+  await boss.post(`/review/expense-review/${tripId}/take`);
+  const detail = (await boss.get(`/review/expense-review/${tripId}`)).body;
+  expect(detail.enviadoPor).toMatchObject({nombre: 'Ana', esReemplazo: true});
+  await boss.post(`/review/expense-review/${tripId}/comment`, {descripcion: 'Falta el comprobante legible', id_gasto: registered.body.gasto.id_gasto});
+  expect((await boss.post(`/review/expense-review/${tripId}/reject`)).status).toBe(200);
+
+  expect((await substitute.postForm('/expense/register', {...expense, descripcion: 'Comprobante corregido'})).status).toBe(200);
+  expect((await substitute.put(`/trip/${tripId}/confirm-completion`, {justificaciones: []})).status).toBe(200);
+  const {data: trip} = await supabase.from('Viaje').select('estado').eq('id_viaje', tripId).single();
+  expect(trip.estado).toBe('EN_REVISION');
+});

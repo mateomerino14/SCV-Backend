@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase');
+const substitutionService = require('./substitutionService');
 const signatureService = require('../shared/signatureService');
 const expenseSummaryService = require('./expenseSummaryService');
 const tripCommentService = require('../trip/tripCommentService');
@@ -182,6 +183,7 @@ const getAlcoholReviewDetail = async (tripId, approverId) => {
     exceededDays: summary.exceededDays,
     dailyBreakdown: summary.dailyBreakdown,
     hotelExceeds: summary.hotelExceeds || summary.hotelExceedsUsd,
+    submitter: await signatureService.submitterOf(tripId, trip.id_usuario),
     totalExceeds: summary.totalExceeds,
     totalExceedsUsd: summary.totalExceedsUsd,
     alerts,
@@ -267,6 +269,7 @@ const rejectAlcoholReview = async (tripId, approverId) => {
     }
     await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.alcoholReview, 'RECHAZADO');
     await emailService.sendRejectionNotice(trip.Usuario);
+    await substitutionService.notifySubstitutesOfRejection(tripId, trip.Usuario);
     return {message: 'Viaje rechazado correctamente'};
   }
 };

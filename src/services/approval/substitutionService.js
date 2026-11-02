@@ -436,7 +436,35 @@ const canRegisterExpenseOnTrip = async (tripId, userId) => {
   return {allowed: true, trip};
 };
 
+// Avisa a los reemplazos aprobados que la rendicion que hacen por el titular fue rechazada, para que la corrijan
+const notifySubstitutesOfRejection = async (tripId, owner) => {
+  const {data} = await supabase
+    .from('Solicitud_Reemplazo')
+    .select('Sustituto:Usuario!solicitud_reemplazo_sustituto_fkey(nombre, apellido_paterno, email_corporativo), Viaje(motivo)')
+    .eq('id_viaje', tripId)
+    .eq('estado', 'APROBADA');
+  const ownerName = `${owner?.nombre || ''} ${owner?.apellido_paterno || ''}`.trim();
+  for (const row of data || []) {
+    const substitute = row.Sustituto;
+    if (!substitute?.email_corporativo) {
+      continue;
+    }
+    try {
+      const html = emailService.buildEmailLayout('Rendición rechazada', `
+        ${emailService.emailParagraph(`Hola <strong>${escapeHtml(substitute.nombre)}</strong>,`)}
+        ${emailService.emailParagraph(`La rendición que haces por <strong>${escapeHtml(ownerName)}</strong> (${escapeHtml(shortenText(row.Viaje?.motivo))}) fue rechazada. Revisa las observaciones, corrígela y vuelve a enviarla.`)}
+        ${emailService.emailButton()}
+      `);
+      await emailService.sendEmail([{email: substitute.email_corporativo, name: `${substitute.nombre} ${substitute.apellido_paterno}`}], `Rendición rechazada — ${shortenText(row.Viaje?.motivo)}`, html);
+    }
+    catch (error) {
+      console.warn('Error avisando al reemplazo del rechazo:', error.message);
+    }
+  }
+};
+
 module.exports = {
+  notifySubstitutesOfRejection,
   closePendingRequests,
   createRequest,
   getRequestStatus,

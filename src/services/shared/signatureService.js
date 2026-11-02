@@ -55,6 +55,22 @@ const getTripSignatures = async (tripId, until = null) => {
   return latest;
 };
 
+// Quien envio la ultima vez la rendicion (firmo Preparado por) y si fue un reemplazo y no el titular
+const submitterOf = async (tripId, ownerId) => {
+  const {data} = await supabase
+    .from('Firma')
+    .select('id_usuario, fecha, Usuario(nombre, apellido_paterno)')
+    .eq('id_viaje', tripId)
+    .eq('etapa', signatureStages.prepared)
+    .order('fecha', {ascending: false})
+    .limit(1);
+  const latest = (data || [])[0];
+  if (!latest) {
+    return null;
+  }
+  return {nombre: latest.Usuario?.nombre, apellido_paterno: latest.Usuario?.apellido_paterno, fecha: latest.fecha, esReemplazo: latest.id_usuario !== ownerId};
+};
+
 // Firmas de los tres casilleros de la planilla; si el jefe directo es el gerente, su Vo/ Bo vale para los dos, y si la rendicion no paso por el gerente se indica que no lo requiere
 const getStatementSignatures = async (tripId, until = null) => {
   const latest = await getTripSignatures(tripId, until);
@@ -122,4 +138,4 @@ const signatureStyles = `
   .firma-fecha { font-size: 6pt; color: #7f7f7f; }
 `;
 
-module.exports = {signatureStages, validateSignature, saveSignature, getTripSignatures, getStatementSignatures, statementSignaturesForExport, signerNameOf, signatureDateOf, signatureBlockHtml, signatureStyles};
+module.exports = {signatureStages, validateSignature, saveSignature, getTripSignatures, submitterOf, getStatementSignatures, statementSignaturesForExport, signerNameOf, signatureDateOf, signatureBlockHtml, signatureStyles};
