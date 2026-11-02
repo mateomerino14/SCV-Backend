@@ -410,7 +410,7 @@ const canActOnTrip = async (tripId, userId) => {
 
 // Verifica que el usuario sea titular o reemplazo aprobado y el viaje este en fase de gastos
 const canRegisterExpenseOnTrip = async (tripId, userId) => {
-  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, fue_iniciado, tipo, fecha_inicio, fecha_fin').eq('id_viaje', tripId).single();
+  const {data: trip} = await supabase.from('Viaje').select('id_usuario, estado, fue_iniciado, tipo, fecha_inicio, fecha_fin, monto_asignado_usd').eq('id_viaje', tripId).single();
   if (!trip) {
     return {allowed: false, error: 'Viaje no encontrado', status: 404};
   }
