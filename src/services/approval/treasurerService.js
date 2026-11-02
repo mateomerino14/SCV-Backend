@@ -103,9 +103,18 @@ const updateAmounts = async (tripId, amounts, treasurerId) => {
   if (amounts.monto_asignado_usd !== undefined) {
     assignedAmountUsd = parseFloat(amounts.monto_asignado_usd) || 0;
   }
+  const hasFundRate = amounts.tipo_cambio_fondo !== undefined && amounts.tipo_cambio_fondo !== null && amounts.tipo_cambio_fondo !== '';
+  if (hasFundRate && !(parseFloat(amounts.tipo_cambio_fondo) > 0)) {
+    return {error: 'El tipo de cambio del fondo debe ser mayor a cero', status: 400};
+  }
+  // El tipo de cambio solo sirve si el fondo se entrego en Bs; con fondo en USD no se guarda
+  let fundRate = null;
+  if (hasFundRate && assignedAmountUsd === 0) {
+    fundRate = parseFloat(amounts.tipo_cambio_fondo);
+  }
   const {error} = await supabase
     .from('Viaje')
-    .update({monto_asignado: parseFloat(amounts.monto_asignado), monto_asignado_usd: assignedAmountUsd})
+    .update({monto_asignado: parseFloat(amounts.monto_asignado), monto_asignado_usd: assignedAmountUsd, tipo_cambio_fondo: fundRate})
     .eq('id_viaje', tripId)
     .eq('estado', 'EN_REVISION_TESORERO');
   if (error) {
