@@ -61,17 +61,24 @@ const calculateLineBases = (amount, type, isInternational, hasAlcohol, lineAmoun
 
 const usdCurrency = 'USD';
 
-// Un gasto internacional nuevo guarda sus subgastos en la moneda de la factura; los antiguos, sin tipo de cambio a Bs, los guardaban en USD
-const hasOriginCurrencyLines = (expense) => !!expense.es_gasto_internacional && parseFloat(expense.tipo_cambio_bs) > 0 && expense.moneda !== usdCurrency;
+// Indica si el gasto es de los nuevos, que guardan la moneda de rendicion o el tipo de cambio a Bs
+const isCurrentInternational = (expense) => parseFloat(expense.tipo_cambio_bs) > 0 || !!expense.moneda_rendicion || !!expense.monto_en_bs;
 
-// Montos pagados de los subgastos; en moneda extranjera se pasan a USD y el ultimo absorbe el redondeo para que sumen el total
+// Un gasto internacional nuevo guarda sus subgastos en la moneda de la factura; los antiguos, sin tipo de cambio a Bs, los guardaban en USD
+const hasOriginCurrencyLines = (expense) => !!expense.es_gasto_internacional && isCurrentInternational(expense) && (expense.moneda !== usdCurrency || !!expense.monto_en_bs);
+
+// Montos pagados de los subgastos; en moneda extranjera se pasan a la de rendicion y el ultimo absorbe el redondeo para que sumen el total
 const subItemAmounts = (expense) => {
   const amounts = (expense.Gasto_Subitem || []).map((item) => parseFloat(item.monto) || 0);
   if (!hasOriginCurrencyLines(expense) || amounts.length === 0) {
     return amounts;
   }
   const exchangeRate = parseFloat(expense.tipo_cambio) || 1;
-  const converted = amounts.map((amount) => roundCents(amount / exchangeRate));
+  // Rendido en Bs, tipo_cambio son los Bs de 1 unidad de la factura; en USD, las unidades de la factura por 1 USD
+  let converted = amounts.map((amount) => roundCents(amount / exchangeRate));
+  if (expense.monto_en_bs) {
+    converted = amounts.map((amount) => roundCents(amount * exchangeRate));
+  }
   const difference = roundCents(parseFloat(expense.monto_total) - converted.reduce((sum, value) => sum + value, 0));
   converted[converted.length - 1] = roundCents(converted[converted.length - 1] + difference);
   return converted;

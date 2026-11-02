@@ -29,32 +29,56 @@ const buildAlcoholText = (expenseData, usesSubItems) => {
 // Moneda del gasto escrita por el empleado; en internacionales es USD si no eligio otra
 const currencyOf = (expenseData) => String(expenseData.moneda || usdCurrency).trim().toUpperCase();
 
-// Moneda a la que el empleado convierte el gasto internacional para rendirlo (USD o Bs); sin eleccion queda null
-const renditionCurrencyInput = (expenseData) => {
-  const currency = String(expenseData.moneda_rendicion || '').trim().toUpperCase();
-  if (['USD', 'BOB'].includes(currency)) {
-    return currency;
+const bsCurrency = 'BOB';
+const bothCurrencies = 'AMBOS';
+
+// Como rinde el empleado el gasto internacional: USD, BOB (solo en Bs) o AMBOS (con los dos tipos de cambio, en la moneda del fondo)
+const renditionModeOf = (expenseData) => {
+  const mode = String(expenseData.moneda_rendicion || '').trim().toUpperCase();
+  if ([usdCurrency, bsCurrency].includes(mode)) {
+    return mode;
   }
-  return null;
+  return bothCurrencies;
 };
+
+// Indica si el viaje recibio fondo en dolares
+const tripHasUsdFund = (trip) => (parseFloat(trip?.monto_asignado_usd) || 0) > 0;
 
 // Montos y tipos de cambio del gasto: los nacionales van en Bs; los internacionales se escriben en la moneda de la factura y se pasan a USD
 const resolveExpenseAmounts = (expenseData, isInternational, enteredAmount) => {
   if (!isInternational) {
-    return {moneda: nationalCurrency, tipo_cambio: 1, tipo_cambio_bs: null, monto_moneda_origen: enteredAmount, monto_total: enteredAmount, moneda_rendicion: null};
+    return {moneda: nationalCurrency, tipo_cambio: 1, tipo_cambio_bs: null, monto_moneda_origen: enteredAmount, monto_total: enteredAmount, moneda_rendicion: null, monto_en_bs: false};
   }
   const currency = currencyOf(expenseData);
+  const mode = renditionModeOf(expenseData);
+  // Solo en Bs: tipo_cambio son los Bs de 1 unidad de la factura y el total queda en Bs
+  if (mode === bsCurrency) {
+    const bsPerUnit = parseFloat(expenseData.tipo_cambio);
+    return {
+      moneda: currency, tipo_cambio: bsPerUnit, tipo_cambio_bs: 1, monto_moneda_origen: enteredAmount,
+      monto_total: roundCents(enteredAmount * bsPerUnit), moneda_rendicion: bsCurrency, monto_en_bs: true,
+    };
+  }
   let exchangeRate = 1;
   if (currency !== usdCurrency) {
     exchangeRate = parseFloat(expenseData.tipo_cambio);
   }
+  let bsRate = null;
+  if (parseFloat(expenseData.tipo_cambio_bs) > 0) {
+    bsRate = parseFloat(expenseData.tipo_cambio_bs);
+  }
+  let rendition = null;
+  if (mode === usdCurrency) {
+    rendition = usdCurrency;
+  }
   return {
     moneda: currency,
     tipo_cambio: exchangeRate,
-    tipo_cambio_bs: parseFloat(expenseData.tipo_cambio_bs),
+    tipo_cambio_bs: bsRate,
     monto_moneda_origen: enteredAmount,
     monto_total: roundCents(enteredAmount / exchangeRate),
-    moneda_rendicion: renditionCurrencyInput(expenseData),
+    moneda_rendicion: rendition,
+    monto_en_bs: false,
   };
 };
 
@@ -82,7 +106,7 @@ const buildExchangeRow = (expenseId, amounts) => ({
 });
 
 // Un gasto internacional en otra moneda deja su conversion a USD
-const needsExchangeRow = (isInternational, amounts) => isInternational && amounts.moneda !== usdCurrency;
+const needsExchangeRow = (isInternational, amounts) => isInternational && amounts.moneda !== usdCurrency && !amounts.monto_en_bs;
 
 // Calcula el monto total a partir de un arreglo de subitems
 const calculateAmountFromSubitems = (subItems) => {
@@ -93,16 +117,22 @@ const calculateAmountFromSubitems = (subItems) => {
 };
 
 // Valida la moneda, los tipos de cambio y los subgastos antes de escribir nada
-const validateExpenseDetails = (expenseData, isInternational) => {
+const validateExpenseDetails = (expenseData, isInternational, trip) => {
   if (isInternational) {
     const currency = currencyOf(expenseData);
+    const mode = renditionModeOf(expenseData);
     if (currency.length > maxCurrencyLength) {
       return 'La moneda del gasto no es válida';
     }
-    if (currency !== usdCurrency && !(parseFloat(expenseData.tipo_cambio) > 0)) {
+    if (mode === bsCurrency && !(parseFloat(expenseData.tipo_cambio) > 0)) {
+      return `Indica cuántos bolivianos vale 1 ${currency}, mayor a cero`;
+    }
+    if (mode !== bsCurrency && currency !== usdCurrency && !(parseFloat(expenseData.tipo_cambio) > 0)) {
       return `Indica el tipo de cambio de ${currency} a dólares, mayor a cero`;
     }
-    if (!(parseFloat(expenseData.tipo_cambio_bs) > 0)) {
+    // Sin fondo en USD el gasto se descuenta del fondo en Bs, asi que hace falta su tipo de cambio a bolivianos
+    const needsBsRate = mode === bothCurrencies || (mode === usdCurrency && !tripHasUsdFund(trip));
+    if (needsBsRate && !(parseFloat(expenseData.tipo_cambio_bs) > 0)) {
       return 'Indica el tipo de cambio de dólares a bolivianos, mayor a cero';
     }
   }
@@ -179,7 +209,7 @@ const createExpense = async (expenseData, images, userId) => {
   }
   const isInternational = expenseData.es_gasto_internacional === true || expenseData.es_gasto_internacional === 'true';
   const usesSubItems = Array.isArray(expenseData.subitems) && expenseData.subitems.length > 0;
-  const detailsError = validateExpenseDetails(expenseData, isInternational);
+  const detailsError = validateExpenseDetails(expenseData, isInternational, access.trip);
   if (detailsError) {
     return {error: detailsError, status: 400};
   }
@@ -314,7 +344,7 @@ const updateExpense = async (expenseId, expenseData, images, userId) => {
   }
   const isInternational = expenseData.es_gasto_internacional === true || expenseData.es_gasto_internacional === 'true';
   const usesSubItems = Array.isArray(expenseData.subitems) && expenseData.subitems.length > 0;
-  const detailsError = validateExpenseDetails(expenseData, isInternational);
+  const detailsError = validateExpenseDetails(expenseData, isInternational, access.trip);
   if (detailsError) {
     return {error: detailsError, status: 400};
   }

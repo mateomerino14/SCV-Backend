@@ -37,6 +37,29 @@ test('acepta un gasto en bolivianos en un dia intermedio', async () => {
   expect(response.status).toBe(200);
 });
 
+// Rendido solo en Bs: se pide cuántos Bs vale 1 unidad de la factura y el monto queda en bolivianos
+test('rinde en Bs un gasto en soles con solo el tipo de cambio a bolivianos', async () => {
+  const base = {id_viaje: tripId, monto_moneda_origen: 170, moneda: 'PEN', moneda_rendicion: 'BOB', fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi en Lima', id_categoria_gasto: 1, es_gasto_internacional: true};
+  expect((await employee.postForm('/expense/register', base)).status).toBe(400);
+  const response = await employee.postForm('/expense/register', {...base, tipo_cambio: 1.85, subitems: [{descripcion: 'Ida', monto: 100}, {descripcion: 'Vuelta', monto: 70}]});
+  expect(response.status).toBe(200);
+  const detail = (await employee.get(`/expense/${response.body.gasto.id_gasto}/detail`)).body;
+  expect(detail).toMatchObject({moneda_rendicion: 'BOB', monto_en_bs: true});
+  expect(parseFloat(detail.monto_total)).toBe(314.5);
+  expect(detail.Gasto_Tramo_Moneda).toEqual([]);
+});
+
+// Rendido en USD en un viaje con fondo en USD solo se pide el tipo de cambio a dolares
+test('rinde en USD con solo el tipo de cambio a dólares si el viaje tiene fondo en USD', async () => {
+  const response = await employee.postForm('/expense/register', {
+    id_viaje: tripId, monto_moneda_origen: 150, moneda: 'PEN', moneda_rendicion: 'USD', tipo_cambio: 3.75, fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi en Lima', id_categoria_gasto: 1, es_gasto_internacional: true,
+  });
+  expect(response.status).toBe(200);
+  const detail = (await employee.get(`/expense/${response.body.gasto.id_gasto}/detail`)).body;
+  expect(parseFloat(detail.monto_total)).toBe(40);
+  expect(detail.tipo_cambio_bs).toBeNull();
+});
+
 // El gasto internacional se escribe en la moneda de la factura y se pasa a USD con el tipo de cambio del empleado
 test('pasa a USD un gasto escrito en soles con su tipo de cambio', async () => {
   const response = await employee.postForm('/expense/register', {
