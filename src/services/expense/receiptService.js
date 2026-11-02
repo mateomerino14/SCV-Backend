@@ -7,6 +7,7 @@ const {escapeDeep, escapeHtml: escapeText} = require('../../utils/htmlEscape');
 const {getExpenseRetentions, getExpenseLineBases, hasOriginCurrencyLines} = require('../../utils/retentions');
 const {formatReceiptNumber, getReceiptNumber} = require('./receiptNumberService');
 const documentSealService = require('../shared/documentSealService');
+const {isAmountInBs, originalAmountLinesOf} = require('../../utils/expenseCurrency');
 
 // Los datos se escapan al entrar a cada plantilla (escapeDeep); aqui solo se normaliza el vacio
 const escapeHtml = (text) => text || '';
@@ -17,15 +18,15 @@ const formatShortDate = (isoString) => {
   return `${day}/${month}/${year}`;
 };
 
-// Datos de cabecera de un recibo: fecha de emision, moneda y titulos segun el tipo de gasto
-const buildReceiptHeader = (type, isInternational) => {
+// Datos de cabecera de un recibo: fecha de emision, moneda y titulos segun el tipo de gasto; el internacional rendido solo en Bs va en Bs
+const buildReceiptHeader = (type, isInternational, inBs = false) => {
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const today = new Date();
   const header = {
     day: today.getDate(), month: monthNames[today.getMonth()], year: today.getFullYear(),
     currency: 'Bs', currencyWords: 'BOLIVIANOS', retentionLabel: 'RETENCIÓN IUE 5%', typeTitle: 'RECIBO DE COMPRAS',
   };
-  if (isInternational) {
+  if (isInternational && !inBs) {
     header.currency = 'USD';
     header.currencyWords = 'DÓLARES AMERICANOS';
   }
@@ -257,7 +258,7 @@ const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, t
   const motivo = escapeDeep(rawMotivo);
   const supervisor = escapeDeep(rawSupervisor);
   const isInternational = !!expense.es_gasto_internacional;
-  const {day, month, year, currency, currencyWords, retentionLabel, typeTitle} = buildReceiptHeader(expense.tipo, isInternational);
+  const {day, month, year, currency, currencyWords, retentionLabel, typeTitle} = buildReceiptHeader(expense.tipo, isInternational, isAmountInBs(expense));
   const subItems = expense.Gasto_Subitem || [];
   const exchangeSegments = expense.Gasto_Tramo_Moneda || [];
   const hasSubItems = subItems.length > 0;
@@ -307,6 +308,13 @@ const generateIndividualReceiptHtml = (rawExpense, rawEmployee, receiptNumber, t
         <div class="totales-fila"><span>RETENCIÓN IT 3%</span><span>${totalIt.toFixed(2)}</span></div>`;
   }
   let segmentsHtml = '';
+  if (isAmountInBs(expense)) {
+    segmentsHtml = `
+    <div class="tramos-box">
+      <p class="tramos-titulo">CAMBIO DE MONEDA</p>
+      <p class="tramos-linea">${originalAmountLinesOf(expense)[0]}</p>
+    </div>`;
+  }
   if (hasSegments) {
     segmentsHtml = `
     <div class="tramos-box">
@@ -447,7 +455,7 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   if (!employee?.email_corporativo) {
     return {error: 'El empleado no tiene un correo corporativo registrado', status: 400};
   }
-  const {data: expenses, error: expensesError} = await supabase
+  const {data: tripExpenses, error: expensesError} = await supabase
     .from('Gasto')
     .select('*, Categoria_Gasto(nombre), Gasto_Subitem(id_subitem, descripcion, monto), Gasto_Tramo_Moneda(moneda, monto_origen, tipo_cambio, monto_usd), Recibo(numero, periodo)')
     .eq('id_viaje', tripId)
@@ -457,7 +465,9 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   if (expensesError) {
     return {error: expensesError.message, status: 500};
   }
-  if (!expenses || expenses.length === 0) {
+  // El recibo agrupado internacional va en USD: los gastos rendidos solo en Bs tienen su recibo individual
+  const expenses = (tripExpenses || []).filter((expense) => !isAmountInBs(expense));
+  if (expenses.length === 0) {
     let internationalLabel = '';
     if (isInternational) {
       internationalLabel = 'internacionales ';

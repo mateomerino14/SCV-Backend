@@ -1,4 +1,4 @@
-const {spentAgainstFunds, hasUsdFund, amountInBsOf} = require('../../utils/expenseCurrency');
+const {spentAgainstFunds, hasUsdFund, amountInBsOf, isRenderedInUsd, fundExchangeRateOf} = require('../../utils/expenseCurrency');
 const {roundCents} = require('../../utils/retentions');
 
 // Determina si un gasto corresponde a la categoria de hoteles
@@ -33,8 +33,9 @@ const calculateExpenseSummary = (expenses, trip) => {
 
   const dailyRate = parseFloat(trip.Usuario?.Cargo?.monto_diario || 0);
   const dailyRateUsd = parseFloat(trip.Usuario?.Cargo?.monto_diario_usd || 0);
-  // Viaje internacional con fondo solo en Bs: todo se controla en Bs, y los dias intermedios con la tarifa en USD pasada a Bs
+  // Viaje internacional con fondo solo en Bs: todo se controla en Bs, y los dias intermedios con la tarifa en USD por el tipo de cambio del fondo
   const onlyBsFund = trip.tipo === 'Internacional' && !hasUsdFund(trip);
+  const fundExchangeRate = fundExchangeRateOf(trip);
   const dailyTotals = {};
   nonHotelExpenses.forEach((expense) => {
     const day = expense.fecha_gasto;
@@ -42,42 +43,27 @@ const calculateExpenseSummary = (expenses, trip) => {
       return;
     }
     if (!dailyTotals[day]) {
-      dailyTotals[day] = {fecha: day, montoBs: 0, montoUsd: 0, usdConvertidos: 0, bsConvertidos: 0};
+      dailyTotals[day] = {fecha: day, montoBs: 0, montoUsd: 0};
     }
     const amount = parseFloat(expense.monto_total || 0);
-    const amountBs = amountInBsOf(expense);
     if (!expense.es_gasto_internacional) {
       dailyTotals[day].montoBs += amount;
     }
-    else if (onlyBsFund && amountBs !== null) {
-      dailyTotals[day].montoBs += amountBs;
-      dailyTotals[day].usdConvertidos += amount;
-      dailyTotals[day].bsConvertidos += amountBs;
-    }
-    else {
+    else if (isRenderedInUsd(trip, expense)) {
       dailyTotals[day].montoUsd += amount;
     }
+    else {
+      dailyTotals[day].montoBs += amountInBsOf(expense);
+    }
   });
-  const totals = Object.values(dailyTotals);
-  const tripUsd = totals.reduce((sum, day) => sum + day.usdConvertidos, 0);
-  const tripBs = totals.reduce((sum, day) => sum + day.bsConvertidos, 0);
-  const dailyBreakdown = totals
-    .map(({usdConvertidos, bsConvertidos, ...day}) => {
+  const dailyBreakdown = Object.values(dailyTotals)
+    .map((day) => {
       let limitBs = dailyRate;
       let exchangeRate = null;
       const isMiddleDay = day.fecha > trip.fecha_inicio && day.fecha < trip.fecha_fin;
       if (onlyBsFund && isMiddleDay) {
-        // Tipo de cambio de los gastos del dia; si ese dia no hay gastos en el exterior, el promedio del viaje
-        if (usdConvertidos > 0) {
-          exchangeRate = bsConvertidos / usdConvertidos;
-        }
-        else if (tripUsd > 0) {
-          exchangeRate = tripBs / tripUsd;
-        }
-        if (exchangeRate) {
-          limitBs = roundCents(dailyRateUsd * exchangeRate);
-          exchangeRate = Math.round(exchangeRate * 10000) / 10000;
-        }
+        exchangeRate = fundExchangeRate;
+        limitBs = roundCents(dailyRateUsd * exchangeRate);
       }
       return {
         ...day,

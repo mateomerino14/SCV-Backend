@@ -129,6 +129,8 @@ create table if not exists "Viaje" (
   -- quien gestiona el hospedaje: la empresa lo reserva o el propio empleado
   gestion_hospedaje varchar(10) not null default 'Propio' check (gestion_hospedaje in ('Empresa', 'Propio')),
   monto_asignado_usd numeric(10, 2) default 0,
+  -- bolivianos por 1 USD con que Tesorería convirtió el fondo de un viaje internacional entregado solo en Bs; sin dato se usa 6.96
+  tipo_cambio_fondo numeric(10, 4) check (tipo_cambio_fondo > 0),
   estado varchar(25) not null default 'BORRADOR' constraint viaje_estado_check check (estado in (
     'BORRADOR', 'EN_REVISION_VIAJE', 'APROBADO_VIAJE', 'EN_REVISION_TESORERO', 'EN_CURSO',
     'EN_REVISION', 'EN_REVISION_APROBADOR', 'APROBADO_SUPERVISOR', 'APROBADO_FINAL', 'RECHAZADO'
@@ -187,6 +189,8 @@ create table if not exists "Gasto" (
   tipo_cambio_bs numeric(10, 4), -- bolivianos por 1 USD de un gasto internacional, para la planilla en Bs
   -- moneda en la que se rinde el gasto internacional (USD o BOB), elegida por el empleado; null toma la del fondo del viaje
   moneda_rendicion char(3) check (moneda_rendicion in ('USD', 'BOB')),
+  -- el gasto internacional se rindió solo en Bs: monto_total ya está en Bs y tipo_cambio son los Bs de 1 unidad de la factura
+  monto_en_bs boolean not null default false,
   base_imponible numeric(10, 2) default 0,
   retencion_rc_iva numeric(10, 2) default 0,
   retencion_iue numeric(10, 2) default 0,

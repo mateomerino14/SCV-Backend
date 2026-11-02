@@ -148,7 +148,7 @@ test('controla en Bs el viaje internacional con fondo solo en Bs', () => {
     {monto_total: '120', tipo_cambio_bs: '10', fecha_gasto: '2026-01-02', es_gasto_internacional: true},
     {monto_total: '150', fecha_gasto: '2026-01-03', es_gasto_internacional: false},
   ];
-  const onlyBs = {...tripWithDailyRate(300, 100, 5000, 0), tipo: 'Internacional', fecha_inicio: '2026-01-01', fecha_fin: '2026-01-04'};
+  const onlyBs = {...tripWithDailyRate(300, 100, 5000, 0), tipo: 'Internacional', fecha_inicio: '2026-01-01', fecha_fin: '2026-01-04', tipo_cambio_fondo: '10'};
   const result = expenseSummaryService.calculateExpenseSummary(expenses, onlyBs);
   expect(result.accumulatedExpense).toBe(1550);
   expect(result.dailyBreakdown).toMatchObject([
@@ -156,6 +156,8 @@ test('controla en Bs el viaje internacional con fondo solo en Bs', () => {
     {fecha: '2026-01-02', montoBs: 1200, montoUsd: 0, limiteBs: 1000, tipoCambio: 10, excedeBs: true},
     {fecha: '2026-01-03', montoBs: 150, limiteBs: 1000, tipoCambio: 10, excedeBs: false},
   ]);
+  const withoutRate = expenseSummaryService.calculateExpenseSummary(expenses, {...onlyBs, tipo_cambio_fondo: null});
+  expect(withoutRate.dailyBreakdown[1]).toMatchObject({limiteBs: 696, tipoCambio: 6.96});
   const withUsd = expenseSummaryService.calculateExpenseSummary(expenses, {...onlyBs, monto_asignado_usd: 200});
   expect(withUsd.dailyBreakdown[1]).toMatchObject({montoBs: 0, montoUsd: 120, limiteBs: 300, limiteUsd: 100, soloBs: false, excedeUsd: true});
 });
@@ -185,4 +187,14 @@ test('la gasolina no cuenta en el control diario si el viaje tiene fondo de comb
   expect(withFuel.accumulatedExpense).toBe(600);
   const withoutFuel = expenseSummaryService.calculateExpenseSummary(fuelExpenses, {...fuelTrip, monto_combustible: 0});
   expect(withoutFuel.dailyBreakdown[0]).toMatchObject({montoBs: 600, excedeBs: true});
+});
+
+// Un gasto rendido solo en Bs ya esta en bolivianos: va al fondo y al control diario en Bs aunque el viaje tenga fondo en USD
+test('el gasto rendido solo en Bs se descuenta y se controla en Bs', () => {
+  const expenses = [{monto_total: '314.50', monto_en_bs: true, moneda_rendicion: 'BOB', tipo_cambio_bs: '1', fecha_gasto: '2026-01-02', es_gasto_internacional: true}];
+  const trip = {...tripWithDailyRate(300, 100, 1000, 200), tipo: 'Internacional', fecha_inicio: '2026-01-01', fecha_fin: '2026-01-04'};
+  const result = expenseSummaryService.calculateExpenseSummary(expenses, trip);
+  expect(result.accumulatedExpense).toBe(314.5);
+  expect(result.accumulatedExpenseUsd).toBe(0);
+  expect(result.dailyBreakdown[0]).toMatchObject({montoBs: 314.5, montoUsd: 0, excedeBs: true});
 });

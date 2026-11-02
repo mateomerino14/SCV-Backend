@@ -2,8 +2,22 @@ const {roundCents} = require('./retentions');
 
 const usdCurrency = 'USD';
 
-// Bolivianos por 1 USD guardados en el gasto internacional, o 0 si es antiguo y no los tiene
-const bsRateOf = (expense) => parseFloat(expense.tipo_cambio_bs) || 0;
+const bsCurrency = 'BOB';
+const defaultFundExchangeRate = 6.96;
+
+// Indica si el gasto internacional se rindio solo en Bs: su monto_total ya esta en bolivianos
+const isAmountInBs = (expense) => !!expense.es_gasto_internacional && !!expense.monto_en_bs;
+
+// Bolivianos por 1 USD guardados en el gasto internacional (1 si ya esta en Bs), o 0 si es antiguo y no los tiene
+const bsRateOf = (expense) => {
+  if (isAmountInBs(expense)) {
+    return 1;
+  }
+  return parseFloat(expense.tipo_cambio_bs) || 0;
+};
+
+// Bolivianos por 1 USD con que se convirtio el fondo del viaje; sin dato, el tipo de cambio oficial
+const fundExchangeRateOf = (trip) => parseFloat(trip?.tipo_cambio_fondo) || defaultFundExchangeRate;
 
 // Importe del gasto en Bs: los nacionales tal cual y los internacionales con su tipo de cambio; null si no se puede convertir
 const amountInBsOf = (expense) => {
@@ -24,6 +38,9 @@ const originalAmountLinesOf = (expense) => {
     return [];
   }
   const usd = (parseFloat(expense.monto_total) || 0).toFixed(2);
+  if (isAmountInBs(expense)) {
+    return [`${parseFloat(expense.monto_moneda_origen).toFixed(2)} ${expense.moneda} = ${usd} Bs (T/C ${parseFloat(expense.tipo_cambio).toFixed(4)} Bs por ${expense.moneda})`, 'Rendido en Bs'];
+  }
   const rate = bsRateOf(expense);
   const segments = expense.Gasto_Tramo_Moneda || [];
   const lines = [];
@@ -50,17 +67,28 @@ const hasUsdFund = (trip) => (parseFloat(trip?.monto_asignado_usd) || 0) > 0;
 
 // Moneda en la que se rinde un gasto internacional: la que eligio el empleado o, si no eligio, la del fondo del viaje
 const renditionCurrencyOf = (trip, expense) => {
-  if (expense.moneda_rendicion === usdCurrency || expense.moneda_rendicion === 'BOB') {
+  if (isAmountInBs(expense)) {
+    return bsCurrency;
+  }
+  if (expense.moneda_rendicion === usdCurrency || expense.moneda_rendicion === bsCurrency) {
     return expense.moneda_rendicion;
   }
   if (hasUsdFund(trip)) {
     return usdCurrency;
   }
-  return 'BOB';
+  return bsCurrency;
 };
 
-// Indica si el gasto internacional se rinde en USD (tambien si no tiene tipo de cambio a Bs)
-const isRenderedInUsd = (trip, expense) => !!expense.es_gasto_internacional && (renditionCurrencyOf(trip, expense) === usdCurrency || amountInBsOf(expense) === null);
+// Indica si el gasto internacional se descuenta del fondo en USD: rendido en USD en un viaje con fondo en USD, o sin tipo de cambio a Bs
+const isRenderedInUsd = (trip, expense) => {
+  if (!expense.es_gasto_internacional || isAmountInBs(expense)) {
+    return false;
+  }
+  if (amountInBsOf(expense) === null) {
+    return true;
+  }
+  return hasUsdFund(trip) && renditionCurrencyOf(trip, expense) === usdCurrency;
+};
 
 // Gasto descontado de cada fondo: los internacionales salen del fondo en USD si el viaje lo tiene; si no, del fondo en Bs con su tipo de cambio
 const spentAgainstFunds = (trip, expenses) => {
@@ -73,7 +101,9 @@ const spentAgainstFunds = (trip, expenses) => {
       spentBs += amount;
       return;
     }
-    internationalUsd += amount;
+    if (!isAmountInBs(expense)) {
+      internationalUsd += amount;
+    }
     if (isRenderedInUsd(trip, expense)) {
       spentUsd += amount;
     }
@@ -103,4 +133,4 @@ const summarizeStatement = (trip, expenses) => {
   };
 };
 
-module.exports = {amountInBsOf, originalAmountLinesOf, hasUsdFund, isRenderedInUsd, spentAgainstFunds, summarizeStatement};
+module.exports = {amountInBsOf, originalAmountLinesOf, hasUsdFund, isRenderedInUsd, spentAgainstFunds, summarizeStatement, isAmountInBs, renditionCurrencyOf, fundExchangeRateOf};
