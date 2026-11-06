@@ -21,10 +21,10 @@ database/
 
 ## Orden de ejecución
 
-1. `01_esquema.sql` - crea las 30 tablas, relaciones e índices.
+1. `01_esquema.sql` - crea las 30 tablas, relaciones e índices. Cada llave foránea tiene su índice, para que los cruces y los borrados no recorran la tabla entera.
 2. `02_funciones.sql` - crea la función `incrementar_correlativo_recibo(periodo)`, usada por el backend para numerar recibos (el correlativo vuelve a 1 cada mes); el trigger `viaje_numero_anual`, que al crear un viaje le da el siguiente número de su año para el código `VIA-numero/año` (`Viaje.numero_viaje` y `anio_viaje`), y el trigger `viaje_numero_rendicion`, que al quedar un viaje en `APROBADO_FINAL` le asigna el siguiente número de rendición del mes de su último comprobante (`Viaje.numero_rendicion` y `periodo_rendicion`). Para empezar desde un número, por ejemplo si contabilidad ya va por la 40: `insert into "Correlativo_Rendicion" (periodo, numero) values ('2026-10', 40) on conflict (periodo) do update set numero = 40;`
 3. `03_datos_iniciales.sql` - roles, cargos, impuesto de IVA, las 43 secciones de la empresa con su código de Oracle, los 38 vehículos livianos de la flota, categorías de gasto y la configuración de recordatorios por defecto. De los vehículos, quedan activos los 14 que pueden viajar; los demás (asignados a planta, a la mina, sin viajar o por confirmar) quedan inactivos y el administrador los activa cuando corresponda. La descripción de cada uno dice a quién está asignado o dónde está. No se cargan los vendidos ni el equipo pesado.
-4. `04_seguridad_rls.sql` - activa la seguridad por fila (RLS) en todas las tablas.
+4. `04_seguridad_rls.sql` - activa la seguridad por fila (RLS) en todas las tablas, sin políticas: con la llave pública nadie lee ni escribe, y el backend entra con la llave de servicio. Por eso Supabase muestra el aviso informativo «RLS Enabled No Policy» en cada tabla, y es lo esperado. También quita el permiso de ejecutar por la API la función `rls_auto_enable()` que crea Supabase, porque solo la usa su trigger de eventos.
 5. `05_demo_usuarios_ficticios.sql` - opcional: la demo con personas ficticias (ver más abajo).
 
 Los archivos `01` a `04` reflejan siempre el estado final y completo del esquema: alcanza con correrlos en orden para levantar una base nueva, sin aplicar ningún cambio adicional después.
