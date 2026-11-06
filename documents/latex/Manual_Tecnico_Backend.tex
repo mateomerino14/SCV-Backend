@@ -316,9 +316,9 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \endhead
 \rowcolor{maxamFondo} \code{01_esquema.sql} & Las 30 tablas, relaciones, restricciones e índices \\
 \code{02_funciones.sql} & Función \code{incrementar_correlativo_recibo(periodo)} (recibos por mes) y triggers \code{viaje_numero_anual} (código VIA por año) y \code{viaje_numero_rendicion} (rendición por mes) \\
-\rowcolor{maxamFondo} \code{03_datos_iniciales.sql} & Roles, cargos, impuesto IVA, categorías de gasto y configuración de recordatorios \\
+\rowcolor{maxamFondo} \code{03_datos_iniciales.sql} & Roles, cargos, impuesto IVA, las 43 secciones con su código de Oracle, los 38 vehículos livianos (activos solo los 14 que pueden viajar), categorías de gasto y configuración de recordatorios \\
 \code{04_seguridad_rls.sql} & Activa seguridad por fila (RLS) en todas las tablas \\
-\rowcolor{maxamFondo} \code{05_demo_usuarios_ficticios.sql} & Demo con personas ficticias y tres vehículos; solo empleado, aprobador y tesorera usan correos reales de prueba \\
+\rowcolor{maxamFondo} \code{05_demo_usuarios_ficticios.sql} & Demo con personas ficticias en las secciones reales; solo empleado, aprobador y tesorera usan correos reales de prueba \\
 \code{reconstruir_base_completa.sql} & Todo junto (borrar y \code{01} a \code{05}) para pegar en Supabase; se genera con \code{npm run db:reconstruccion} y una prueba verifica que esté al día \\
 \rowcolor{maxamFondo} \code{mantenimiento/borrar_todo.sql} & Elimina las 30 tablas, las funciones y los triggers (solo pruebas) \\
 \code{mantenimiento/limpiar_datos.sql} & Borra datos operativos, conserva catálogos y vehículos \\
