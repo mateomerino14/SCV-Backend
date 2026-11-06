@@ -7,7 +7,7 @@ on:
 jobs:
   unitarias:
     name: Pruebas unitarias
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       SUPABASE_URL: http://localhost:3998
       SUPABASE_KEY: clave-de-prueba
@@ -24,7 +24,7 @@ jobs:
 
   api:
     name: Pruebas de la API
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
