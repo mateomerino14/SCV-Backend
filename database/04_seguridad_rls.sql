@@ -55,3 +55,11 @@ where schemaname = 'public'
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Imagen_Respaldo', 'Impuesto', 'Proveedor',
     'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Firma', 'Documento_Emitido', 'Configuracion_Recordatorio'
   );
+-- Supabase crea rls_auto_enable() para activar RLS en las tablas nuevas; corre sola como trigger de eventos,
+-- asi que nadie de afuera necesita llamarla por la API
+do $block$
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+  end if;
+end $block$;

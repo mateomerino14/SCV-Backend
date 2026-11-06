@@ -78,3 +78,20 @@ test('el memorándum autoriza el viaje con sus datos', () => {
   expect(html).not.toContain('Señor Gerente');
   expect(html).toContain('data:image/jpeg;base64,');
 });
+
+// Activar o suspender un vehiculo queda en la auditoria con quien lo hizo y la placa
+test('registra en la auditoría quién suspende y activa un vehículo', async () => {
+  const created = await admin.post('/vehicle', {placa: `A${Date.now() % 1000000}-AU`});
+  const vehicle = created.body;
+  expect((await admin.patch(`/vehicle/${vehicle.id_vehiculo}/suspend`)).status).toBe(200);
+  expect((await admin.patch(`/vehicle/${vehicle.id_vehiculo}/activate`)).status).toBe(200);
+  const audits = (await admin.get('/audit')).body.filter((audit) => audit.detalle === `Vehículo ${vehicle.placa}`);
+  expect(audits.map((audit) => audit.tipo).sort()).toEqual(['ACTIVAR_VEHICULO', 'SUSPENDER_VEHICULO']);
+  expect(audits.every((audit) => audit.Usuario.email_corporativo === 'admin.prueba@maxam.com')).toBe(true);
+});
+
+// Los registros de auditoria solo los escribe el sistema: no se pueden crear ni borrar por la API
+test('no deja crear ni borrar registros de auditoría por la API', async () => {
+  expect((await admin.post('/audit', {tipo: 'INGRESO', id_usuario: 1, fecha: new Date().toISOString()})).status).toBe(404);
+  expect((await admin.del('/audit/1')).status).toBe(404);
+});

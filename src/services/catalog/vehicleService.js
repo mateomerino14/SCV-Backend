@@ -1,4 +1,5 @@
 const supabase = require('../../config/supabase');
+const auditLogService = require('../shared/auditLogService');
 
 // Estados en los que el viaje ocupa su vehiculo; al terminar el viaje (EN_REVISION) el vehiculo queda libre
 const busyTripStates = ['EN_REVISION_VIAJE', 'APROBADO_VIAJE', 'EN_REVISION_TESORERO', 'EN_CURSO'];
@@ -95,8 +96,8 @@ const saveVehicle = async (data, vehicleId = null) => {
   return {vehicle: saved};
 };
 
-// Activa o suspende un vehiculo; uno ocupado en un viaje no se puede suspender
-const setVehicleActive = async (vehicleId, active) => {
+// Activa o suspende un vehiculo y deja en la auditoria quien lo hizo; uno ocupado en un viaje no se puede suspender
+const setVehicleActive = async (vehicleId, active, userId) => {
   if (!active) {
     const busyTrips = (await getBusyTrips()).filter((trip) => String(trip.id_vehiculo) === String(vehicleId));
     if (busyTrips.length > 0) {
@@ -107,6 +108,11 @@ const setVehicleActive = async (vehicleId, active) => {
   if (error) {
     return {error: error.message, status: 500};
   }
+  let auditType = 'SUSPENDER_VEHICULO';
+  if (active) {
+    auditType = 'ACTIVAR_VEHICULO';
+  }
+  await auditLogService.logAudit(userId, auditType, `Vehículo ${data.placa}`);
   return {vehicle: data};
 };
 
