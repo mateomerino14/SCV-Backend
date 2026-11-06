@@ -1,6 +1,6 @@
 const supabase = require('../../config/supabase');
 
-const auditColumns = 'id_auditoria, fecha, tipo, Usuario(id_usuario, nombre, apellido_paterno, email_corporativo)';
+const auditColumns = 'id_auditoria, fecha, tipo, detalle, Usuario(id_usuario, nombre, apellido_paterno, email_corporativo)';
 const maxRowsPerRequest = 1000;
 const boliviaOffset = '-04:00';
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -50,26 +50,4 @@ const getAllAudits = async (req, res) => {
   return res.json(rows);
 };
 
-// Crea un nuevo registro de auditoria
-const createAudit = async (req, res) => {
-  const {data, error} = await supabase.from('Auditoria').insert(req.body).select();
-  if (error) {
-    return res.status(500).json({error: error.message});
-  }
-  else {
-    return res.json(data);
-  }
-};
-
-// Elimina un registro de auditoria
-const deleteAudit = async (req, res) => {
-  const {data, error} = await supabase.from('Auditoria').delete().eq('id_auditoria', req.params.id).select();
-  if (error) {
-    return res.status(500).json({error: error.message});
-  }
-  else {
-    return res.json(data);
-  }
-};
-
-module.exports = {getAllAudits, createAudit, deleteAudit};
+module.exports = {getAllAudits};

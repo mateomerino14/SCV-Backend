@@ -314,10 +314,10 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \endfirsthead
 \cabecera \tth{Archivo} & \tth{Contenido} \\
 \endhead
-\rowcolor{maxamFondo} \code{01_esquema.sql} & Las 30 tablas, relaciones, restricciones e índices \\
+\rowcolor{maxamFondo} \code{01_esquema.sql} & Las 30 tablas, relaciones, restricciones e índices (cada llave foránea con el suyo) \\
 \code{02_funciones.sql} & Función \code{incrementar_correlativo_recibo(periodo)} (recibos por mes) y triggers \code{viaje_numero_anual} (código VIA por año) y \code{viaje_numero_rendicion} (rendición por mes) \\
 \rowcolor{maxamFondo} \code{03_datos_iniciales.sql} & Roles, cargos, impuesto IVA, las 43 secciones con su código de Oracle, los 38 vehículos livianos (activos solo los 14 que pueden viajar), categorías de gasto y configuración de recordatorios \\
-\code{04_seguridad_rls.sql} & Activa seguridad por fila (RLS) en todas las tablas \\
+\code{04_seguridad_rls.sql} & Activa seguridad por fila (RLS) en todas las tablas, sin políticas, y quita el permiso de ejecutar \code{rls\_auto\_enable()} por la API \\
 \rowcolor{maxamFondo} \code{05_demo_usuarios_ficticios.sql} & Demo con personas ficticias en las secciones reales; solo empleado, aprobador y tesorera usan correos reales de prueba \\
 \code{reconstruir_base_completa.sql} & Todo junto (borrar y \code{01} a \code{05}) para pegar en Supabase; se genera con \code{npm run db:reconstruccion} y una prueba verifica que esté al día \\
 \rowcolor{maxamFondo} \code{mantenimiento/borrar_todo.sql} & Elimina las 30 tablas, las funciones y los triggers (solo pruebas) \\
@@ -355,7 +355,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \code{Detalle_Factura} & Productos de cada factura; la cantidad admite hasta 3 decimales y el precio unitario hasta 4 \\
 \rowcolor{maxamFondo} \code{Impuesto} y \code{Factura_Impuestos} & Catálogo de impuestos y su relación con facturas \\
 \code{Comentario} & Observaciones de revisión y justificaciones de exceso \\
-\rowcolor{maxamFondo} \code{Auditoria} & Ingresos, salidas y cambios de contraseña \\
+\rowcolor{maxamFondo} \code{Auditoria} & Ingresos, salidas, cambios de contraseña y quién activó o suspendió cada vehículo \\
 \code{Correlativo_Recibo} y \code{Recibo} & Numeración de recibos por mes (el correlativo vuelve a 1 cada mes y el número se muestra con su mes, por ejemplo \code{000012/10-2026}): cada gasto sin factura recibe su número al registrarlo (\code{receiptNumberService}, \code{enviado} falso hasta mandarlo) y es el N° DOCUMENTO de la planilla cuando no hay recibo original (si lo hay, va el original), marcado en lila; si el gasto tiene número de recibo en papel, el recibo del sistema muestra los dos (``Recibo Nº … · Recibo original Nº …'') y el ``Son'' va en letras con el importe a cancelar \\
 \rowcolor{maxamFondo} \code{Correlativo_Rendicion} & Último número de rendición de cada mes; el trigger \code{viaje_numero_rendicion} asigna el siguiente al viaje (\code{numero_rendicion}, \code{periodo_rendicion}) cuando queda aprobado del todo, según el mes de su último comprobante \\
 \rowcolor{maxamFondo} \code{Revision_Viaje} & Historial de aprobaciones y rechazos por persona y etapa \\
@@ -574,7 +574,7 @@ Todas las rutas, salvo las de \code{/auth} y \code{/user/check-email}, requieren
 \epf{PUT DELETE}{/user/:id}{Administrador}{Edita o elimina un usuario}
 \end{xltabular}}
 
-La importación desde Excel (\code{userImportService}) admite hasta 500 filas y aplica las reglas del formulario. Marca los correos y CI que ya existen en el sistema o que se repiten en el archivo (todas las filas repetidas), los cargos y secciones que no existen, el rol inválido, los roles y cargos de una sola persona ocupados o repetidos, y el jefe directo que no está en el sistema ni en el archivo; si la fila del jefe tiene errores, la del subordinado tampoco se crea, y se detectan jefes en ciclo. Crea por niveles, primero los jefes, y cada usuario recibe en segundo plano su contraseña temporal por correo.
+La importación desde Excel (\code{userImportService}) admite hasta 500 filas y aplica las reglas del formulario. La sección se reconoce por su código de Oracle (\code{230}), por código y nombre (\code{230 - NATIONAL SALES}, como la ofrece la plantilla) o por su nombre. Marca los correos y CI que ya existen en el sistema o que se repiten en el archivo (todas las filas repetidas), los cargos y secciones que no existen, el rol inválido, los roles y cargos de una sola persona ocupados o repetidos, y el jefe directo que no está en el sistema ni en el archivo; si la fila del jefe tiene errores, la del subordinado tampoco se crea, y se detectan jefes en ciclo. Crea por niveles, primero los jefes, y cada usuario recibe en segundo plano su contraseña temporal por correo.
 
 \subsection{Viajes, gastos y facturas}
 {\small\begin{xltabular}{\textwidth}{L{1.45cm} L{5.4cm} L{2.4cm} Y}
@@ -641,7 +641,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \epf{PATCH}{/position/:id/suspend}{Administrador}{Suspende o activa (también secciones)}
 \ep{GET}{/expense-category}{Sesión}{Categorías de gasto, ordenadas por número de cuenta}
 \epf{GET}{/role, /tax, /supplier}{Administrador}{Roles, impuestos y proveedores}
-\ep{GET}{/audit}{Administrador}{Historial de accesos con filtros; las fechas son días de Bolivia}
+\ep{GET}{/audit}{Administrador}{Historial de accesos y de cambios de vehículos con filtros; las fechas son días de Bolivia. No hay endpoints para crear ni borrar registros}
 \epf{GET}{/admin/dashboard}{Administrador}{Indicadores por fase; periodo opcional con fecha\_inicio y fecha\_fin}
 \ep{GET PUT}{/admin/reminders}{Administrador}{Lee o guarda los días y horas del resumen}
 \epf{GET}{/admin/reminders/preview}{Administrador}{A quién le llegaría el resumen, sin enviar}
@@ -649,7 +649,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \ep{GET}{/document/verify/:code}{Público}{Verifica un documento emitido por su código}
 \epf{GET}{/vehicle/available?viaje=}{Sesión}{Vehículos activos y libres; el del viaje que se edita cuenta como libre}
 \ep{GET POST PUT}{/vehicle}{Administrador}{Lista la flota con el viaje que ocupa cada vehículo, registra y edita}
-\epf{PATCH}{/vehicle/:id/suspend, /activate}{Administrador}{Suspende (no si está en un viaje) o activa}
+\epf{PATCH}{/vehicle/:id/suspend, /activate}{Administrador}{Suspende (no si está en un viaje) o activa, y lo deja en la auditoría con la placa}
 \end{xltabular}}
 
 \section{Servicios transversales}

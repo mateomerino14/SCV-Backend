@@ -321,12 +321,12 @@ tests/                        Pruebas: services/ (unitarias), api/ (de la API), 
 | `/supplier` | `expense/supplier.js` | Proveedores (solo administrador) |
 | `/review` | `approval/review.js` | Revisión previa y de gastos del supervisor |
 | `/approver` | `approval/approver.js` | Aprobación del viaje y revisión adicional de gastos no deducibles |
-| `/vehicle` | `catalog/vehicle.js` | Flota de la empresa: `GET /vehicle/available` (con `?viaje=` para editar) lista los activos y libres; el administrador registra, edita, suspende y activa (un vehículo no se elimina: se suspende para conservar el historial de los viajes) |
+| `/vehicle` | `catalog/vehicle.js` | Flota de la empresa: `GET /vehicle/available` (con `?viaje=` para editar) lista los activos y libres; el administrador registra, edita, suspende y activa (un vehículo no se elimina: se suspende para conservar el historial de los viajes); cada activación o suspensión queda en la auditoría con quién la hizo |
 | `/treasurer` | `approval/treasurer.js` | Asignación de fondos |
 | `/reviewer` | `approval/reviewer.js` | Revisión final |
 | `/deadline-authorization` | `approval/deadlineAuthorization.js` | Extensiones de plazo |
 | `/substitution` | `approval/substitution.js` | Rendición por terceros |
-| `/role`, `/position`, `/section`, `/expense-category`, `/tax`, `/audit` | `catalog/` | Catálogos e historial de accesos (el filtro de fechas usa días de Bolivia) |
+| `/role`, `/position`, `/section`, `/expense-category`, `/tax`, `/audit` | `catalog/` | Catálogos e historial de accesos (el filtro de fechas usa días de Bolivia). La auditoría solo se consulta: la escribe el sistema al ingresar, salir, cambiar la contraseña y activar o suspender un vehículo (con la placa en `detalle`) |
 | `/admin` | `admin/admin.js` | Resumen general del administrador (con periodo opcional `fecha_inicio` y `fecha_fin`; los montos por sección cuentan solo viajes con fondos entregados) y configuración de recordatorios |
 
 Las imágenes de comprobantes y los productos de cada factura no tienen rutas propias: se gestionan solo a través de `/expense` y `/invoice`, que verifican dueño, etapa y plazo.
@@ -406,7 +406,7 @@ El administrador puede cargar hasta 500 personas a la vez (`userImportService`).
 - `POST /user/import/preview` revisa cada fila y devuelve sus errores **sin guardar nada**.
 - `POST /user/import` vuelve a validar, crea solo las filas correctas y devuelve cuántas creó y qué filas omitió y por qué.
 
-Controles de cada fila: nombre, apellido paterno, correo y cargo obligatorios; letras en nombres (hasta 30), correo válido, teléfono de 7 u 8 números, dependencia de Oracle de 3 dígitos; cargo y sección activos buscados por nombre (sin importar mayúsculas ni tildes) y rol válido (vacío = EMPLEADO); **correo o CI que ya existen en el sistema o que se repiten en el archivo** (se marcan todas las filas repetidas, para que el administrador decida cuál es la correcta); roles y cargos de una sola persona (aprobador, revisor y los cargos únicos) ocupados o repetidos; jefe directo por correo, que puede estar en el sistema o en otra fila del archivo (si la fila del jefe tiene errores, la del subordinado tampoco se crea, y se detectan jefes en ciclo). Los usuarios se crean por niveles, primero los jefes y después sus subordinados; cada uno recibe en segundo plano el correo de bienvenida con su contraseña temporal (`userService.sendWelcomeEmail`, el mismo del formulario) y debe cambiarla al primer ingreso.
+Controles de cada fila: nombre, apellido paterno, correo y cargo obligatorios; letras en nombres (hasta 30), correo válido, teléfono de 7 u 8 números, dependencia de Oracle de 3 dígitos; cargo activo buscado por nombre (sin importar mayúsculas ni tildes); sección activa buscada por su código de Oracle («230»), por código y nombre («230 - NATIONAL SALES», como la ofrece la plantilla) o por su nombre y rol válido (vacío = EMPLEADO); **correo o CI que ya existen en el sistema o que se repiten en el archivo** (se marcan todas las filas repetidas, para que el administrador decida cuál es la correcta); roles y cargos de una sola persona (aprobador, revisor y los cargos únicos) ocupados o repetidos; jefe directo por correo, que puede estar en el sistema o en otra fila del archivo (si la fila del jefe tiene errores, la del subordinado tampoco se crea, y se detectan jefes en ciclo). Los usuarios se crean por niveles, primero los jefes y después sus subordinados; cada uno recibe en segundo plano el correo de bienvenida con su contraseña temporal (`userService.sendWelcomeEmail`, el mismo del formulario) y debe cambiarla al primer ingreso.
 
 ## Servicios transversales
 

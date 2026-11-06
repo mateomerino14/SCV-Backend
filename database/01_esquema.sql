@@ -90,8 +90,9 @@ create table if not exists "Codigo_Verificacion" (
 create table if not exists "Auditoria" (
   id_auditoria serial primary key,
   fecha timestamptz not null,
-  tipo varchar(15) not null check (tipo in ('INGRESO', 'SALIDA', 'CAMBIO_CLAVE')),
-  id_usuario integer not null references "Usuario"(id_usuario)
+  tipo varchar(20) not null check (tipo in ('INGRESO', 'SALIDA', 'CAMBIO_CLAVE', 'ACTIVAR_VEHICULO', 'SUSPENDER_VEHICULO')),
+  id_usuario integer not null references "Usuario"(id_usuario),
+  detalle varchar(150) -- Sobre que se hizo el evento, por ejemplo la placa del vehiculo activado o suspendido
 );
 
 -- ------------------------------------------------------------
@@ -446,3 +447,27 @@ create table if not exists "Configuracion_Recordatorio" (
   fecha_actualizacion timestamptz not null default now(),
   id_usuario_actualizacion integer references "Usuario"(id_usuario) on delete set null
 );
+
+-- ------------------------------------------------------------
+-- Indices de las llaves foraneas que no tenian uno propio
+-- ------------------------------------------------------------
+-- Aceleran los cruces y evitan recorrer la tabla entera al borrar o cambiar la fila referida
+create index if not exists idx_comentario_id_usuario on "Comentario"(id_usuario);
+create index if not exists idx_configuracion_recordatorio_usuario on "Configuracion_Recordatorio"(id_usuario_actualizacion);
+create index if not exists idx_documento_emitido_id_gasto on "Documento_Emitido"(id_gasto);
+create index if not exists idx_documento_emitido_id_viaje on "Documento_Emitido"(id_viaje);
+create index if not exists idx_factura_impuestos_id_impuesto on "Factura_Impuestos"(id_impuesto);
+create index if not exists idx_factura_id_proveedor on "Factura"(id_proveedor);
+create index if not exists idx_firma_id_usuario on "Firma"(id_usuario);
+create index if not exists idx_gasto_id_categoria on "Gasto"(id_categoria);
+create index if not exists idx_gasto_id_proveedor on "Gasto"(id_proveedor);
+create index if not exists idx_imagen_respaldo_id_gasto on "Imagen_Respaldo"(id_gasto);
+create index if not exists idx_solicitud_id_empleado on "Solicitud_Autorizacion_Plazo"(id_empleado);
+create index if not exists idx_solicitud_id_revisor on "Solicitud_Autorizacion_Plazo"(id_revisor);
+create index if not exists idx_reemplazo_id_revisor on "Solicitud_Reemplazo"(id_revisor);
+create index if not exists idx_reemplazo_id_solicitante on "Solicitud_Reemplazo"(id_solicitante);
+create index if not exists idx_usuario_id_cargo on "Usuario"(id_cargo);
+create index if not exists idx_usuario_id_rol on "Usuario"(id_rol);
+create index if not exists idx_viaje_aprobador on "Viaje"(id_aprobador_asignado);
+create index if not exists idx_viaje_revisor on "Viaje"(id_revisor_asignado);
+create index if not exists idx_viaje_tesorero on "Viaje"(id_tesorero_asignado);

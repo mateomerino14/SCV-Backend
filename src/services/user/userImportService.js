@@ -14,6 +14,7 @@ const onlyLetters = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phonePattern = /^[0-9]{7,8}$/;
 const dependencyPattern = /^\d{3}$/;
+const sectionCodePrefix = /^(\d{3})(?:\s*-.*)?$/;
 const importedColumns = 'id_usuario, nombre, apellido_paterno, email_corporativo';
 
 // Texto de una celda sin espacios de mas; vacio si no tiene nada
@@ -108,6 +109,15 @@ const checkDuplicates = (row, context, emailCounts, idCardCounts, errors) => {
   }
 };
 
+// La seccion se reconoce por su codigo de Oracle ("230"), por codigo y nombre ("230 - NATIONAL SALES") o solo por su nombre
+const findSection = (text, context) => {
+  const code = text.match(sectionCodePrefix);
+  if (code) {
+    return context.sectionsByCode.get(code[1]);
+  }
+  return context.sections.get(keyOf(text));
+};
+
 // Busca cargo, seccion y rol por su nombre y deja sus ids en la fila
 const resolveCatalogs = (row, context, errors) => {
   const position = context.positions.get(keyOf(row.cargo));
@@ -119,7 +129,7 @@ const resolveCatalogs = (row, context, errors) => {
   }
   let section = null;
   if (row.seccion) {
-    section = context.sections.get(keyOf(row.seccion));
+    section = findSection(row.seccion, context);
     if (!section) {
       errors.push(`La sección "${row.seccion}" no existe o está suspendida`);
     }
@@ -273,7 +283,7 @@ const loadContext = async () => {
   const [users, positions, sections, roles] = await Promise.all([
     supabase.from('Usuario').select('id_usuario, email_corporativo, carnet_identidad, id_rol, activo, Cargo(nombre)'),
     supabase.from('Cargo').select('id_cargo, nombre').eq('activo', true),
-    supabase.from('Seccion').select('id_seccion, nombre').eq('activo', true),
+    supabase.from('Seccion').select('id_seccion, nombre, codigo_seccion').eq('activo', true),
     supabase.from('Rol').select('id_rol, nombre'),
   ]);
   const failed = [users, positions, sections, roles].find((result) => result.error);
@@ -287,6 +297,7 @@ const loadContext = async () => {
     usersByEmail: new Map(users.data.map((user) => [textOf(user.email_corporativo).toLowerCase(), user])),
     positions: new Map(positions.data.map((position) => [keyOf(position.nombre), position])),
     sections: new Map(sections.data.map((section) => [keyOf(section.nombre), section])),
+    sectionsByCode: new Map(sections.data.filter((section) => section.codigo_seccion).map((section) => [section.codigo_seccion, section])),
     roles: new Map(roles.data.map((role) => [role.nombre.toUpperCase(), role])),
     uniqueRoleIds: new Set(userService.uniqueRoles.map((role) => role.id)),
     takenRoleIds: new Set(activeUsers.map((user) => user.id_rol)),
