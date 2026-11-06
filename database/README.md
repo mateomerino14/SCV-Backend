@@ -8,9 +8,9 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 database/
 ├── 01_esquema.sql                  Las 30 tablas, relaciones, restricciones e índices
 ├── 02_funciones.sql                Correlativos (recibos por mes, viajes por año, rendiciones por mes) y sus triggers
-├── 03_datos_iniciales.sql          Roles, cargos, impuesto IVA, plan de cuentas y recordatorios por defecto
+├── 03_datos_iniciales.sql          Roles, cargos, impuesto IVA, secciones, vehículos, plan de cuentas y recordatorios por defecto
 ├── 04_seguridad_rls.sql            Seguridad por fila (RLS) en todas las tablas
-├── 05_demo_usuarios_ficticios.sql  Demo de MAXAM FANEXA con personas ficticias y tres vehículos
+├── 05_demo_usuarios_ficticios.sql  Demo de MAXAM FANEXA con personas ficticias
 ├── reconstruir_base_completa.sql   Todo junto para pegar de una vez en Supabase (generado, no se edita)
 ├── mantenimiento/
 │   ├── borrar_todo.sql             Elimina tablas, funciones y triggers para crear la base de nuevo
@@ -23,7 +23,7 @@ database/
 
 1. `01_esquema.sql` - crea las 30 tablas, relaciones e índices.
 2. `02_funciones.sql` - crea la función `incrementar_correlativo_recibo(periodo)`, usada por el backend para numerar recibos (el correlativo vuelve a 1 cada mes); el trigger `viaje_numero_anual`, que al crear un viaje le da el siguiente número de su año para el código `VIA-numero/año` (`Viaje.numero_viaje` y `anio_viaje`), y el trigger `viaje_numero_rendicion`, que al quedar un viaje en `APROBADO_FINAL` le asigna el siguiente número de rendición del mes de su último comprobante (`Viaje.numero_rendicion` y `periodo_rendicion`). Para empezar desde un número, por ejemplo si contabilidad ya va por la 40: `insert into "Correlativo_Rendicion" (periodo, numero) values ('2026-10', 40) on conflict (periodo) do update set numero = 40;`
-3. `03_datos_iniciales.sql` - roles, cargos, impuesto de IVA, categorías de gasto y la configuración de recordatorios por defecto.
+3. `03_datos_iniciales.sql` - roles, cargos, impuesto de IVA, las 43 secciones de la empresa con su código de Oracle, los 38 vehículos livianos de la flota, categorías de gasto y la configuración de recordatorios por defecto. De los vehículos, quedan activos los 14 que pueden viajar; los demás (asignados a planta, a la mina, sin viajar o por confirmar) quedan inactivos y el administrador los activa cuando corresponda. La descripción de cada uno dice a quién está asignado o dónde está. No se cargan los vendidos ni el equipo pesado.
 4. `04_seguridad_rls.sql` - activa la seguridad por fila (RLS) en todas las tablas.
 5. `05_demo_usuarios_ficticios.sql` - opcional: la demo con personas ficticias (ver más abajo).
 
@@ -43,7 +43,7 @@ Los archivos `01` a `04` reflejan siempre el estado final y completo del esquema
 
 ## Demo con usuarios ficticios
 
-`05_demo_usuarios_ficticios.sql` carga una empleada, el Gerente General (aprobador y jefe directo de todos), la tesorera, un revisor, una administradora y un compañero para probar el reemplazo, con sus secciones de Oracle, la dependencia 900 y tres vehículos. Solo tres cuentas usan correos reales para recibir los avisos: empleado `mateomerino988@gmail.com`, aprobador `mateomerino14@gmail.com` y tesorera `202301308@est.umss.edu`; las demás usan `@example.com`. Contraseña de todos: `Viaticos2026`.
+`05_demo_usuarios_ficticios.sql` carga una empleada, el Gerente General (aprobador y jefe directo de todos), la tesorera, un revisor, una administradora y un compañero para probar el reemplazo, en las secciones reales que carga `03` y con la dependencia 900. Solo tres cuentas usan correos reales para recibir los avisos: empleado `mateomerino988@gmail.com`, aprobador `mateomerino14@gmail.com` y tesorera `202301308@est.umss.edu`; las demás usan `@example.com`. Contraseña de todos: `Viaticos2026`.
 
 ## Mantenimiento y pruebas
 

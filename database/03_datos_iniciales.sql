@@ -1,7 +1,7 @@
 -- ============================================================
 -- SCV · 03 DATOS INICIALES
 -- ============================================================
--- Roles, cargos, impuesto IVA, plan de cuentas (categorías de gasto) y recordatorios por defecto.
+-- Roles, cargos, impuesto IVA, secciones de Oracle, vehículos livianos, plan de cuentas (categorías de gasto) y recordatorios por defecto.
 -- Se corre después de 02_funciones.sql.
 -- ============================================================
 
@@ -27,6 +27,96 @@ on conflict (nombre) do nothing;
 insert into "Impuesto" (nombre, porcentaje) values
   ('IVA 13%', 13)
 on conflict do nothing;
+
+-- Secciones de la empresa con su codigo de Oracle (segmento de seccion de la cuenta del gasto), segun la lista de contabilidad
+insert into "Seccion" (nombre, codigo_seccion, activo) values
+  ('INTERNAL AUDIT', '105', true),
+  ('LEGAL', '111', true),
+  ('GENERAL SERVICES', '112', true),
+  ('FINANCE & ADMINISTRATION', '120', true),
+  ('HHRR - HUMAN RESOURCES', '130', true),
+  ('SITIC / IT - EMPLOYEES', '131', true),
+  ('QUALITY', '160', true),
+  ('ENVIRONMENT', '161', true),
+  ('SHE&Q&S - SAFETY, HEALTH, ENVIRONMENT & QUALITY & SECURITY', '164', true),
+  ('FACTORY INDIRECT WORKFORCE - WAREHOUSING & INTERNAL LOGISTICS', '200', true),
+  ('PURCHASING & RAW MATERIALS WAREHOUSING', '201', true),
+  ('SECURITY SERVICES (GE)', '202', true),
+  ('OPERATIONS & SUPPLY CHAIN', '210', true),
+  ('ENGINEERING', '211', true),
+  ('EXPORT SALES', '220', true),
+  ('NATIONAL SALES', '230', true),
+  ('TECHNICAL ASSISTANCE & OPERATIONS SERVICES (TAP)', '232', true),
+  ('REGIONAL BUSINESS MANAGEMENT', '240', true),
+  ('DIRECTORIO', '242', true),
+  ('PERSONAL DESPLAZADO', '244', true),
+  ('MANUFACTURING MANAGEMENT', '270', true),
+  ('HYDROGEL & TUBE PRODUCTION', '301', true),
+  ('INDUSTRIAL EXPLOSIVES CARTRIDGING', '303', true),
+  ('CARGA CARTUCHOS', '304', true),
+  ('ANFO PRODUCTION (PRODUCTION OPERATORS)', '305', true),
+  ('WATERGEL / RIOFLEX MATRIX PRODUCTION', '306', true),
+  ('MIX POWDER / AMUNITE', '308', true),
+  ('POLVORA NEGRA', '309', true),
+  ('INITIATORS / MASTER MIX PRODUCTION', '320', true),
+  ('DELAY ELEMENT LOADING', '323', true),
+  ('DETONATOR LOADING', '324', true),
+  ('METAL PARTS PRODUCTION', '326', true),
+  ('NON-ELECTRIC DETONATOR ASSEMBLY', '327', true),
+  ('DETONATING & IGNITER CORD PRODUCTION', '330', true),
+  ('MECHAS', '331', true),
+  ('PETN DRYING', '332', true),
+  ('BOOSTERS PRODUCTION', '333', true),
+  ('MOBILE PRODUCTION', '350', true),
+  ('GENERAL WORKSHOPS (LOGISTICS)', '600', true),
+  ('INTERNAL TRANSPORT & WAREHOUSING', '635', true),
+  ('GENERAL MAINTENANCE / UPI WORKSHOPS', '645', true),
+  ('LABORATORY', '650', true),
+  ('ADMINISTRACION', '837', true)
+on conflict (nombre) do nothing;
+
+-- Flota liviana de la empresa: activos los que pueden viajar; la descripcion dice a quien esta asignado o donde esta
+-- No se cargan los vendidos (1119-RZR, 1173-FEL, 1410-UCG, 984-RTS, 6361-TCC) ni el equipo pesado
+insert into "Vehiculo" (placa, descripcion, activo) values
+  ('2087-SCL', 'Veimar - Minera San Cristóbal', true),
+  ('966-ICE', 'Situación por confirmar', false),
+  ('1189-RSE', 'My. Urzagaste - Gerencia de Recursos Humanos - no viaja', false),
+  ('1210-HHG', 'Situación por confirmar', false),
+  ('1913-BCI', 'Cesar - Comprador - no viaja', false),
+  ('1911-XLT', 'Jagui - Proyectos - no viaja', false),
+  ('779-PSN', 'Situación por confirmar', false),
+  ('686-PIU', 'Camión - Osvaldo - Planta Jatita', false),
+  ('1183-SGT', 'Freddy Alejandro - Jefe de Seguridad - Jatita, circulación local', false),
+  ('946-LPY', 'Camión - Osvaldo - Planta Jatita', false),
+  ('DODGE PERRERA', 'Dodge Perrera - Mantenimiento - no viaja', false),
+  ('2377-TEX', 'Yorman - Mantenimiento - no viaja, necesita cambio de motor', false),
+  ('1809-YLD', 'Juan Gabriel - Jefe Comercial Oruro', true),
+  ('2377-TFB', 'Jhon Vega - Comprador - no viaja hasta cambiar el motor', false),
+  ('2034-PAP', 'Operaciones', true),
+  ('1428-XZK', 'Situación por confirmar', false),
+  ('1543-CKH', 'Camión - William - Almacenes', false),
+  ('2903-RGF', 'Camión - Minera San Cristóbal', false),
+  ('1809-YKA', 'Osvaldo - Planta Jatita', false),
+  ('2925-ZEY', 'Operaciones', true),
+  ('2925-ZCP', 'Ing. Freddy Coila - Gerencia Técnica', true),
+  ('3795-TKN', 'Equipo Minera San Cristóbal', false),
+  ('3795-XKR', 'Equipo Minera San Cristóbal', false),
+  ('4508-ERE', 'Manuel Andia - Comprador - no viaja', false),
+  ('5160-HPL', 'Gerencia de Operaciones', true),
+  ('4727-YKE', 'Jefe Comercial La Paz', true),
+  ('5759-IUD', 'Equipo Minera San Cristóbal', false),
+  ('5768-KPL', 'Equipo Minera San Cristóbal', false),
+  ('5768-IBS', 'Guillermo - Jefe Comercial Potosí', true),
+  ('5768-KSU', 'Equipo Minera San Cristóbal', false),
+  ('5768-KRR', 'Equipo Minera San Cristóbal', false),
+  ('6354-ZGN', 'Ambulancia - Gerencia de Producción - no viaja', false),
+  ('6445-TNE', 'Gerencia Comercial - prestada a German, Jefe Comercial Santa Cruz (proyecto sísmico)', true),
+  ('6453-SUR', 'My. Castro - Gerencia de Producción', true),
+  ('6672-ZGF', 'Andrés Bejarano - Gerencia Comercial', true),
+  ('6672-ZFC', 'Tcnl. Valdivia - Gerencia Administrativa', true),
+  ('6672-ZHI', 'Gerencia General', true),
+  ('6806-BBA', 'Gerencia Comercial - prestada a German, Jefe Comercial Santa Cruz (proyecto sísmico)', true)
+on conflict (placa) do nothing;
 
 -- Plan de cuentas de gastos de la empresa (planilla de Castro); el nombre empieza con la cuenta contable de Oracle
 insert into "Categoria_Gasto" (nombre) values

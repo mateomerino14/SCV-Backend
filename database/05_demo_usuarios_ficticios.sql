@@ -5,7 +5,7 @@
 -- Los nombres son ficticios; solo tres cuentas usan correos reales para recibir los avisos de prueba:
 --   empleado    mateomerino988@gmail.com  (Comercial, EXPORT SALES 220)
 --   aprobador   mateomerino14@gmail.com   (Gerente General, REGIONAL BUSINESS MANAGEMENT 240), jefe directo de todos
---   tesorera    202301308@est.umss.edu    (Asistente de Caja y Tesoreria, FINANCE AND ADMINISTRATION 120)
+--   tesorera    202301308@est.umss.edu    (Asistente de Caja y Tesoreria, FINANCE & ADMINISTRATION 120)
 -- El revisor, el administrador y el compañero del empleado usan correos ficticios (@example.com, no reciben correo)
 -- Flujo del viaje: empleado > aprobador (jefe directo, su aprobacion vale tambien como aprobador) > tesoreria
 -- Flujo de la rendicion: empleado > aprobador (jefe directo) > revisor (aprobacion final)
@@ -23,18 +23,7 @@ on conflict (nombre) do nothing;
 -- Tesoreria es un cargo unico que ya crea 03_datos_iniciales.sql; se reconoce por el nombre exacto del cargo
 update "Cargo" set monto_diario = 300, monto_diario_usd = 100 where nombre = 'Asistente de Caja y Tesoreria';
 
-insert into "Seccion" (nombre, codigo_seccion, activo) values
-  ('EXPORT SALES', '220', true),
-  ('REGIONAL BUSINESS MANAGEMENT', '240', true),
-  ('ADMINISTRACION', '837', true),
-  ('FINANCE AND ADMINISTRATION', '120', true)
-on conflict (nombre) do update set codigo_seccion = excluded.codigo_seccion, activo = true;
-
-insert into "Vehiculo" (placa, descripcion) values
-  ('2345-ABC', 'Camioneta Toyota Hilux'),
-  ('3456-BCD', 'Vagoneta Nissan Patrol'),
-  ('4567-CDE', 'Camioneta Mitsubishi L200')
-on conflict (placa) do nothing;
+-- Las secciones y los vehiculos son los reales que carga 03_datos_iniciales.sql
 
 -- Roles: 1 administrador, 3 empleado, 4 revisor, 5 aprobador; la tesorera es empleada con el cargo de tesoreria
 insert into "Usuario" (email_corporativo, nombre, apellido_paterno, apellido_materno, contrasenia, activo, codigo_dependencia, id_seccion, id_cargo, id_rol) values
@@ -45,13 +34,13 @@ insert into "Usuario" (email_corporativo, nombre, apellido_paterno, apellido_mat
     (select id_seccion from "Seccion" where nombre = 'EXPORT SALES'),
     (select id_cargo from "Cargo" where nombre = 'Comercial'), 3),
   ('202301308@est.umss.edu', 'Lucia', 'Fernandez', 'Rocha', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
-    (select id_seccion from "Seccion" where nombre = 'FINANCE AND ADMINISTRATION'),
+    (select id_seccion from "Seccion" where nombre = 'FINANCE & ADMINISTRATION'),
     (select id_cargo from "Cargo" where nombre = 'Asistente de Caja y Tesoreria'), 3),
   ('revisor@example.com', 'Andres', 'Villarroel', 'Gutierrez', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
     (select id_seccion from "Seccion" where nombre = 'ADMINISTRACION'),
     (select id_cargo from "Cargo" where nombre = 'Jefe de Administracion'), 4),
   ('admin@example.com', 'Paola', 'Arce', 'Terrazas', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
-    (select id_seccion from "Seccion" where nombre = 'FINANCE AND ADMINISTRATION'),
+    (select id_seccion from "Seccion" where nombre = 'FINANCE & ADMINISTRATION'),
     (select id_cargo from "Cargo" where nombre = 'Analista de Finanzas y Administracion'), 1),
   ('companero@example.com', 'Diego', 'Camacho', 'Lopez', '$2b$10$kS81IPI4x9LTIx3yXF85Guj8vnxe7H2KFX.BiDYMZdj77sna0oGee', true, '900',
     (select id_seccion from "Seccion" where nombre = 'EXPORT SALES'),
