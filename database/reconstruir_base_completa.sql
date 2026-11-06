@@ -506,6 +506,30 @@ create table if not exists "Configuracion_Recordatorio" (
   id_usuario_actualizacion integer references "Usuario"(id_usuario) on delete set null
 );
 
+-- ------------------------------------------------------------
+-- Indices de las llaves foraneas que no tenian uno propio
+-- ------------------------------------------------------------
+-- Aceleran los cruces y evitan recorrer la tabla entera al borrar o cambiar la fila referida
+create index if not exists idx_comentario_id_usuario on "Comentario"(id_usuario);
+create index if not exists idx_configuracion_recordatorio_usuario on "Configuracion_Recordatorio"(id_usuario_actualizacion);
+create index if not exists idx_documento_emitido_id_gasto on "Documento_Emitido"(id_gasto);
+create index if not exists idx_documento_emitido_id_viaje on "Documento_Emitido"(id_viaje);
+create index if not exists idx_factura_impuestos_id_impuesto on "Factura_Impuestos"(id_impuesto);
+create index if not exists idx_factura_id_proveedor on "Factura"(id_proveedor);
+create index if not exists idx_firma_id_usuario on "Firma"(id_usuario);
+create index if not exists idx_gasto_id_categoria on "Gasto"(id_categoria);
+create index if not exists idx_gasto_id_proveedor on "Gasto"(id_proveedor);
+create index if not exists idx_imagen_respaldo_id_gasto on "Imagen_Respaldo"(id_gasto);
+create index if not exists idx_solicitud_id_empleado on "Solicitud_Autorizacion_Plazo"(id_empleado);
+create index if not exists idx_solicitud_id_revisor on "Solicitud_Autorizacion_Plazo"(id_revisor);
+create index if not exists idx_reemplazo_id_revisor on "Solicitud_Reemplazo"(id_revisor);
+create index if not exists idx_reemplazo_id_solicitante on "Solicitud_Reemplazo"(id_solicitante);
+create index if not exists idx_usuario_id_cargo on "Usuario"(id_cargo);
+create index if not exists idx_usuario_id_rol on "Usuario"(id_rol);
+create index if not exists idx_viaje_aprobador on "Viaje"(id_aprobador_asignado);
+create index if not exists idx_viaje_revisor on "Viaje"(id_revisor_asignado);
+create index if not exists idx_viaje_tesorero on "Viaje"(id_tesorero_asignado);
+
 -- >>>>> 02_funciones.sql
 
 -- ============================================================
@@ -928,6 +952,14 @@ where schemaname = 'public'
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Imagen_Respaldo', 'Impuesto', 'Proveedor',
     'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Firma', 'Documento_Emitido', 'Configuracion_Recordatorio'
   );
+-- Supabase crea rls_auto_enable() para activar RLS en las tablas nuevas; corre sola como trigger de eventos,
+-- asi que nadie de afuera necesita llamarla por la API
+do $block$
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+  end if;
+end $block$;
 
 -- >>>>> 05_demo_usuarios_ficticios.sql
 
