@@ -574,7 +574,7 @@ Todas las rutas, salvo las de \code{/auth} y \code{/user/check-email}, requieren
 \epf{PUT DELETE}{/user/:id}{Administrador}{Edita o elimina un usuario}
 \end{xltabular}}
 
-La importación desde Excel (\code{userImportService}) admite hasta 500 filas y aplica las reglas del formulario. Marca los correos y CI que ya existen en el sistema o que se repiten en el archivo (todas las filas repetidas), los cargos y secciones que no existen, el rol inválido, los roles y cargos de una sola persona ocupados o repetidos, y el jefe directo que no está en el sistema ni en el archivo; si la fila del jefe tiene errores, la del subordinado tampoco se crea, y se detectan jefes en ciclo. Crea por niveles, primero los jefes, y cada usuario recibe en segundo plano su contraseña temporal por correo.
+La importación desde Excel (\code{userImportService}) admite hasta 500 filas y aplica las reglas del formulario. La sección se reconoce por su código de Oracle (\code{230}), por código y nombre (\code{230 - NATIONAL SALES}, como la ofrece la plantilla) o por su nombre. Marca los correos y CI que ya existen en el sistema o que se repiten en el archivo (todas las filas repetidas), los cargos y secciones que no existen, el rol inválido, los roles y cargos de una sola persona ocupados o repetidos, y el jefe directo que no está en el sistema ni en el archivo; si la fila del jefe tiene errores, la del subordinado tampoco se crea, y se detectan jefes en ciclo. Crea por niveles, primero los jefes, y cada usuario recibe en segundo plano su contraseña temporal por correo.
 
 \subsection{Viajes, gastos y facturas}
 {\small\begin{xltabular}{\textwidth}{L{1.45cm} L{5.4cm} L{2.4cm} Y}
