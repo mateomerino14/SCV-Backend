@@ -90,3 +90,8 @@ test('registra en la auditoría quién suspende y activa un vehículo', async ()
   expect(audits.every((audit) => audit.Usuario.email_corporativo === 'admin.prueba@maxam.com')).toBe(true);
 });
 
+// Los registros de auditoria solo los escribe el sistema: no se pueden crear ni borrar por la API
+test('no deja crear ni borrar registros de auditoría por la API', async () => {
+  expect((await admin.post('/audit', {tipo: 'INGRESO', id_usuario: 1, fecha: new Date().toISOString()})).status).toBe(404);
+  expect((await admin.del('/audit/1')).status).toBe(404);
+});
