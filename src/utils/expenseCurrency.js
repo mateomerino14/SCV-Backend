@@ -133,4 +133,4 @@ const summarizeStatement = (trip, expenses) => {
   };
 };
 
-module.exports = {amountInBsOf, originalAmountLinesOf, hasUsdFund, isRenderedInUsd, spentAgainstFunds, summarizeStatement, isAmountInBs, renditionCurrencyOf, fundExchangeRateOf};
+module.exports = {amountInBsOf, originalAmountLinesOf, hasUsdFund, isRenderedInUsd, spentAgainstFunds, summarizeStatement, isAmountInBs, fundExchangeRateOf};
