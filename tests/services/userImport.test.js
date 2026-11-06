@@ -12,6 +12,7 @@ const context = {
   usersByEmail: new Map([['jefe.planta@maxam.com', {id_usuario: 7}], ['ana.lopez@maxam.com', {id_usuario: 8}]]),
   positions: new Map([[key('Operador de planta'), {id_cargo: 1, nombre: 'Operador de planta'}], [key('Gerente RRHH'), {id_cargo: 2, nombre: 'Gerente RRHH'}]]),
   sections: new Map([[key('Producción'), {id_seccion: 3, nombre: 'Producción'}]]),
+  sectionsByCode: new Map([['305', {id_seccion: 3, nombre: 'Producción'}]]),
   roles: new Map([['EMPLEADO', {id_rol: 3, nombre: 'EMPLEADO'}], ['SUPERVISOR', {id_rol: 2, nombre: 'SUPERVISOR'}], ['REVISOR', {id_rol: 4, nombre: 'REVISOR'}]]),
   uniqueRoleIds: new Set([4, 5]),
   takenRoleIds: new Set([4]),
@@ -84,4 +85,19 @@ test('detecta jefes que forman un ciclo', () => {
   ], context);
   expect(results[0].errores).toContain('Los jefes directos forman un ciclo dentro del archivo');
   expect(results[1].errores).toContain('Los jefes directos forman un ciclo dentro del archivo');
+});
+
+// La lista real de personal trae la seccion por su codigo de Oracle; la plantilla la muestra como "codigo - nombre"
+test('reconoce la seccion por su codigo de Oracle, por codigo y nombre o por su nombre', () => {
+  const results = validateImportRows([
+    row(2, {seccion: '305'}),
+    row(3, {seccion: '305 - PRODUCCION'}),
+    row(4, {seccion: 'Producción'}),
+    row(5, {seccion: '999'}),
+  ], context);
+  results.slice(0, 3).forEach((result) => {
+    expect(result.errores).toEqual([]);
+    expect(result.payload.id_seccion).toBe(3);
+  });
+  expect(results[3].errores).toContain('La sección "999" no existe o está suspendida');
 });
