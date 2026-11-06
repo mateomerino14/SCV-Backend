@@ -321,12 +321,12 @@ tests/                        Pruebas: services/ (unitarias), api/ (de la API), 
 | `/supplier` | `expense/supplier.js` | Proveedores (solo administrador) |
 | `/review` | `approval/review.js` | Revisión previa y de gastos del supervisor |
 | `/approver` | `approval/approver.js` | Aprobación del viaje y revisión adicional de gastos no deducibles |
-| `/vehicle` | `catalog/vehicle.js` | Flota de la empresa: `GET /vehicle/available` (con `?viaje=` para editar) lista los activos y libres; el administrador registra, edita, suspende y activa (un vehículo no se elimina: se suspende para conservar el historial de los viajes) |
+| `/vehicle` | `catalog/vehicle.js` | Flota de la empresa: `GET /vehicle/available` (con `?viaje=` para editar) lista los activos y libres; el administrador registra, edita, suspende y activa (un vehículo no se elimina: se suspende para conservar el historial de los viajes); cada activación o suspensión queda en la auditoría con quién la hizo |
 | `/treasurer` | `approval/treasurer.js` | Asignación de fondos |
 | `/reviewer` | `approval/reviewer.js` | Revisión final |
 | `/deadline-authorization` | `approval/deadlineAuthorization.js` | Extensiones de plazo |
 | `/substitution` | `approval/substitution.js` | Rendición por terceros |
-| `/role`, `/position`, `/section`, `/expense-category`, `/tax`, `/audit` | `catalog/` | Catálogos e historial de accesos (el filtro de fechas usa días de Bolivia) |
+| `/role`, `/position`, `/section`, `/expense-category`, `/tax`, `/audit` | `catalog/` | Catálogos e historial de accesos (el filtro de fechas usa días de Bolivia). La auditoría solo se consulta: la escribe el sistema al ingresar, salir, cambiar la contraseña y activar o suspender un vehículo (con la placa en `detalle`) |
 | `/admin` | `admin/admin.js` | Resumen general del administrador (con periodo opcional `fecha_inicio` y `fecha_fin`; los montos por sección cuentan solo viajes con fondos entregados) y configuración de recordatorios |
 
 Las imágenes de comprobantes y los productos de cada factura no tienen rutas propias: se gestionan solo a través de `/expense` y `/invoice`, que verifican dueño, etapa y plazo.

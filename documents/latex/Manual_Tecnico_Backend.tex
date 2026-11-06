@@ -355,7 +355,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \code{Detalle_Factura} & Productos de cada factura; la cantidad admite hasta 3 decimales y el precio unitario hasta 4 \\
 \rowcolor{maxamFondo} \code{Impuesto} y \code{Factura_Impuestos} & Catálogo de impuestos y su relación con facturas \\
 \code{Comentario} & Observaciones de revisión y justificaciones de exceso \\
-\rowcolor{maxamFondo} \code{Auditoria} & Ingresos, salidas y cambios de contraseña \\
+\rowcolor{maxamFondo} \code{Auditoria} & Ingresos, salidas, cambios de contraseña y quién activó o suspendió cada vehículo \\
 \code{Correlativo_Recibo} y \code{Recibo} & Numeración de recibos por mes (el correlativo vuelve a 1 cada mes y el número se muestra con su mes, por ejemplo \code{000012/10-2026}): cada gasto sin factura recibe su número al registrarlo (\code{receiptNumberService}, \code{enviado} falso hasta mandarlo) y es el N° DOCUMENTO de la planilla cuando no hay recibo original (si lo hay, va el original), marcado en lila; si el gasto tiene número de recibo en papel, el recibo del sistema muestra los dos (``Recibo Nº … · Recibo original Nº …'') y el ``Son'' va en letras con el importe a cancelar \\
 \rowcolor{maxamFondo} \code{Correlativo_Rendicion} & Último número de rendición de cada mes; el trigger \code{viaje_numero_rendicion} asigna el siguiente al viaje (\code{numero_rendicion}, \code{periodo_rendicion}) cuando queda aprobado del todo, según el mes de su último comprobante \\
 \rowcolor{maxamFondo} \code{Revision_Viaje} & Historial de aprobaciones y rechazos por persona y etapa \\
@@ -641,7 +641,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \epf{PATCH}{/position/:id/suspend}{Administrador}{Suspende o activa (también secciones)}
 \ep{GET}{/expense-category}{Sesión}{Categorías de gasto, ordenadas por número de cuenta}
 \epf{GET}{/role, /tax, /supplier}{Administrador}{Roles, impuestos y proveedores}
-\ep{GET}{/audit}{Administrador}{Historial de accesos con filtros; las fechas son días de Bolivia}
+\ep{GET}{/audit}{Administrador}{Historial de accesos y de cambios de vehículos con filtros; las fechas son días de Bolivia. No hay endpoints para crear ni borrar registros}
 \epf{GET}{/admin/dashboard}{Administrador}{Indicadores por fase; periodo opcional con fecha\_inicio y fecha\_fin}
 \ep{GET PUT}{/admin/reminders}{Administrador}{Lee o guarda los días y horas del resumen}
 \epf{GET}{/admin/reminders/preview}{Administrador}{A quién le llegaría el resumen, sin enviar}
@@ -649,7 +649,7 @@ La importación desde Excel (\code{userImportService}) admite hasta 500 filas y 
 \ep{GET}{/document/verify/:code}{Público}{Verifica un documento emitido por su código}
 \epf{GET}{/vehicle/available?viaje=}{Sesión}{Vehículos activos y libres; el del viaje que se edita cuenta como libre}
 \ep{GET POST PUT}{/vehicle}{Administrador}{Lista la flota con el viaje que ocupa cada vehículo, registra y edita}
-\epf{PATCH}{/vehicle/:id/suspend, /activate}{Administrador}{Suspende (no si está en un viaje) o activa}
+\epf{PATCH}{/vehicle/:id/suspend, /activate}{Administrador}{Suspende (no si está en un viaje) o activa, y lo deja en la auditoría con la placa}
 \end{xltabular}}
 
 \section{Servicios transversales}

@@ -79,7 +79,7 @@ Solo para entornos de prueba, nunca en una base con datos reales.
 | Impuesto | Catalogo de impuestos (IVA, etc) |
 | Factura_Impuestos | Relacion muchos a muchos entre facturas e impuestos |
 | Comentario | Observaciones sobre un viaje o gasto especifico, y justificaciones (una por dia excedido) |
-| Auditoria | Registro de auditoria (ingreso, salida, cambio de clave) |
+| Auditoria | Registro de auditoría (ingreso, salida, cambio de clave, activar o suspender un vehículo), con `detalle` para la placa; solo lo escribe el sistema |
 | Correlativo_Recibo | Ultimo numero de recibo de cada mes (AAAA-MM); el recibo se muestra como `000012/10-2026` |
 | Firma | Firma dibujada en el momento de aprobar o enviar (MEMORANDUM, PREPARADO, JEFE, GERENTE): trazo PNG, usuario, fecha, IP o aprobación automática |
 | Documento_Emitido | Código y datos clave de cada PDF emitido, para verificarlo con su QR |
