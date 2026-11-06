@@ -90,8 +90,9 @@ create table if not exists "Codigo_Verificacion" (
 create table if not exists "Auditoria" (
   id_auditoria serial primary key,
   fecha timestamptz not null,
-  tipo varchar(15) not null check (tipo in ('INGRESO', 'SALIDA', 'CAMBIO_CLAVE')),
-  id_usuario integer not null references "Usuario"(id_usuario)
+  tipo varchar(20) not null check (tipo in ('INGRESO', 'SALIDA', 'CAMBIO_CLAVE', 'ACTIVAR_VEHICULO', 'SUSPENDER_VEHICULO')),
+  id_usuario integer not null references "Usuario"(id_usuario),
+  detalle varchar(150) -- Sobre que se hizo el evento, por ejemplo la placa del vehiculo activado o suspendido
 );
 
 -- ------------------------------------------------------------

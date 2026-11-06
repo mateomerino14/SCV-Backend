@@ -1,6 +1,6 @@
 const supabase = require('../../config/supabase');
 
-const auditColumns = 'id_auditoria, fecha, tipo, Usuario(id_usuario, nombre, apellido_paterno, email_corporativo)';
+const auditColumns = 'id_auditoria, fecha, tipo, detalle, Usuario(id_usuario, nombre, apellido_paterno, email_corporativo)';
 const maxRowsPerRequest = 1000;
 const boliviaOffset = '-04:00';
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
