@@ -105,7 +105,10 @@ const emailInfoBox = (rows) => {
   const items = rows
     .filter((row) => row.value !== undefined && row.value !== null && row.value !== '')
     .map((row, index, list) => {
-      const marginBottom = index < list.length - 1 ? '12px' : '0';
+      let marginBottom = '0';
+      if (index < list.length - 1) {
+        marginBottom = '12px';
+      }
       return `
         <p style="margin: 0 0 3px 0; color: ${BRAND.labels}; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">${row.label}</p>
         <p style="margin: 0 0 ${marginBottom} 0; color: ${BRAND.text}; font-size: 14px;">${escapeHtml(row.value)}</p>
