@@ -308,6 +308,7 @@ const editTrip = async (tripId, userId, tripData) => {
   if (wasRejected) {
     message = 'Viaje reeditado y reenviado a revisión correctamente';
     await hierarchyAssignmentService.assignNextReviewer(tripId, userId, 'SUPERVISOR', 'id_supervisor_asignado');
+    await require('../approval/selfReviewSkipService').advanceSelfReviewStages(tripId);
   }
   return {message};
 };
@@ -348,6 +349,7 @@ const submitToReview = async (tripId, userId) => {
     return {error: 'El viaje ya fue enviado a revisión. Actualiza la página.', status: 409};
   }
   await hierarchyAssignmentService.assignNextReviewer(tripId, userId, 'SUPERVISOR', 'id_supervisor_asignado');
+  await require('../approval/selfReviewSkipService').advanceSelfReviewStages(tripId);
   return {message: 'Viaje enviado a revisión correctamente'};
 };
 
@@ -458,6 +460,7 @@ const confirmCompletion = async (tripId, userId, justifications, {password = nul
   // Las solicitudes de reemplazo o de plazo que quedaron sin responder ya no aplican
   await substitutionService.closePendingRequests([tripId]);
   await require('../approval/deadlineAuthorizationService').closePendingRequests([tripId]);
+  await require('../approval/selfReviewSkipService').advanceSelfReviewStages(tripId);
   return {message: 'Viaje enviado a revisión de gastos correctamente'};
 };
 
