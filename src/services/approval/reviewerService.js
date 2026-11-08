@@ -222,7 +222,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
 };
 
 // Aprueba definitivamente un viaje; con selfStageSkip se aprueba solo si es del propio revisor
-const approveReview = async (tripId, reviewerId, {selfStageSkip = false} = {}) => {
+const approveReview = async (tripId, reviewerId, {selfStageSkip = false, password = null, ip = null} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd))')
@@ -240,6 +240,14 @@ const approveReview = async (tripId, reviewerId, {selfStageSkip = false} = {}) =
   if (trip.id_revisor_asignado && trip.id_revisor_asignado !== reviewerId && !selfStageSkip) {
     return {error: 'Este viaje ya está asignado a otro revisor', status: 403};
   }
+  // El revisor firma Revisado/Registrado por con su firma guardada y su contrasena; si la etapa se aprueba sola no hay trazo
+  let signing = {image: null};
+  if (!selfStageSkip) {
+    signing = await signatureService.signatureForSigning(reviewerId, password);
+    if (signing.error) {
+      return {error: signing.error, status: signing.status};
+    }
+  }
   const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'APROBADO_FINAL', id_revisor_asignado: reviewerId}).eq('id_viaje', tripId).eq('estado', 'APROBADO_SUPERVISOR').select('id_viaje');
   if (error) {
     return {error: error.message, status: 500};
@@ -248,6 +256,7 @@ const approveReview = async (tripId, reviewerId, {selfStageSkip = false} = {}) =
     return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
   }
   await reviewLogService.recordReview(tripId, reviewerId, reviewLogService.reviewStages.finalReview, 'APROBADO', {automatic: selfStageSkip});
+  await signatureService.saveSignature(tripId, signatureService.signatureStages.reviewer, reviewerId, {image: signing.image, automatic: selfStageSkip, ip});
   const {data: reviewerData} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre, monto_diario, monto_diario_usd)').eq('id_usuario', reviewerId).single();
   // Si es el viaje del propio revisor, el documento indica aprobacion automatica
   const reviewer = {...reviewerData, aprobacionAutomatica: selfStageSkip};

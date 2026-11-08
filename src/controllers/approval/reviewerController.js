@@ -55,7 +55,7 @@ const getReviewDetail = async (req, res) => {
 const approveReview = async (req, res) => {
   const {tripId} = req.params;
   const reviewerId = req.user.id_usuario;
-  const result = await reviewerService.approveReview(tripId, reviewerId);
+  const result = await reviewerService.approveReview(tripId, reviewerId, {password: req.body?.contrasenia, ip: req.ip});
   if (result.error) {
     return res.status(result.status).json({error: result.error});
   }
