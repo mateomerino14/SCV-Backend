@@ -67,7 +67,7 @@ test('ocupa el vehículo mientras el viaje está activo', async () => {
   expect(released.body.some((vehicle) => vehicle.id_vehiculo === vehicleId)).toBe(true);
 });
 
-// El memorandum autoriza el viaje sin el saludo al gerente e indica el hospedaje y el combustible
+// El memorandum autoriza el viaje sin el saludo al gerente, indica el hospedaje y el combustible, y pide los fondos a rendir sin el nombre del sistema
 test('el memorándum autoriza el viaje con sus datos', () => {
   const {generateMemoHtml} = require('../../src/services/approval/approvalMemoService');
   const html = generateMemoHtml({...vehicleTrip(), placa_vehiculo: '9999-ZZZ', fecha_inicio: '2026-11-03', fecha_fin: '2026-11-06', Usuario: {nombre: 'Juan', apellido_paterno: 'Empleado', Cargo: {nombre: 'Analista'}}}, {nombre: 'Pedro', apellido_paterno: 'Aprobador'}, 'VIA-3/2026');
@@ -77,6 +77,10 @@ test('el memorándum autoriza el viaje con sus datos', () => {
   expect(html).toContain('(4 días)');
   expect(html).not.toContain('Señor Gerente');
   expect(html).toContain('data:image/jpeg;base64,');
+  expect(html).toContain('<span>Asunto:</span><span>Viaje VIA-3/2026</span>');
+  expect(html).toContain('<strong>Asignación de fondos a rendir:</strong> se solicita a Tesorería la revisión y asignación de los fondos a rendir');
+  expect(html).not.toContain('Sistema de Control de Viáticos');
+  expect(generateMemoHtml(vehicleTrip(), {aprobacionAutomatica: true}, 'VIA-3/2026')).not.toContain('Sistema de Control de Viáticos');
 });
 
 // Activar o suspender un vehiculo queda en la auditoria con quien lo hizo y la placa
