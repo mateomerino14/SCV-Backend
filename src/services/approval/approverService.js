@@ -161,7 +161,7 @@ const getTripDetail = async (tripId) => {
 };
 
 // Aprueba un viaje en fase de aprobacion previa; con selfStageSkip se aprueba solo (es suyo o ya lo aprobo como jefe directo)
-const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedAsBoss = false, signature = null, ip = null} = {}) => {
+const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedAsBoss = false, password = null, ip = null} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
     .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
@@ -179,11 +179,12 @@ const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedA
   if (trip.id_aprobador_asignado && trip.id_aprobador_asignado !== approverId && !selfStageSkip) {
     return {error: 'Este viaje ya está asignado a otro aprobador', status: 403};
   }
-  // El aprobador firma el memorandum al aprobar; si la etapa se aprueba sola no hay trazo
+  // El aprobador firma el memorandum con su firma guardada y su contrasena; si la etapa se aprueba sola no hay trazo
+  let signing = {image: null};
   if (!selfStageSkip) {
-    const signatureError = signatureService.validateSignature(signature);
-    if (signatureError) {
-      return {error: signatureError, status: 400};
+    signing = await signatureService.signatureForSigning(approverId, password);
+    if (signing.error) {
+      return {error: signing.error, status: signing.status};
     }
   }
   const {data: updatedRows, error} = await supabase
@@ -200,7 +201,7 @@ const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedA
   }
   await reviewLogService.recordReview(tripId, approverId, reviewLogService.reviewStages.tripApproval, 'APROBADO', {automatic: selfStageSkip});
   if (!selfStageSkip) {
-    await signatureService.saveSignature(tripId, signatureService.signatureStages.memo, approverId, {image: signature, ip});
+    await signatureService.saveSignature(tripId, signatureService.signatureStages.memo, approverId, {image: signing.image, ip});
   }
   else if (!approvedAsBoss) {
     await signatureService.saveSignature(tripId, signatureService.signatureStages.memo, approverId, {automatic: true});

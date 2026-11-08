@@ -5,6 +5,7 @@ const userImportService = require('../../services/user/userImportService');
 const auditLogService = require('../../services/shared/auditLogService');
 const tokenService = require('../../services/user/tokenService');
 const storageService = require('../../services/shared/storageService');
+const signatureService = require('../../services/shared/signatureService');
 const saltRounds = 10;
 
 // Columnas que se devuelven al administrar usuarios (sin hash ni datos de sesion)
@@ -408,4 +409,21 @@ const getMyPosition = async (req, res) => {
   }
 };
 
-module.exports = {getMe, updateMe, updateMyPhoto, changeMyPassword, getAllUsers, updateUser, createUser, deleteUser, checkEmail, getEmployees, getAllUsersDetailed, activateUser, suspendUser, getMyPosition, previewUserImport, importUsers};
+// Devuelve la firma digital que el usuario registro en su perfil, o null si aun no tiene
+const getMySignature = async (req, res) => {
+  const signature = await signatureService.getUserSignature(req.user.id_usuario);
+  return res.json({firma: signature});
+};
+
+// Registra o cambia la firma digital del usuario, confirmada con su contrasena
+const updateMySignature = async (req, res) => {
+  const result = await signatureService.saveUserSignature(req.user.id_usuario, req.body?.firma, req.body?.contrasenia);
+  if (result.error) {
+    return res.status(result.status).json({error: result.error});
+  }
+  else {
+    return res.json({message: 'Tu firma digital quedó registrada', firma: result.signature});
+  }
+};
+
+module.exports = {getMe, updateMe, updateMyPhoto, changeMyPassword, getMySignature, updateMySignature, getAllUsers, updateUser, createUser, deleteUser, checkEmail, getEmployees, getAllUsersDetailed, activateUser, suspendUser, getMyPosition, previewUserImport, importUsers};

@@ -6,7 +6,7 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 
 ```
 database/
-├── 01_esquema.sql                  Las 30 tablas, relaciones, restricciones e índices
+├── 01_esquema.sql                  Las 31 tablas, relaciones, restricciones e índices
 ├── 02_funciones.sql                Correlativos (recibos por mes, viajes por año, rendiciones por mes) y sus triggers
 ├── 03_datos_iniciales.sql          Roles, cargos, impuesto IVA, secciones, vehículos, plan de cuentas y recordatorios por defecto
 ├── 04_seguridad_rls.sql            Seguridad por fila (RLS) en todas las tablas
@@ -21,7 +21,7 @@ database/
 
 ## Orden de ejecución
 
-1. `01_esquema.sql` - crea las 30 tablas, relaciones e índices. Cada llave foránea tiene su índice, para que los cruces y los borrados no recorran la tabla entera.
+1. `01_esquema.sql` - crea las 31 tablas, relaciones e índices. Cada llave foránea tiene su índice, para que los cruces y los borrados no recorran la tabla entera.
 2. `02_funciones.sql` - crea la función `incrementar_correlativo_recibo(periodo)`, usada por el backend para numerar recibos (el correlativo vuelve a 1 cada mes); el trigger `viaje_numero_anual`, que al crear un viaje le da el siguiente número de su año para el código `VIA-numero/año` (`Viaje.numero_viaje` y `anio_viaje`), y el trigger `viaje_numero_rendicion`, que al quedar un viaje en `APROBADO_FINAL` le asigna el siguiente número de rendición del mes de su último comprobante (`Viaje.numero_rendicion` y `periodo_rendicion`). Para empezar desde un número, por ejemplo si contabilidad ya va por la 40: `insert into "Correlativo_Rendicion" (periodo, numero) values ('2026-10', 40) on conflict (periodo) do update set numero = 40;`
 3. `03_datos_iniciales.sql` - roles, cargos, impuesto de IVA, las 43 secciones de la empresa con su código de Oracle, los 38 vehículos livianos de la flota, categorías de gasto y la configuración de recordatorios por defecto. De los vehículos, quedan activos los 14 que pueden viajar; los demás (asignados a planta, a la mina, sin viajar o por confirmar) quedan inactivos y el administrador los activa cuando corresponda. La descripción de cada uno dice a quién está asignado o dónde está. No se cargan los vendidos ni el equipo pesado.
 4. `04_seguridad_rls.sql` - activa la seguridad por fila (RLS) en todas las tablas, sin políticas: con la llave pública nadie lee ni escribe, y el backend entra con la llave de servicio. Por eso Supabase muestra el aviso informativo «RLS Enabled No Policy» en cada tabla, y es lo esperado. También quita el permiso de ejecutar por la API la función `rls_auto_enable()` que crea Supabase, porque solo la usa su trigger de eventos.
@@ -49,7 +49,7 @@ Los archivos `01` a `04` reflejan siempre el estado final y completo del esquema
 
 | Script | Uso |
 |---|---|
-| `mantenimiento/borrar_todo.sql` | Elimina las 30 tablas, las funciones y los triggers para volver a crear la base con `01` a `05`. No se puede deshacer |
+| `mantenimiento/borrar_todo.sql` | Elimina las 31 tablas, las funciones y los triggers para volver a crear la base con `01` a `05`. No se puede deshacer |
 | `mantenimiento/limpiar_datos.sql` | Borra usuarios, viajes, gastos, facturas, firmas, documentos emitidos, solicitudes y auditoría. Conserva los catálogos (roles, cargos, secciones, categorías, impuestos y vehículos) y repone la configuración de recordatorios por defecto |
 | `pruebas/organizacion_prueba.sql` | Organización de prueba completa con jerarquía de jefe directo y tres vehículos. Contraseña de todos: `Prueba1234`. La usan las pruebas automáticas de la API y de extremo a extremo |
 
@@ -81,7 +81,8 @@ Solo para entornos de prueba, nunca en una base con datos reales.
 | Comentario | Observaciones sobre un viaje o gasto especifico, y justificaciones (una por dia excedido) |
 | Auditoria | Registro de auditoría (ingreso, salida, cambio de clave, activar o suspender un vehículo), con `detalle` para la placa; solo lo escribe el sistema |
 | Correlativo_Recibo | Ultimo numero de recibo de cada mes (AAAA-MM); el recibo se muestra como `000012/10-2026` |
-| Firma | Firma dibujada en el momento de aprobar o enviar (MEMORANDUM, PREPARADO, JEFE, GERENTE): trazo PNG, usuario, fecha, IP o aprobación automática |
+| Firma | Copia de la firma con la que se firmó cada etapa (MEMORANDUM, PREPARADO, JEFE, GERENTE, REVISOR): trazo PNG, usuario, fecha, IP o aprobación automática |
+| Firma_Usuario | Firma digital que cada usuario registra en su perfil, con la fecha en que la cambió; se copia en cada documento que firma |
 | Documento_Emitido | Código y datos clave de cada PDF emitido, para verificarlo con su QR |
 | Correlativo_Viaje | Ultimo numero de viaje de cada año, para el codigo `VIA-numero/año` que vuelve a 1 cada año |
 | Correlativo_Rendicion | Ultimo numero de rendicion de cada mes (AAAA-MM) para la descripcion de Oracle (10-40); lo usa el trigger `viaje_numero_rendicion`; el incremento es atomico (`insert ... on conflict do update`) y un indice unico sobre `Viaje(periodo_rendicion, numero_rendicion)` impide repetir numeros aunque se aprueben varias a la vez |

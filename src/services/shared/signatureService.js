@@ -1,14 +1,14 @@
+const bcrypt = require('bcrypt');
 const supabase = require('../../config/supabase');
 const {escapeHtml} = require('../../utils/htmlEscape');
 
 const pngPrefix = 'data:image/png;base64,';
 const maxSignatureLength = 400000;
 const minSignatureBytes = 300;
-const signatureStages = {memo: 'MEMORANDUM', prepared: 'PREPARADO', boss: 'JEFE', manager: 'GERENTE'};
+const signatureStages = {memo: 'MEMORANDUM', prepared: 'PREPARADO', boss: 'JEFE', manager: 'GERENTE', reviewer: 'REVISOR'};
 const missingSignatureMessage = 'Firma en el recuadro antes de continuar';
-const managerNotRequiredText = 'No requiere Vo/ Bo de gerencia';
-// Estados en los que la rendicion ya paso la etapa en que el gerente podia dar su Vo/ Bo
-const statesAfterManagerStage = ['APROBADO_SUPERVISOR', 'APROBADO_FINAL'];
+const missingStoredSignatureMessage = 'Registra tu firma digital en tu perfil antes de firmar';
+const wrongPasswordMessage = 'La contraseña no es correcta';
 
 // Valida que la firma sea un PNG dibujado con trazos (no vacio ni demasiado grande); devuelve el error o null
 const validateSignature = (image) => {
@@ -26,6 +26,85 @@ const validateSignature = (image) => {
     return missingSignatureMessage;
   }
   return null;
+};
+
+// Intentos fallidos de contrasena al firmar, por usuario, para que una sesion abierta no sirva para adivinarla
+const failedAttempts = new Map();
+const maxFailedAttempts = 10;
+const attemptsWindowMs = 15 * 60 * 1000;
+const tooManyAttemptsMessage = 'Demasiados intentos con una contraseña incorrecta. Espera 15 minutos antes de volver a firmar.';
+
+// Intentos fallidos del usuario que siguen dentro de la ventana de tiempo
+const recentFailuresOf = (userId) => {
+  const now = Date.now();
+  const recent = (failedAttempts.get(userId) || []).filter((time) => now - time < attemptsWindowMs);
+  failedAttempts.set(userId, recent);
+  return recent;
+};
+
+// Confirma la contrasena contando los intentos fallidos; devuelve el error o null si es correcta
+const confirmPassword = async (userId, password) => {
+  if (recentFailuresOf(userId).length >= maxFailedAttempts) {
+    return {error: tooManyAttemptsMessage, status: 429};
+  }
+  if (!(await isPasswordOf(userId, password))) {
+    recentFailuresOf(userId).push(Date.now());
+    return {error: wrongPasswordMessage, status: 400};
+  }
+  failedAttempts.delete(userId);
+  return null;
+};
+
+// Revisa la contrasena del usuario, que confirma que es el quien firma
+const isPasswordOf = async (userId, password) => {
+  if (typeof password !== 'string' || password === '') {
+    return false;
+  }
+  const {data} = await supabase.from('Usuario').select('contrasenia').eq('id_usuario', userId).maybeSingle();
+  if (!data?.contrasenia) {
+    return false;
+  }
+  return bcrypt.compare(password, data.contrasenia);
+};
+
+// Firma digital que el usuario registro en su perfil, o null si aun no tiene
+const getUserSignature = async (userId) => {
+  const {data} = await supabase.from('Firma_Usuario').select('imagen, fecha_actualizacion').eq('id_usuario', userId).maybeSingle();
+  return data || null;
+};
+
+// Registra o cambia la firma digital del usuario; pide su contrasena para que nadie mas la cambie
+const saveUserSignature = async (userId, image, password) => {
+  const signatureError = validateSignature(image);
+  if (signatureError) {
+    return {error: signatureError, status: 400};
+  }
+  const passwordError = await confirmPassword(userId, password);
+  if (passwordError) {
+    return passwordError;
+  }
+  const {data, error} = await supabase
+    .from('Firma_Usuario')
+    .upsert({id_usuario: userId, imagen: image, fecha_actualizacion: new Date().toISOString()})
+    .select('imagen, fecha_actualizacion')
+    .single();
+  if (error) {
+    return {error: error.message, status: 500};
+  }
+  return {signature: data};
+};
+
+// Firma guardada con la que el usuario firma un documento, confirmada con su contrasena
+const signatureForSigning = async (userId, password) => {
+  const stored = await getUserSignature(userId);
+  if (!stored) {
+    return {error: missingStoredSignatureMessage, status: 400};
+  }
+  const passwordError = await confirmPassword(userId, password);
+  if (passwordError) {
+    return passwordError;
+  }
+  return {image: stored.imagen};
 };
 
 // Guarda la firma de una etapa del viaje; las automaticas no llevan trazo
@@ -71,20 +150,10 @@ const submitterOf = async (tripId, ownerId) => {
   return {nombre: latest.Usuario?.nombre, apellido_paterno: latest.Usuario?.apellido_paterno, fecha: latest.fecha, esReemplazo: latest.id_usuario !== ownerId};
 };
 
-// Firmas de los tres casilleros de la planilla; si el jefe directo es el gerente, su Vo/ Bo vale para los dos, y si la rendicion no paso por el gerente se indica que no lo requiere
+// Firmas de los tres casilleros de la planilla: Preparado por, Aprobado por (jefe directo) y Revisado/Registrado por (revisor)
 const getStatementSignatures = async (tripId, until = null) => {
   const latest = await getTripSignatures(tripId, until);
-  const boss = latest[signatureStages.boss] || null;
-  let manager = latest[signatureStages.manager] || null;
-  if (!manager && boss?.Usuario?.Rol?.nombre === 'APROBADOR') {
-    manager = boss;
-  }
-  let managerNotRequired = false;
-  if (!manager) {
-    const {data: trip} = await supabase.from('Viaje').select('estado').eq('id_viaje', tripId).maybeSingle();
-    managerNotRequired = statesAfterManagerStage.includes(trip?.estado);
-  }
-  return {prepared: latest[signatureStages.prepared] || null, boss, manager, managerNotRequired};
+  return {prepared: latest[signatureStages.prepared] || null, boss: latest[signatureStages.boss] || null, reviewer: latest[signatureStages.reviewer] || null};
 };
 
 // Firmas de la planilla listas para el Excel: trazo, nombre, cargo y fecha de cada casillero
@@ -96,7 +165,7 @@ const statementSignaturesForExport = async (tripId) => {
     }
     return {imagen: signature.imagen, automatica: signature.automatica, nombre: signerNameOf(signature), cargo: signature.Usuario?.Cargo?.nombre || '', fecha: signatureDateOf(signature)};
   };
-  return {preparado: toExport(signatures.prepared), jefe: toExport(signatures.boss), gerente: toExport(signatures.manager), gerenteNoRequerido: signatures.managerNotRequired};
+  return {preparado: toExport(signatures.prepared), jefe: toExport(signatures.boss), revisor: toExport(signatures.reviewer)};
 };
 
 // Nombre completo de quien firmo
@@ -105,13 +174,10 @@ const signerNameOf = (signature) => [signature?.Usuario?.nombre, signature?.Usua
 // Fecha y hora de Bolivia de una firma
 const signatureDateOf = (signature) => new Date(signature.fecha).toLocaleString('es-BO', {timeZone: 'America/La_Paz', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
 
-// Casillero de firma para los PDF: el trazo, la linea, el titulo, el nombre y cargo, y cuando se firmo (o la leyenda si no hace falta)
-const signatureBlockHtml = (signature, title, fallbackRole, {notRequired = false} = {}) => {
+// Casillero de firma para los PDF: el trazo, la linea, el titulo, el nombre y cargo, y cuando se firmo
+const signatureBlockHtml = (signature, title, fallbackRole) => {
   let stroke = '<div class="firma-espacio"></div>';
   let detail = `<div class="firma-rol">${escapeHtml(fallbackRole)}</div>`;
-  if (!signature && notRequired) {
-    stroke = `<div class="firma-espacio firma-auto">${managerNotRequiredText}</div>`;
-  }
   if (signature) {
     const name = escapeHtml(signerNameOf(signature));
     const role = escapeHtml(signature.Usuario?.Cargo?.nombre || fallbackRole);
@@ -138,4 +204,4 @@ const signatureStyles = `
   .firma-fecha { font-size: 6pt; color: #7f7f7f; }
 `;
 
-module.exports = {signatureStages, validateSignature, saveSignature, getTripSignatures, submitterOf, getStatementSignatures, statementSignaturesForExport, signerNameOf, signatureDateOf, signatureBlockHtml, signatureStyles};
+module.exports = {signatureStages, getUserSignature, saveUserSignature, signatureForSigning, saveSignature, getTripSignatures, submitterOf, getStatementSignatures, statementSignaturesForExport, signerNameOf, signatureDateOf, signatureBlockHtml, signatureStyles};

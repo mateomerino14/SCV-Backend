@@ -9,6 +9,7 @@
 truncate table
   "Recibo",
   "Firma",
+  "Firma_Usuario",
   "Documento_Emitido",
   "Correlativo_Rendicion",
   "Correlativo_Recibo",

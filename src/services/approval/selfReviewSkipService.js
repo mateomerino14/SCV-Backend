@@ -9,8 +9,23 @@ const getTreasurerId = async () => {
   return treasurers[0]?.id_usuario || null;
 };
 
+// El Gerente General no tiene jefe directo: las etapas del supervisor de su propio viaje se aprueban solas
+const topManagerOwnerOf = async (trip) => {
+  const approverId = await hierarchyAssignmentService.getUniqueRoleHolder('APROBADOR');
+  if (!approverId || approverId !== trip.id_usuario) {
+    return null;
+  }
+  const scope = await hierarchyAssignmentService.resolveReviewerScope(trip.id_usuario, 'SUPERVISOR');
+  if (scope.level === 'directo') {
+    return null;
+  }
+  return trip.id_usuario;
+};
+
 // Etapas de una sola persona: si el viaje es suyo, la etapa se aprueba automaticamente
 const stages = {
+  EN_REVISION_VIAJE: {label: 'supervisor', getHolder: topManagerOwnerOf, approve: (tripId, userId) => require('./reviewService').approveTripReview(tripId, userId, {selfStageSkip: true})},
+  EN_REVISION: {label: 'supervisor', getHolder: topManagerOwnerOf, approve: (tripId, userId) => require('./reviewService').approveExpenseReview(tripId, userId, {selfStageSkip: true})},
   APROBADO_VIAJE: {label: 'aprobador', getHolder: () => hierarchyAssignmentService.getUniqueRoleHolder('APROBADOR'), approve: (tripId, userId, approvedAsBoss) => require('./approverService').approveTrip(tripId, userId, {selfStageSkip: true, approvedAsBoss})},
   EN_REVISION_TESORERO: {label: 'tesorero', getHolder: getTreasurerId, approve: (tripId, userId) => require('./treasurerService').approveTrip(tripId, userId, {selfStageSkip: true})},
   EN_REVISION_APROBADOR: {label: 'aprobador', getHolder: () => hierarchyAssignmentService.getUniqueRoleHolder('APROBADOR'), approve: (tripId, userId) => require('./approverAlcoholReviewService').approveAlcoholReview(tripId, userId, {selfStageSkip: true})},
@@ -28,7 +43,7 @@ const advanceSelfReviewStages = async (tripId) => {
     if (!stage) {
       return;
     }
-    const holderId = await stage.getHolder();
+    const holderId = await stage.getHolder(trip);
     if (!holderId) {
       return;
     }

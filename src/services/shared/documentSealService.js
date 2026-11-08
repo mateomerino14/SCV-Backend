@@ -25,10 +25,10 @@ const documentLabels = {
 // Firmas que se muestran al verificar cada documento
 const documentSignatureStages = {
   MEMORANDUM: ['MEMORANDUM'],
-  PLANILLA_RENDICION: ['PREPARADO', 'JEFE', 'GERENTE'],
-  RENDICION_FINAL: ['PREPARADO', 'JEFE', 'GERENTE'],
+  PLANILLA_RENDICION: ['PREPARADO', 'JEFE', 'GERENTE', 'REVISOR'],
+  RENDICION_FINAL: ['PREPARADO', 'JEFE', 'GERENTE', 'REVISOR'],
 };
-const signatureStageLabels = {MEMORANDUM: 'Autorizó el viaje', PREPARADO: 'Preparó la rendición', JEFE: 'Vo/ Bo Jefe de Área', GERENTE: 'Vo/ Bo Gerente de Área'};
+const signatureStageLabels = {MEMORANDUM: 'Autorizó el viaje', PREPARADO: 'Preparó la rendición', JEFE: 'Aprobó la rendición (Gerente de Área)', GERENTE: 'Aprobó los gastos no deducibles', REVISOR: 'Revisó y registró la rendición'};
 
 // Genera un codigo aleatorio de 12 caracteres
 const generateCode = () => Array.from(crypto.randomBytes(codeLength), (byte) => codeAlphabet[byte % codeAlphabet.length]).join('');

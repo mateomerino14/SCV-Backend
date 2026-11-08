@@ -30,6 +30,7 @@ drop table if exists
   "Gasto_Subitem",
   "Gasto",
   "Firma",
+  "Firma_Usuario",
   "Documento_Emitido",
   "Viaje",
   "Vehiculo",
@@ -471,16 +472,24 @@ create table if not exists "Firma" (
   id_viaje integer not null references "Viaje"(id_viaje) on delete cascade,
   -- MEMORANDUM: aprobador del viaje; PREPARADO: empleado al enviar la rendicion;
   -- JEFE: jefe directo o supervisor al aprobar la rendicion (Vo/ Bo Jefe de Area);
-  -- GERENTE: aprobador al aprobar la revision adicional de la rendicion (Vo/ Bo Gerente de Area)
-  etapa varchar(15) not null check (etapa in ('MEMORANDUM', 'PREPARADO', 'JEFE', 'GERENTE')),
+  -- GERENTE: aprobador al aprobar la revision adicional de la rendicion (gastos no deducibles);
+  -- REVISOR: revisor al aprobar la rendicion al final (Revisado/Registrado por)
+  etapa varchar(15) not null check (etapa in ('MEMORANDUM', 'PREPARADO', 'JEFE', 'GERENTE', 'REVISOR')),
   id_usuario integer not null references "Usuario"(id_usuario),
-  imagen text, -- PNG en base64; vacio cuando la etapa se aprobo automaticamente
+  imagen text, -- Copia del PNG de la firma guardada de quien firmo; vacio cuando la etapa se aprobo automaticamente
   automatica boolean not null default false,
   ip varchar(60),
   fecha timestamptz not null default now()
 );
 
 create index if not exists firma_viaje_etapa on "Firma"(id_viaje, etapa, fecha desc);
+
+-- Firma digital de cada usuario: la registra en su perfil y se copia en cada documento que firma
+create table if not exists "Firma_Usuario" (
+  id_usuario integer primary key references "Usuario"(id_usuario) on delete cascade,
+  imagen text not null, -- PNG en base64 con el trazo de la firma
+  fecha_actualizacion timestamptz not null default now()
+);
 
 -- Cada PDF que genera el sistema lleva un codigo y un QR para comprobar que es autentico
 create table if not exists "Documento_Emitido" (
@@ -911,7 +920,7 @@ declare
     'Auditoria', 'Cargo', 'Categoria_Gasto', 'Codigo_Verificacion', 'Comentario',
     'Correlativo_Recibo', 'Correlativo_Rendicion', 'Correlativo_Viaje', 'Recibo', 'Revision_Viaje', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Imagen_Respaldo', 'Impuesto', 'Proveedor',
-    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Firma', 'Documento_Emitido', 'Configuracion_Recordatorio'
+    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Firma', 'Firma_Usuario', 'Documento_Emitido', 'Configuracion_Recordatorio'
   ];
 begin
   foreach table_name in array target_tables
@@ -951,7 +960,7 @@ where schemaname = 'public'
     'Auditoria', 'Cargo', 'Categoria_Gasto', 'Codigo_Verificacion', 'Comentario',
     'Correlativo_Recibo', 'Correlativo_Rendicion', 'Correlativo_Viaje', 'Recibo', 'Revision_Viaje', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Imagen_Respaldo', 'Impuesto', 'Proveedor',
-    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Firma', 'Documento_Emitido', 'Configuracion_Recordatorio'
+    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Firma', 'Firma_Usuario', 'Documento_Emitido', 'Configuracion_Recordatorio'
   );
 -- Supabase crea rls_auto_enable() para activar RLS en las tablas nuevas; corre sola como trigger de eventos,
 -- asi que nadie de afuera necesita llamarla por la API

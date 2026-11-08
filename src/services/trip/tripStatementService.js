@@ -398,8 +398,8 @@ const generateStatementHtml = (rawTrip, rawExpenses, rawJustifications, {signatu
     </div>
     <div class="firmas">
       ${signatureService.signatureBlockHtml(signatures.prepared, 'Preparado por', 'Responsable')}
-      ${signatureService.signatureBlockHtml(signatures.boss, 'Vo/ Bo', 'Jefe de Área')}
-      ${signatureService.signatureBlockHtml(signatures.manager, 'Vo/ Bo', 'Gerente de Área', {notRequired: signatures.managerNotRequired})}
+      ${signatureService.signatureBlockHtml(signatures.boss, 'Aprobado por', 'Gerente de Área')}
+      ${signatureService.signatureBlockHtml(signatures.reviewer, 'Revisado/Registrado por', 'Asistente Cargos/Descargos')}
     </div>
     ${documentSealService.sealHtml(seal)}
   </div>

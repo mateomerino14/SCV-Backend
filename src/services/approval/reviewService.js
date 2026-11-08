@@ -156,26 +156,28 @@ const getTripReviewDetail = async (tripId, supervisorId) => {
 };
 
 // Aprueba un viaje en revision previa
-const approveTripReview = async (tripId, supervisorId, {signature = null, ip = null} = {}) => {
+// Con selfStageSkip la etapa se aprueba sola: el viaje es del Gerente General, que no tiene jefe directo
+const approveTripReview = async (tripId, supervisorId, {password = null, ip = null, selfStageSkip = false} = {}) => {
   const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_supervisor_asignado, estado').eq('id_viaje', tripId).single();
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404};
   }
-  if (trip.id_usuario === supervisorId) {
+  if (trip.id_usuario === supervisorId && !selfStageSkip) {
     return {error: 'No puedes aprobar tu propio viaje', status: 403};
   }
-  if (trip.id_supervisor_asignado !== supervisorId) {
+  if (trip.id_supervisor_asignado !== supervisorId && !selfStageSkip) {
     return {error: 'No tienes permiso para aprobar este viaje', status: 403};
   }
   if (trip.estado !== 'EN_REVISION_VIAJE') {
     return {error: 'Este viaje no está en revisión previa', status: 400};
   }
   // Si quien aprueba como jefe directo es el aprobador, su aprobacion genera el memorandum y debe firmarlo
-  const signsMemo = (await hierarchyAssignmentService.getUniqueRoleHolder('APROBADOR')) === supervisorId;
+  const signsMemo = !selfStageSkip && (await hierarchyAssignmentService.getUniqueRoleHolder('APROBADOR')) === supervisorId;
+  let signing = {image: null};
   if (signsMemo) {
-    const signatureError = signatureService.validateSignature(signature);
-    if (signatureError) {
-      return {error: signatureError, status: 400};
+    signing = await signatureService.signatureForSigning(supervisorId, password);
+    if (signing.error) {
+      return {error: signing.error, status: signing.status};
     }
   }
   const {data: updatedRows, error} = await supabase.from('Viaje').update({estado: 'APROBADO_VIAJE'}).eq('id_viaje', tripId).eq('estado', 'EN_REVISION_VIAJE').select('id_viaje');
@@ -186,9 +188,9 @@ const approveTripReview = async (tripId, supervisorId, {signature = null, ip = n
     if (!updatedRows?.length) {
       return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
     }
-    await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.tripReview, 'APROBADO');
+    await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.tripReview, 'APROBADO', {automatic: selfStageSkip});
     if (signsMemo) {
-      await signatureService.saveSignature(tripId, signatureService.signatureStages.memo, supervisorId, {image: signature, ip});
+      await signatureService.saveSignature(tripId, signatureService.signatureStages.memo, supervisorId, {image: signing.image, ip});
     }
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'APROBADOR', 'id_aprobador_asignado');
     await require('./selfReviewSkipService').advanceSelfReviewStages(tripId);
@@ -428,15 +430,16 @@ const getExpenseReviewDetail = async (tripId, supervisorId) => {
 };
 
 // Aprueba los gastos de un viaje
-const approveExpenseReview = async (tripId, supervisorId, {signature = null, ip = null} = {}) => {
+// Con selfStageSkip la etapa se aprueba sola: la rendicion es del Gerente General, que no tiene jefe directo
+const approveExpenseReview = async (tripId, supervisorId, {password = null, ip = null, selfStageSkip = false} = {}) => {
   const {data: trip} = await supabase.from('Viaje').select('id_usuario, id_supervisor_asignado, estado, tiene_alcohol').eq('id_viaje', tripId).single();
   if (!trip) {
     return {error: 'Viaje no encontrado', status: 404};
   }
-  if (trip.id_usuario === supervisorId) {
+  if (trip.id_usuario === supervisorId && !selfStageSkip) {
     return {error: 'No puedes aprobar tu propio viaje', status: 403};
   }
-  if (trip.id_supervisor_asignado !== supervisorId) {
+  if (trip.id_supervisor_asignado !== supervisorId && !selfStageSkip) {
     return {error: 'No tienes permiso para aprobar este viaje', status: 403};
   }
   if (trip.estado !== 'EN_REVISION') {
@@ -445,10 +448,13 @@ const approveExpenseReview = async (tripId, supervisorId, {signature = null, ip 
   if ((await hierarchyAssignmentService.getTripSubstituteIds(tripId)).includes(supervisorId)) {
     return {error: 'No puedes aprobar una rendición que registraste como reemplazo', status: 403};
   }
-  // El jefe directo o supervisor firma el Vo/ Bo de la planilla al aprobarla
-  const signatureError = signatureService.validateSignature(signature);
-  if (signatureError) {
-    return {error: signatureError, status: 400};
+  // El jefe directo o supervisor firma Aprobado por con su firma guardada y su contrasena; si la etapa se aprueba sola no hay trazo
+  let signing = {image: null};
+  if (!selfStageSkip) {
+    signing = await signatureService.signatureForSigning(supervisorId, password);
+    if (signing.error) {
+      return {error: signing.error, status: signing.status};
+    }
   }
   let nextState = 'APROBADO_SUPERVISOR';
   if (trip.tiene_alcohol) {
@@ -461,8 +467,8 @@ const approveExpenseReview = async (tripId, supervisorId, {signature = null, ip 
   if (!updatedRows?.length) {
     return {error: 'Otra persona ya procesó este viaje. Actualiza la página para ver su estado actual.', status: 409};
   }
-  await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.expenseReview, 'APROBADO');
-  await signatureService.saveSignature(tripId, signatureService.signatureStages.boss, supervisorId, {image: signature, ip});
+  await reviewLogService.recordReview(tripId, supervisorId, reviewLogService.reviewStages.expenseReview, 'APROBADO', {automatic: selfStageSkip});
+  await signatureService.saveSignature(tripId, signatureService.signatureStages.boss, supervisorId, {image: signing.image, automatic: selfStageSkip, ip});
   if (trip.tiene_alcohol) {
     await hierarchyAssignmentService.assignNextReviewer(tripId, supervisorId, 'APROBADOR', 'id_aprobador_asignado');
     await require('./selfReviewSkipService').advanceSelfReviewStages(tripId);
