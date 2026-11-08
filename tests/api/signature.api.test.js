@@ -71,6 +71,8 @@ test('verifica el memorándum por su código', async () => {
   expect(verified.status).toBe(200);
   expect(verified.body.tipo).toBe('Memorándum de autorización de viaje');
   expect(verified.body.firmas[0]).toMatchObject({etapa: 'Autorizó el viaje', nombre: 'Pedro Aprobador'});
+  expect(verified.body.viaje.ruta).toMatch(/ → /);
+  expect(verified.body.viaje).not.toHaveProperty('destino');
   expect(verified.body.firmas[0].imagen).toBeUndefined();
   expect((await request(app).get('/document/verify/AAAA-BBBB-CCCC')).status).toBe(404);
   expect((await request(app).get('/document/verify/123')).status).toBe(400);

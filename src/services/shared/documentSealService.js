@@ -96,7 +96,7 @@ const verifyDocument = async (rawCode) => {
   }
   const {data: document} = await supabase
     .from('Documento_Emitido')
-    .select('codigo, tipo, resumen, fecha, id_viaje, Viaje(id_viaje, numero_viaje, anio_viaje, fecha_inicio, motivo, destino, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, apellido_materno))')
+    .select('codigo, tipo, resumen, fecha, id_viaje, Viaje(id_viaje, numero_viaje, anio_viaje, fecha_inicio, origen, destino, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, apellido_materno))')
     .eq('codigo', code)
     .maybeSingle();
   if (!document) {
@@ -117,7 +117,7 @@ const verifyDocument = async (rawCode) => {
   const trip = document.Viaje;
   let tripData = null;
   if (trip) {
-    tripData = {codigo: buildTripCode(trip), motivo: trip.motivo, destino: trip.destino, empleado: signatureService.signerNameOf({Usuario: trip.Usuario})};
+    tripData = {codigo: buildTripCode(trip), ruta: `${trip.origen || '—'} → ${trip.destino}`, empleado: signatureService.signerNameOf({Usuario: trip.Usuario})};
   }
   return {
     document: {
