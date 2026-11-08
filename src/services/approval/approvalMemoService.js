@@ -93,7 +93,6 @@ const generateMemoHtml = (rawTrip, rawApprover, rawTripCode, {signature = null, 
       <div class="firma-cargo">${approver?.Cargo?.nombre || 'Aprobador'}</div>${signedAt}`;
   if (approver?.aprobacionAutomatica) {
     signatureHtml = `<div class="firma-nombre">Aprobación automática</div>
-      <div class="firma-cargo">Sistema de Control de Viáticos</div>
       <div class="firma-nota">El titular del viaje es el aprobador; esta etapa se aprobó automáticamente.</div>`;
   }
   return `<!DOCTYPE html>
@@ -132,7 +131,7 @@ const generateMemoHtml = (rawTrip, rawApprover, rawTripCode, {signature = null, 
   <div class="pagina">
     <div class="membrete">
       <img src="${logoDataUri}" alt="MAXAM FANEXA">
-      <div class="membrete-datos">MAXAM FANEXA<br>Sistema de Control de Viáticos</div>
+      <div class="membrete-datos">MAXAM FANEXA</div>
     </div>
     <div class="titulo-bloque">
       <div class="titulo">MEMORÁNDUM</div>
@@ -141,14 +140,15 @@ const generateMemoHtml = (rawTrip, rawApprover, rawTripCode, {signature = null, 
     <div class="encabezado">
       <span>Para:</span><span>${fullNameOf(employee)}${employee.Cargo?.nombre ? ` — ${employee.Cargo.nombre}` : ''}</span>
       <span>Copia:</span><span>Tesorería, Recursos Humanos y Administración</span>
-      <span>Asunto:</span><span>Autorización de viaje ${tripCode}</span>
+      <span>Asunto:</span><span>Viaje ${tripCode}</span>
     </div>
     <p class="cuerpo">Se autoriza el viaje de <strong>${fullNameOf(employee)}</strong>${employee.Cargo?.nombre ? `, ${employee.Cargo.nombre}` : ''}, con motivo de ${trip.motivo}, con los siguientes datos:</p>
     <table class="datos">${rows}</table>
-    <p class="cuerpo">${purchaseTextOf(trip)} Se solicita también la asignación del fondo a rendir indicado.</p>
+    <p class="cuerpo">${purchaseTextOf(trip)}</p>
+    <p class="cuerpo"><strong>Asignación de fondos a rendir:</strong> se solicita a Tesorería la revisión y asignación de los fondos a rendir de este viaje, con cargo a rendición de cuentas documentada al finalizar el viaje.</p>
     <div class="firma">${signatureHtml}</div>
     ${documentSealService.sealHtml(seal)}
-    <div class="pie"><span>MAXAM FANEXA — Documento generado por el Sistema de Control de Viáticos</span><span>${tripCode}</span></div>
+    <div class="pie"><span>MAXAM FANEXA</span><span>${tripCode}</span></div>
   </div>
 </body>
 </html>`;

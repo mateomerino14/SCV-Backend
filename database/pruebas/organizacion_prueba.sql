@@ -66,6 +66,13 @@ update "Usuario" set id_jefe_directo = (select id_usuario from "Usuario" where e
 
 -- Sofia queda sin jefe directo para probar el respaldo
 
+-- Firma digital guardada de cada usuario de prueba, con la que firman sus aprobaciones
+insert into "Firma_Usuario" (id_usuario, imagen)
+select id_usuario, 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAAoCAYAAAA16j4lAAAB1klEQVR4Xu2Zy3HCQBiDITVQDuWnHHpIZg+eccw+9L83g75LDplgRVrJYG43QgghhBBCCCGZPB7Pn3a94yfJ5R55uV6or9d36DXJX76iDNmxsZ+4JiFtWoVb0eJPXRP3Bq/CrWCkaUetCBLdrg2eteT6u6wWI2ZkabGi8dC9wWfOxl1NRIy3gs5yhhYrPY2IbreANacrklm4vcYiZlXQdI3+F2R5XAJGzalo8cH12ruHPAq2gQR7YA4YncER6OGQgK7JriGPPGl6JeE2TAFrwpUKlCI9MDuFbJ3jHup30Zpwz6Atk2DRZPlbK7NDaS2EqsGVZkimXmJOVZM959ilwZ7herU4UpP0TQ3KLFj0NRBEL+Zp5IE15AxNniFHznEPeKIjjLQSpSlqrqPnWD3RUUZaWhytqeF1jaw5NjX4jOTNi4bZjHkav8LaZK+HFRaWE229RyJIDoxXq1C0IVfMsbjBqyZ5on2MKTkcWiQhRzyssDBscHZTEDLWZMQq5B3muEf3Y1JluKMQKzWdkaxaxrqseAt4ByMREyvNW+mr1HblbaKRr9WqqTZwdv1qbcuAG4fIKrH/wcCrR5qv8jIQParMZIdbBQnmCHl1zyOEEEIIIYQQP34BCsyK1WG1RtkAAAAASUVORK5CYII='
+from "Usuario"
+where email_corporativo like '%@maxam.com'
+on conflict (id_usuario) do nothing;
+
 select
   u.nombre || ' ' || u.apellido_paterno as usuario,
   r.nombre as rol,

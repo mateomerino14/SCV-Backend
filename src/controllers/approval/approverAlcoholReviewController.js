@@ -82,7 +82,7 @@ const getAlcoholReviewDetail = async (req, res) => {
 const approveAlcoholReview = async (req, res) => {
   const {tripId} = req.params;
   const approverId = req.user.id_usuario;
-  const result = await approverAlcoholReviewService.approveAlcoholReview(tripId, approverId, {signature: req.body?.firma, ip: req.ip});
+  const result = await approverAlcoholReviewService.approveAlcoholReview(tripId, approverId, {password: req.body?.contrasenia, ip: req.ip});
   if (result.error) {
     return res.status(result.status).json({error: result.error});
   }
