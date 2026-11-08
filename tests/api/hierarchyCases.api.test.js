@@ -263,3 +263,18 @@ test('nadie aprueba su propio viaje ni la rendición de otro sin estar asignado'
   expect((await clients['pedro.aprobador'].post(`/approver/trip/${tripId}/approve`)).status).toBe(400);
   expect((await clients['lucia.revisora'].post(`/reviewer/${tripId}/approve`)).status).toBe(400);
 });
+
+// El tesorero ajusta el monto de su propio viaje al registrarlo; como su etapa de fondos se aprueba sola, queda ese monto
+test('el fondo del viaje del tesorero es el monto que él ajustó al registrarlo', async () => {
+  await setBoss('tesoro.prueba', 'maria.supervisora');
+  const created = await clients['tesoro.prueba'].post('/trip', {
+    motivo: 'Viaje del tesorero con monto ajustado', origen: 'La Paz', destino: 'Oruro', fecha_inicio: boliviaDate(), fecha_fin: boliviaDate(1), tipo: 'Nacional', transporte: 'Terrestre', monto_asignado: 777.5,
+  });
+  const tripId = created.body.id_viaje;
+  await clients['tesoro.prueba'].put(`/trip/${tripId}/submit-review`);
+  expect((await clients['maria.supervisora'].post(`/review/trip-review/${tripId}/approve`)).status).toBe(200);
+  expect((await clients['pedro.aprobador'].post(`/approver/trip/${tripId}/approve`)).status).toBe(200);
+  const {data: trip} = await supabase.from('Viaje').select('estado, monto_asignado').eq('id_viaje', tripId).single();
+  expect(trip.estado).toBe('EN_CURSO');
+  expect(parseFloat(trip.monto_asignado)).toBe(777.5);
+});
