@@ -72,12 +72,20 @@ const getExpenseTaxValues = (expense) => {
   return {vat: 0, rcIva: retentions.retencion_rc_iva, iue: retentions.retencion_iue, it: retentions.retencion_it, cost: retentions.importe_costo};
 };
 
+// Nombre del producto de la factura con su cantidad, si la tiene
+const productLabelOf = (detail) => {
+  if (detail.cantidad) {
+    return `${cleanValue(detail.nombre_producto)} x${detail.cantidad}`;
+  }
+  return cleanValue(detail.nombre_producto);
+};
+
 // Arma la descripcion visible de un gasto segun tenga factura o subitems
 const getExpenseDescription = (expense) => {
   const hasInvoice = !!expense.Factura;
   if (hasInvoice) {
     const products = (expense.Factura?.Detalle_Factura || [])
-      .map((detail) => `${cleanValue(detail.nombre_producto)}${detail.cantidad ? ` x${detail.cantidad}` : ''}`)
+      .map(productLabelOf)
       .join(', ');
     return escapeHtml((products || expense.descripcion || `Factura N° ${cleanValue(expense.Factura?.numero_factura)}`).toUpperCase());
   }

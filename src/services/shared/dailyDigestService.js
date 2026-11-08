@@ -65,7 +65,12 @@ const getTeamPendingCounts = async (bossId) => {
 };
 
 // "1 viaje esperando" / "3 viajes esperando"
-const countLine = (count, singular, plural, rest) => `${count} ${count === 1 ? singular : plural} ${rest}`;
+const countLine = (count, singular, plural, rest) => {
+  if (count === 1) {
+    return `${count} ${singular} ${rest}`;
+  }
+  return `${count} ${plural} ${rest}`;
+};
 
 // Arma y envia el resumen a un grupo; con dryRun solo lo agrega al reporte
 const sendDigestToGroup = async (users, title, bodyLines, report, dryRun) => {
