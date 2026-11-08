@@ -204,4 +204,4 @@ const signatureStyles = `
   .firma-fecha { font-size: 6pt; color: #7f7f7f; }
 `;
 
-module.exports = {signatureStages, validateSignature, getUserSignature, saveUserSignature, signatureForSigning, saveSignature, getTripSignatures, submitterOf, getStatementSignatures, statementSignaturesForExport, signerNameOf, signatureDateOf, signatureBlockHtml, signatureStyles};
+module.exports = {signatureStages, getUserSignature, saveUserSignature, signatureForSigning, saveSignature, getTripSignatures, submitterOf, getStatementSignatures, statementSignaturesForExport, signerNameOf, signatureDateOf, signatureBlockHtml, signatureStyles};
