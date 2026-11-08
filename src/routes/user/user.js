@@ -22,6 +22,8 @@ router.get('/me', authMiddleware, userController.getMe);
 router.put('/me/update', authMiddleware, userController.updateMe);
 router.put('/me/photo', authMiddleware, upload.single('foto'), userController.updateMyPhoto);
 router.put('/me/change-password', authMiddleware, userController.changeMyPassword);
+router.get('/me/signature', authMiddleware, userController.getMySignature);
+router.put('/me/signature', authMiddleware, userController.updateMySignature);
 router.get('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.getAllUsers);
 router.put('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.updateUser);
 router.post('/', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.createUser);

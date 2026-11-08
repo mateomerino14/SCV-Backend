@@ -92,7 +92,7 @@ const submitToReview = async (req, res) => {
 const confirmCompletion = async (req, res) => {
   const {justificaciones} = req.body;
   const userId = req.user.id_usuario;
-  const result = await tripService.confirmCompletion(req.params.id, userId, justificaciones, {signature: req.body?.firma, ip: req.ip});
+  const result = await tripService.confirmCompletion(req.params.id, userId, justificaciones, {password: req.body?.contrasenia, ip: req.ip});
   if (result.error) {
     return res.status(result.status).json({error: result.error});
   }

@@ -1,4 +1,4 @@
-const {login, api, boliviaDate, request, app, testSignature} = require('./helpers');
+const {login, api, boliviaDate, request, app, testSignature, testPassword} = require('./helpers');
 const supabase = require('../../src/config/supabase');
 
 jest.setTimeout(60000);
@@ -21,15 +21,46 @@ beforeAll(async () => {
   await supervisor.post(`/review/trip-review/${tripId}/approve`);
 });
 
-// Sin trazo, o con algo que no es un PNG dibujado, no se aprueba ni se envia nada
-test('pide la firma dibujada para aprobar el viaje', async () => {
-  const withoutSignature = await approver.post(`/approver/trip/${tripId}/approve`, {firma: null});
-  expect(withoutSignature.status).toBe(400);
-  expect(withoutSignature.body.error).toBe('Firma en el recuadro antes de continuar');
-  const fake = await approver.post(`/approver/trip/${tripId}/approve`, {firma: 'data:image/png;base64,"><script>'});
-  expect(fake.status).toBe(400);
-  const approved = await approver.post(`/approver/trip/${tripId}/approve`, {firma: testSignature});
+// Se firma con la firma guardada en el perfil: sin la contrasena correcta no se aprueba nada
+test('pide la contraseña para firmar con la firma guardada', async () => {
+  const withoutPassword = await approver.post(`/approver/trip/${tripId}/approve`, {contrasenia: ''});
+  expect(withoutPassword.status).toBe(400);
+  expect(withoutPassword.body.error).toBe('La contraseña no es correcta');
+  expect((await approver.post(`/approver/trip/${tripId}/approve`, {contrasenia: 'otra-clave'})).status).toBe(400);
+  const approved = await approver.post(`/approver/trip/${tripId}/approve`, {contrasenia: testPassword});
   expect(approved.status).toBe(200);
+  const {data: memoSignature} = await supabase.from('Firma').select('imagen, automatica').eq('id_viaje', tripId).eq('etapa', 'MEMORANDUM').single();
+  expect(memoSignature).toEqual({imagen: testSignature, automatica: false});
+});
+
+// Cada usuario registra o cambia su firma en el perfil con su contrasena, y la firma debe ser un trazo PNG
+test('registra y cambia la firma digital del perfil', async () => {
+  const user = api(await login('carlos.empleado'));
+  expect((await user.get('/user/me/signature')).body.firma.imagen).toBe(testSignature);
+  expect((await user.put('/user/me/signature', {firma: testSignature, contrasenia: 'otra-clave'})).status).toBe(400);
+  const fake = await user.put('/user/me/signature', {firma: 'data:image/png;base64,"><script>', contrasenia: testPassword});
+  expect(fake.status).toBe(400);
+  expect(fake.body.error).toBe('Firma en el recuadro antes de continuar');
+  const saved = await user.put('/user/me/signature', {firma: testSignature, contrasenia: testPassword});
+  expect(saved.status).toBe(200);
+  expect(saved.body.firma.imagen).toBe(testSignature);
+});
+
+// Sin firma registrada no se puede firmar, y tras muchos intentos con una contrasena equivocada se bloquea un rato
+test('pide registrar la firma antes de firmar y frena los intentos con contraseña equivocada', async () => {
+  const signatureService = require('../../src/services/shared/signatureService');
+  const {data: carlos} = await supabase.from('Usuario').select('id_usuario').eq('email_corporativo', 'carlos.empleado@maxam.com').single();
+  await supabase.from('Firma_Usuario').delete().eq('id_usuario', carlos.id_usuario);
+  const user = api(await login('carlos.empleado'));
+  expect((await user.get('/user/me/signature')).body.firma).toBeNull();
+  expect(await signatureService.signatureForSigning(carlos.id_usuario, testPassword)).toEqual({error: 'Registra tu firma digital en tu perfil antes de firmar', status: 400});
+  expect((await user.put('/user/me/signature', {firma: testSignature, contrasenia: testPassword})).status).toBe(200);
+  expect(await signatureService.signatureForSigning(carlos.id_usuario, testPassword)).toEqual({image: testSignature});
+  for (let attempt = 0; attempt < 10; attempt++) {
+    expect((await signatureService.signatureForSigning(carlos.id_usuario, 'otra-clave')).status).toBe(400);
+  }
+  const blocked = await signatureService.signatureForSigning(carlos.id_usuario, testPassword);
+  expect(blocked.status).toBe(429);
 });
 
 // El memorandum queda registrado con su codigo y al verificarlo muestra quien autorizo el viaje
@@ -45,27 +76,33 @@ test('verifica el memorándum por su código', async () => {
   expect((await request(app).get('/document/verify/123')).status).toBe(400);
 });
 
-// Enviar la rendicion pide la firma del empleado y aprobarla la del jefe; sin gastos no deducibles el gerente no da su Vo/ Bo
-test('la planilla lleva las firmas de quien la preparó y del jefe', async () => {
+// La planilla lleva Preparado por (empleado), Aprobado por (jefe directo) y Revisado/Registrado por (revisor)
+test('la planilla lleva las firmas de quien la preparó, del jefe y del revisor', async () => {
   await api(await login('tesoro.prueba')).post(`/treasurer/${tripId}/approve`);
   await employee.postForm('/expense/register', {id_viaje: tripId, monto_total: 40, fecha_gasto: boliviaDate(), tipo: 'S', descripcion: 'Taxi', id_categoria_gasto: 1, es_gasto_internacional: false});
-  expect((await employee.put(`/trip/${tripId}/confirm-completion`, {justificaciones: [], firma: ''})).status).toBe(400);
+  expect((await employee.put(`/trip/${tripId}/confirm-completion`, {justificaciones: [], contrasenia: ''})).status).toBe(400);
   expect((await employee.put(`/trip/${tripId}/confirm-completion`, {justificaciones: []})).status).toBe(200);
   await supervisor.post(`/review/expense-review/${tripId}/take`);
-  expect((await supervisor.post(`/review/expense-review/${tripId}/approve`, {firma: undefined})).status).toBe(400);
+  expect((await supervisor.post(`/review/expense-review/${tripId}/approve`, {contrasenia: 'otra-clave'})).status).toBe(400);
   expect((await supervisor.post(`/review/expense-review/${tripId}/approve`)).status).toBe(200);
   const signatures = (await employee.get(`/trip/${tripId}/firmas-planilla`)).body;
   expect(signatures.preparado).toMatchObject({nombre: 'Juan Empleado', automatica: false});
   expect(signatures.jefe.nombre).toBe('María Supervisora');
   expect(signatures.jefe.imagen.startsWith('data:image/png;base64,')).toBe(true);
-  expect(signatures.gerente).toBeNull();
-  expect(signatures.gerenteNoRequerido).toBe(true);
+  expect(signatures.revisor).toBeNull();
+  const reviewer = api(await login('lucia.revisora'));
+  expect((await reviewer.post(`/reviewer/${tripId}/approve`, {contrasenia: 'otra-clave'})).status).toBe(400);
+  expect((await reviewer.post(`/reviewer/${tripId}/approve`)).status).toBe(200);
+  const finalSignatures = (await employee.get(`/trip/${tripId}/firmas-planilla`)).body;
+  expect(finalSignatures.revisor).toMatchObject({nombre: 'Lucía Revisora', automatica: false});
+  expect(finalSignatures.gerente).toBeUndefined();
   const signatureService = require('../../src/services/shared/signatureService');
   const {generateStatementHtml} = require('../../src/services/trip/tripStatementService');
   const html = generateStatementHtml({id_viaje: tripId, tipo: 'Nacional', fecha_inicio: boliviaDate(), motivo: 'x', monto_asignado: 900, Usuario: {nombre: 'Juan'}}, [], [], {signatures: await signatureService.getStatementSignatures(tripId), seal: {code: 'ABCDEFGHJKMN', verifyUrl: 'https://scv.test/verificar/ABCDEFGHJKMN', qrDataUri: 'data:image/png;base64,AAAA'}});
   expect(html).toContain('class="firma-trazo"');
   expect(html).toContain('Firmado electrónicamente el');
   expect(html).toContain('ABCD-EFGH-JKMN');
-  expect(html).toContain('Gerente de Área');
-  expect(html).toContain('No requiere Vo/ Bo de gerencia');
+  expect(html).toContain('Aprobado por');
+  expect(html).toContain('Revisado/Registrado por');
+  expect(html).not.toContain('Vo/ Bo');
 });
