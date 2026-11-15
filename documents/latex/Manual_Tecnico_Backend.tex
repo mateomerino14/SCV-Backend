@@ -514,6 +514,8 @@ Aprobador y revisor son roles únicos: todo viaje de su etapa les corresponde. E
 \section{Reglas de negocio}
 
 \subsection{Monto del viaje}
+\textbf{Listas paginadas.} \code{GET /user/all}, \code{GET /position} y \code{GET /section} aceptan \code{page} (desde 1), \code{limit} (15 por defecto, 100 como máximo) y \code{search}; \code{/user/all} además \code{rol} y \code{seccion} (el id o \code{ninguna}). Con \code{page} responden \code{\{items, total, page, limit\}}: una página y el total que cumple el filtro, para que la pantalla del administrador no descargue miles de usuarios de una vez; sin \code{page}, la lista completa con los mismos filtros (exportaciones a Excel y selectores). La búsqueda (\code{utils/listQuery.js}) separa las palabras y cada una debe aparecer en alguno de los campos, sin importar mayúsculas ni tildes, y descarta los signos que no sean letras, números, @, punto, guion o guion bajo. \code{GET /user/options} es la lista liviana para elegir el jefe directo, y \code{GET /travel-scale} trae en cada tipo cuántos cargos lo usan. La prueba \code{listPagination.api.test.js} lo verifica con 3000 usuarios.
+
 \textbf{Escala de viáticos.} Las tarifas salen de la tabla \code{Escala_Viatico} (punto 5.3 del reglamento): tipo C (Gerente General y Gerentes de Área) Bs 460 en el interior, USD 345 en países clase 1 y USD 280 en clase 2, hospedaje hasta 5 estrellas; tipo B (Jefes de Área) Bs 340, USD 280 y USD 230, hasta 3 estrellas; tipo A (el resto del personal) Bs 230, USD 230 y USD 170, hasta 3 estrellas. Cada cargo lleva su tipo en \code{tipo_viatico}. Clase 1 son Europa, Asia, África y Norte América; clase 2, Centro y Sud América y el Caribe (\code{utils/countryClasses.js}; Oceanía, que el reglamento no menciona, se toma como clase 1). El administrador edita la escala con \code{PUT /travel-scale/:tipo}, agrega tipos nuevos con \code{POST /travel-scale} (una letra de la A a la Z que no exista, con sus tres montos, el hospedaje y la descripción) y elimina con \code{DELETE /travel-scale/:tipo} un tipo que ningún cargo use, siempre que no sea el último. La escala se lista de la tarifa interior más alta a la más baja, y los cargos (al crearlos o importarlos) se validan contra los tipos guardados. Al guardar un viaje, \code{travelScaleService.tripRatesFor} exige en uno internacional un \code{pais_destino} de la lista y fija en el viaje \code{clase_pais}, \code{tarifa_diaria} y \code{tarifa_diaria_usd}; el control diario y el memorándum usan esas tarifas, así que cambiar la escala no altera los viajes ya registrados. El hospedaje es informativo: sale en el memorándum.
 
 Al registrar o editar un viaje, el monto se calcula con la escala del cargo del empleado y se envía en \code{monto_asignado} y \code{monto_asignado_usd}. En un viaje nacional es \emph{días × tarifa en Bs}. En uno internacional, el día de salida y el de regreso se calculan con la tarifa en Bs y los días intermedios con la tarifa en USD de la clase del país. Tesorería revisa el monto y lo ajusta al asignar los fondos.
@@ -573,6 +575,7 @@ Todas las rutas, salvo las de \code{/auth} y \code{/user/check-email}, requieren
 \ep{GET}{/user/employees}{Roles}{Lista de empleados para filtros}
 \epf{POST}{/user/check-email}{Público}{Verifica si un correo está registrado}
 \ep{GET POST}{/user}{Administrador}{Lista y crea usuarios}
+\epf{GET}{/user/all, /user/options}{Administrador}{Usuarios con todos sus datos (con \code{page}, \code{limit}, \code{search}, \code{rol} y \code{seccion}, de a una página con el total) y lista liviana para elegir el jefe directo}
 \epf{POST}{/user/import/preview}{Administrador}{Revisa el Excel de usuarios sin guardar}
 \ep{POST}{/user/import}{Administrador}{Crea los usuarios válidos del Excel}
 \epf{PUT DELETE}{/user/:id}{Administrador}{Edita o elimina un usuario}
@@ -642,7 +645,7 @@ Las secciones y los cargos también se importan (\code{catalogImportService}, ha
 \subsection{Catálogos y administración}
 {\small\begin{xltabular}{\textwidth}{L{1.45cm} L{5.4cm} L{2.4cm} Y}
 \tablaEp{}
-\epf{GET}{/position, /section}{Sesión}{Cargos y secciones}
+\epf{GET}{/position, /section}{Sesión}{Cargos y secciones; con \code{page}, \code{limit} y \code{search} salen de a una página con el total}
 \ep{POST PUT}{/position, /section}{Administrador}{Crea y edita; el cargo exige su \code{tipo_viatico}}
 \epf{POST}{/position/import, /section/import}{Administrador}{Cargan cargos y secciones desde Excel; con \code{/preview} solo revisan}
 \ep{GET POST PUT DELETE}{/travel-scale, /travel-scale/:tipo}{Sesión / Administrador}{Escala de viáticos; solo el administrador agrega, cambia o elimina tipos}

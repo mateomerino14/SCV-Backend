@@ -314,7 +314,7 @@ tests/                        Pruebas: services/ (unitarias), api/ (de la API), 
 | Prefijo | Archivo | Alcance |
 |---|---|---|
 | `/auth` | `user/auth.js` | Inicio y cierre de sesión, renovación, recuperación por código |
-| `/user` | `user/user.js` | Perfil, cambio de contraseña y gestión de usuarios; `/user/import/preview` y `/user/import` (administrador) revisan y crean usuarios desde Excel |
+| `/user` | `user/user.js` | Perfil, cambio de contraseña y gestión de usuarios; `/user/import/preview` y `/user/import` (administrador) revisan y crean usuarios desde Excel; `/user/all` lista los usuarios (paginada, ver más abajo) y `/user/options` es la lista liviana para elegir el jefe directo |
 | `/trip` | `trip/trip.js` | Ciclo de vida del viaje, planilla en PDF y datos de planillas de varios viajes para Excel (`/trip/export/statements`: revisor, tesorero y administrador) |
 | `/expense` | `expense/expense.js` | Gastos y recibos; al registrar o editar un gasto sin factura se envía el comprobante (`imagen`) y, solo en gastos internacionales (en dólares, de un viaje internacional), hasta 2 respaldos (`respaldos`, para el comprobante del cambio de moneda; en un gasto en bolivianos se responde 400); al editar, `respaldos_conservados` indica cuáles se mantienen |
 | `/invoice` | `expense/invoice.js` | Extracción y registro de facturas |
@@ -459,6 +459,10 @@ En la factura (`F`) el IVA es el **13 % del total** y se resta de él: subtotal 
 | **Total** | **240.00** | **285.73** | **37.15** | **8.58** |
 
 Calcular sobre el total de 240 de una vez daría 285.71: por eso se calcula por línea, igual que el recibo en papel que corrige contabilidad.
+
+### Listas paginadas en el servidor
+
+`GET /user/all`, `GET /position` y `GET /section` aceptan `page` (desde 1), `limit` (15 por defecto, 100 como máximo) y `search`; `/user/all` además `rol` (por ejemplo `EMPLEADO`) y `seccion` (el id, o `ninguna`). Con `page` responden `{items, total, page, limit}`: solo esa página y cuántas filas cumplen el filtro, así la pantalla del administrador no descarga miles de usuarios de una vez. Sin `page` responden la lista completa con los mismos filtros (la usan las exportaciones a Excel y los selectores de cargo y sección). La búsqueda (`utils/listQuery.js`) separa las palabras y cada una debe aparecer en alguno de los campos (usuarios: nombre, apellidos y correo; cargos: nombre; secciones: nombre y código de Oracle), sin importar mayúsculas ni tildes; se quitan los signos que no sean letras, números, `@`, `.`, `_` o `-`. Una página pasada del final sale vacía con el total. `GET /travel-scale` trae en cada tipo cuántos cargos lo usan (`cargos`). Con 3000 usuarios de prueba cada página responde en milisegundos (`tests/api/listPagination.api.test.js`).
 
 ### Escala de viáticos
 
