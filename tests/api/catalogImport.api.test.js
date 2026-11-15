@@ -68,7 +68,7 @@ test('importa cargos con su tipo de viático', async () => {
   ]});
   const [valid, withoutType, repeated] = preview.body.filas;
   expect(valid).toMatchObject({accion: 'Crear', tipo_viatico: 'B', valido: true});
-  expect(withoutType.errores).toContain('El tipo de viático debe ser A, B o C');
+  expect(withoutType.errores).toContain('El tipo de viático debe ser uno de la escala: A, B, C');
   expect(repeated.errores).toContain('Se repite con la fila 2');
   const created = await admin.post('/position/import', {filas: [{fila: 2, nombre: name, tipo_viatico: 'B'}]});
   expect(created.body).toMatchObject({creados: 1});
