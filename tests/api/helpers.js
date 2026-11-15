@@ -50,4 +50,18 @@ const api = (token) => ({
   putForm: (path, data, images = []) => attachImages(request(app).put(path).set('authorization', `Bearer ${token}`).field('datos', JSON.stringify(data)), images),
 });
 
-module.exports = {app, request, login, api, boliviaDate, testSignature, testPassword};
+// Junta las filas de todas las pestanas de una bandeja, o solo de una si se indica
+const inboxRows = async (client, inbox, onlyTab = null) => {
+  const first = await client.get(`/inbox/${inbox}?limit=100`);
+  let tabs = Object.keys(first.body.counts || {});
+  if (onlyTab) {
+    tabs = [onlyTab];
+  }
+  const rows = [];
+  for (const tab of tabs) {
+    rows.push(...(await client.get(`/inbox/${inbox}?tab=${tab}&limit=100`)).body.items);
+  }
+  return rows;
+};
+
+module.exports = {app, request, login, api, boliviaDate, testSignature, testPassword, inboxRows};
