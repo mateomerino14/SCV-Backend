@@ -82,35 +82,6 @@ const sendApprovalMemo = async (trip, approver, tripCode, allUsers) => {
   await emailService.sendEmail(to, `Memorandum de Aprobación — ${tripCode}`, emailHtml, attachments);
 };
 
-// Lista los viajes pendientes de aprobacion previa, con filtros opcionales
-const getPendingTrips = async (approverId, filters) => {
-  let query = supabase
-    .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
-    .eq('estado', 'APROBADO_VIAJE')
-    .is('id_aprobador_asignado', null)
-    .neq('id_usuario', approverId);
-  if (filters.fecha_inicio) {
-    query = query.gte('fecha_inicio', filters.fecha_inicio);
-  }
-  if (filters.fecha_fin) {
-    query = query.lte('fecha_fin', filters.fecha_fin);
-  }
-  if (filters.id_empleado) {
-    query = query.eq('id_usuario', filters.id_empleado);
-  }
-  const {data, error} = await query.order('fecha_inicio', {ascending: false});
-  if (error) {
-    return {error: error.message};
-  }
-  else {
-    const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
-      data || [], approverId, 'APROBADOR', (trip) => trip.id_supervisor_asignado
-    );
-    return {trips: hierarchyAssignmentService.filterBySection(trips, filters.id_seccion)};
-  }
-};
-
 // Lista los viajes asignados al aprobador, con filtros opcionales
 const getMyTrips = async (approverId, filters) => {
   const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre)), Comentario(*)';
@@ -274,7 +245,7 @@ const rejectTrip = async (tripId, approverId) => {
 };
 
 module.exports = {
-  getPendingTrips, getMyTrips, getTripDetail, approveTrip, rejectTrip,
+  getMyTrips, getTripDetail, approveTrip, rejectTrip,
   addComment: tripCommentService.addTripComment,
   editComment: tripCommentService.editTripComment,
   deleteComment: tripCommentService.deleteTripComment,

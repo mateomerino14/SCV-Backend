@@ -1,29 +1,5 @@
 const reviewerService = require('../../services/approval/reviewerService');
 
-// Lista los viajes pendientes de revision final
-const getPendingReviews = async (req, res) => {
-  const reviewerId = req.user.id_usuario;
-  const result = await reviewerService.getPendingReviews(reviewerId, req.query);
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.trips);
-  }
-};
-
-// Lista las revisiones finales asignadas al revisor
-const getMyReviews = async (req, res) => {
-  const reviewerId = req.user.id_usuario;
-  const result = await reviewerService.getMyReviews(reviewerId, req.query);
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.trips);
-  }
-};
-
 // Obtiene el detalle de un viaje en revision final
 const getReviewDetail = async (req, res) => {
   const {tripId} = req.params;
@@ -118,4 +94,4 @@ const deleteComment = async (req, res) => {
   }
 };
 
-module.exports = {getPendingReviews, getMyReviews, getReviewDetail, approveReview, rejectReview, addComment, editComment, deleteComment};
+module.exports = {getReviewDetail, approveReview, rejectReview, addComment, editComment, deleteComment};

@@ -1,29 +1,5 @@
 const approverAlcoholReviewService = require('../../services/approval/approverAlcoholReviewService');
 
-// Lista los viajes pendientes de revision adicional por alcohol
-const getPendingAlcoholReviews = async (req, res) => {
-  const approverId = req.user.id_usuario;
-  const result = await approverAlcoholReviewService.getPendingAlcoholReviews(approverId, req.query);
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.trips);
-  }
-};
-
-// Lista los viajes de revision adicional asignados al aprobador
-const getMyAlcoholReviews = async (req, res) => {
-  const approverId = req.user.id_usuario;
-  const result = await approverAlcoholReviewService.getMyAlcoholReviews(approverId, req.query);
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.trips);
-  }
-};
-
 // Toma un viaje para revision adicional por alcohol
 const takeAlcoholReview = async (req, res) => {
   const {tripId} = req.params;
@@ -145,8 +121,4 @@ const deleteAlcoholReviewComment = async (req, res) => {
   }
 };
 
-module.exports = {
-  getPendingAlcoholReviews, getMyAlcoholReviews, takeAlcoholReview, returnAlcoholReview,
-  getAlcoholReviewDetail, approveAlcoholReview, rejectAlcoholReview,
-  addAlcoholReviewComment, editAlcoholReviewComment, deleteAlcoholReviewComment,
-};
+module.exports = {takeAlcoholReview, returnAlcoholReview, getAlcoholReviewDetail, approveAlcoholReview, rejectAlcoholReview, addAlcoholReviewComment, editAlcoholReviewComment, deleteAlcoholReviewComment};
