@@ -326,7 +326,7 @@ tests/                        Pruebas: services/ (unitarias), api/ (de la API), 
 | `/reviewer` | `approval/reviewer.js` | Revisión final |
 | `/deadline-authorization` | `approval/deadlineAuthorization.js` | Extensiones de plazo |
 | `/substitution` | `approval/substitution.js` | Rendición por terceros |
-| `/role`, `/position`, `/section`, `/travel-scale`, `/expense-category`, `/tax`, `/audit` | `catalog/` | Catálogos e historial de accesos; `/position/import` y `/section/import` (con su `/preview`) cargan cargos y secciones desde Excel y `/travel-scale` es la escala de viáticos (la edita el administrador) (el filtro de fechas usa días de Bolivia). La auditoría solo se consulta: la escribe el sistema al ingresar, salir, cambiar la contraseña y activar o suspender un vehículo (con la placa en `detalle`) |
+| `/role`, `/position`, `/section`, `/travel-scale`, `/expense-category`, `/tax`, `/audit` | `catalog/` | Catálogos e historial de accesos; `/position/import` y `/section/import` (con su `/preview`) cargan cargos y secciones desde Excel y `/travel-scale` es la escala de viáticos (el administrador agrega, edita y elimina tipos) (el filtro de fechas usa días de Bolivia). La auditoría solo se consulta: la escribe el sistema al ingresar, salir, cambiar la contraseña y activar o suspender un vehículo (con la placa en `detalle`) |
 | `/admin` | `admin/admin.js` | Resumen general del administrador (con periodo opcional `fecha_inicio` y `fecha_fin`; los montos por sección cuentan solo viajes con fondos entregados) y configuración de recordatorios |
 
 Las imágenes de comprobantes y los productos de cada factura no tienen rutas propias: se gestionan solo a través de `/expense` y `/invoice`, que verifican dueño, etapa y plazo.
@@ -406,7 +406,7 @@ Las secciones y los cargos también se cargan o actualizan desde Excel (`catalog
 - `POST /section/import/preview` y `POST /position/import/preview` devuelven cada fila con su acción (**Crear**, **Actualizar** o **Sin cambios**) y sus errores, sin guardar nada.
 - `POST /section/import` y `POST /position/import` vuelven a validar, crean las nuevas, actualizan las que cambian y devuelven `creados`, `actualizados`, `sinCambios` y las filas `omitidos` con su motivo.
 
-Una **sección** se reconoce por su código de Oracle (3 dígitos, obligatorio): si existe, se actualiza su nombre; si una sección sin código tiene el mismo nombre, se le completa el código; si el nombre lo usa otra sección con otro código, la fila da error. Un **cargo** se reconoce por su nombre (sin importar mayúsculas ni tildes) y debe traer su tipo de viático A, B o C. En ambos, la columna Estado (Activo o Suspendido) es opcional: vacía, lo nuevo entra activo y lo existente queda como está. Un código o nombre repetido en el archivo se marca en la fila que lo repite. Los nombres se guardan tal como vienen, porque son los mismos de Oracle. El Excel que exportan las pantallas de Secciones y Cargos tiene las mismas columnas, así que se puede exportar, corregir y volver a importar.
+Una **sección** se reconoce por su código de Oracle (3 dígitos, obligatorio): si existe, se actualiza su nombre; si una sección sin código tiene el mismo nombre, se le completa el código; si el nombre lo usa otra sección con otro código, la fila da error. Un **cargo** se reconoce por su nombre (sin importar mayúsculas ni tildes) y debe traer uno de los tipos de viático de la escala (A, B, C u otro que se haya agregado). En ambos, la columna Estado (Activo o Suspendido) es opcional: vacía, lo nuevo entra activo y lo existente queda como está. Un código o nombre repetido en el archivo se marca en la fila que lo repite. Los nombres se guardan tal como vienen, porque son los mismos de Oracle. El Excel que exportan las pantallas de Secciones y Cargos tiene las mismas columnas, así que se puede exportar, corregir y volver a importar.
 
 ### Importación de usuarios desde Excel
 
@@ -462,7 +462,7 @@ Calcular sobre el total de 240 de una vez daría 285.71: por eso se calcula por 
 
 ### Escala de viáticos
 
-Las tarifas diarias salen de la **escala de viáticos** de la empresa (punto 5.3 del reglamento), guardada en la tabla `Escala_Viatico` y editable por el administrador (`GET /travel-scale`, `PUT /travel-scale/:tipo`, `travelScaleService`):
+Las tarifas diarias salen de la **escala de viáticos** de la empresa (punto 5.3 del reglamento), guardada en la tabla `Escala_Viatico` y editable por el administrador (`GET /travel-scale`, `POST /travel-scale`, `PUT /travel-scale/:tipo`, `DELETE /travel-scale/:tipo`, `travelScaleService`). Estos son los tipos iniciales:
 
 | Tipo | Quién | Interior (Bs/día) | Exterior clase 1 (USD/día) | Exterior clase 2 (USD/día) | Hospedaje |
 |---|---|---|---|---|---|
@@ -470,7 +470,7 @@ Las tarifas diarias salen de la **escala de viáticos** de la empresa (punto 5.3
 | B | Jefes de Área | 340 | 280 | 230 | Hasta 3 estrellas |
 | A | Personal no comprendido en las anteriores | 230 | 230 | 170 | Hasta 3 estrellas |
 
-Cada cargo lleva su tipo (`Cargo.tipo_viatico`, A, B o C). Países clase 1: Europa, Asia, África y Norte América (Canadá, Estados Unidos y México); clase 2: Centro y Sud América y el Caribe. La lista de países con su clase está en `utils/countryClasses.js` (Oceanía no figura en el reglamento y se toma como clase 1). El viaje internacional exige `pais_destino` de esa lista; al guardar el viaje, `tripRatesFor` fija en el propio viaje `clase_pais`, `tarifa_diaria` (Bs, del tipo del cargo) y `tarifa_diaria_usd` (USD según la clase del país; 0 en un viaje nacional). El control diario, la planilla y el memorándum usan esas tarifas guardadas, así que un cambio posterior de la escala no altera los viajes ya registrados. El hospedaje es informativo: se muestra al crear el viaje y en el memorándum, sin bloquear gastos.
+El administrador puede **agregar tipos nuevos** (una letra de la A a la Z que no exista, con sus tres montos, el hospedaje y la descripción) y eliminar un tipo solo si ningún cargo lo usa y no es el último. La escala se lista de la tarifa interior más alta a la más baja. Cada cargo lleva uno de esos tipos (`Cargo.tipo_viatico`); al crear o importar cargos se valida contra los tipos guardados. Países clase 1: Europa, Asia, África y Norte América (Canadá, Estados Unidos y México); clase 2: Centro y Sud América y el Caribe. La lista de países con su clase está en `utils/countryClasses.js` (Oceanía no figura en el reglamento y se toma como clase 1). El viaje internacional exige `pais_destino` de esa lista; al guardar el viaje, `tripRatesFor` fija en el propio viaje `clase_pais`, `tarifa_diaria` (Bs, del tipo del cargo) y `tarifa_diaria_usd` (USD según la clase del país; 0 en un viaje nacional). El control diario, la planilla y el memorándum usan esas tarifas guardadas, así que un cambio posterior de la escala no altera los viajes ya registrados. El hospedaje es informativo: se muestra al crear el viaje y en el memorándum, sin bloquear gastos.
 
 ### Monto del viaje
 
