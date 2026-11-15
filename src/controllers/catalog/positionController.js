@@ -1,5 +1,6 @@
 const supabase = require('../../config/supabase');
 const positionService = require('../../services/catalog/positionService');
+const travelScaleService = require('../../services/catalog/travelScaleService');
 
 // Lista todos los cargos con las tarifas de su tipo de la escala
 const getAllPositions = async (req, res) => {
@@ -14,7 +15,7 @@ const getAllPositions = async (req, res) => {
 
 // Actualiza el nombre o el tipo de la escala de un cargo, validando que el nombre no este duplicado
 const updatePosition = async (req, res) => {
-  const picked = positionService.pickPositionFields(req.body, false);
+  const picked = positionService.pickPositionFields(req.body, false, await travelScaleService.getScaleTypes());
   if (picked.error) {
     return res.status(400).json({error: picked.error});
   }
@@ -35,7 +36,7 @@ const updatePosition = async (req, res) => {
 
 // Crea un nuevo cargo con su tipo de la escala, validando que el nombre no este duplicado
 const createPosition = async (req, res) => {
-  const picked = positionService.pickPositionFields(req.body, true);
+  const picked = positionService.pickPositionFields(req.body, true, await travelScaleService.getScaleTypes());
   if (picked.error) {
     return res.status(400).json({error: picked.error});
   }

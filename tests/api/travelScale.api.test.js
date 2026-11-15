@@ -40,12 +40,42 @@ test('el administrador actualiza la escala con montos válidos', async () => {
   expect(forbidden.status).toBe(403);
   const negative = await admin.put('/travel-scale/C', {monto_interior: -5});
   expect(negative.status).toBe(400);
-  const wrongType = await admin.put('/travel-scale/Z', {monto_interior: 5});
+  const wrongType = await admin.put('/travel-scale/ZZ', {monto_interior: 5});
   expect(wrongType.status).toBe(400);
+  const missingType = await admin.put('/travel-scale/Z', {monto_interior: 5});
+  expect(missingType.status).toBe(404);
   const updated = await admin.put('/travel-scale/C', {monto_interior: '470.5', hospedaje: 'Hasta 4 estrellas'});
   expect(updated.status).toBe(200);
   expect(parseFloat(updated.body.monto_interior)).toBe(470.5);
   expect(updated.body.hospedaje).toBe('Hasta 4 estrellas');
+});
+
+// El administrador agrega un tipo nuevo, lo usa en un cargo y solo lo puede eliminar cuando ningun cargo lo usa
+test('agrega un tipo nuevo a la escala y lo elimina cuando ningún cargo lo usa', async () => {
+  const newType = {tipo: 'd', descripcion: 'Consultores externos', monto_interior: 300, monto_clase_1_usd: 250, monto_clase_2_usd: 200, hospedaje: 'Hasta 4 estrellas'};
+  const forbidden = await employee.post('/travel-scale', newType);
+  expect(forbidden.status).toBe(403);
+  const incomplete = await admin.post('/travel-scale', {tipo: 'D', monto_interior: 300});
+  expect(incomplete.status).toBe(400);
+  const twoLetters = await admin.post('/travel-scale', {...newType, tipo: 'DD'});
+  expect(twoLetters.status).toBe(400);
+  const created = await admin.post('/travel-scale', newType);
+  expect(created.status).toBe(201);
+  expect(created.body).toMatchObject({tipo: 'D', hospedaje: 'Hasta 4 estrellas'});
+  const repeated = await admin.post('/travel-scale', newType);
+  expect(repeated.status).toBe(400);
+  const scale = await admin.get('/travel-scale');
+  expect(scale.body.map((row) => row.tipo)).toEqual(['C', 'B', 'D', 'A']);
+  const position = await admin.post('/position', {nombre: `Consultor ${Date.now()}`, tipo_viatico: 'D'});
+  expect(position.status).toBe(200);
+  const inUse = await admin.del('/travel-scale/D');
+  expect(inUse.status).toBe(400);
+  expect(inUse.body.error).toContain('lo usan 1 cargo');
+  await admin.put(`/position/${position.body[0].id_cargo}`, {tipo_viatico: 'A'});
+  const deleted = await admin.del('/travel-scale/D');
+  expect(deleted.status).toBe(200);
+  const unknown = await admin.del('/travel-scale/D');
+  expect(unknown.status).toBe(404);
 });
 
 // El cargo necesita un tipo de la escala y solo guarda su nombre y su tipo

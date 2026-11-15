@@ -60,8 +60,8 @@ Solo para entornos de prueba, nunca en una base con datos reales.
 | Tabla | Descripcion |
 |---|---|
 | Rol | Roles del sistema |
-| Escala_Viatico | Escala de viáticos de la empresa: tipos C, B y A con la tarifa diaria en el interior (Bs), en el exterior por clase de país (USD) y el hospedaje permitido |
-| Cargo | Cargos/puestos de trabajo, con su tipo de la escala de viáticos (A, B o C) |
+| Escala_Viatico | Escala de viáticos de la empresa: un tipo por letra (C, B y A al inicio; el administrador puede agregar otros) con la tarifa diaria en el interior (Bs), en el exterior por clase de país (USD) y el hospedaje permitido |
+| Cargo | Cargos/puestos de trabajo, con su tipo de la escala de viáticos (A, B, C u otro tipo agregado) |
 | Seccion | Secciones/departamentos de la empresa; se usa como respaldo intermedio en la jerarquia de revision cuando falta el jefe directo. `codigo_seccion` (3 digitos, opcional) es su codigo de Oracle para la cuenta del gasto: 76.8.dependencia.cuenta.000000.seccion.000.000 |
 | Usuario | Usuarios del sistema; `codigo_dependencia` (3 digitos, opcional) es la dependencia de Oracle que llevan los gastos de quienes lo tienen como jefe directo (y los suyos si no tiene jefe) |
 | Codigo_Verificacion | Codigos temporales de verificacion por correo |

@@ -1,6 +1,5 @@
 const supabase = require('../../config/supabase');
 const textNormalizer = require('../../utils/textNormalizer');
-const travelScaleService = require('./travelScaleService');
 
 // Normaliza el nombre de un cargo para comparacion sin acentos ni espacios extra
 const normalizePositionName = (name) => {
@@ -30,8 +29,8 @@ const validatePositionNotDuplicated = async (name, excludeId) => {
   }
 };
 
-// Toma de la peticion solo el nombre y el tipo de la escala del cargo, validados
-const pickPositionFields = (body, isNew) => {
+// Toma de la peticion solo el nombre y el tipo de la escala del cargo, validados contra los tipos guardados
+const pickPositionFields = (body, isNew, scaleTypes) => {
   const fields = {};
   if (isNew || body.nombre !== undefined) {
     const name = String(body.nombre || '').trim();
@@ -41,8 +40,8 @@ const pickPositionFields = (body, isNew) => {
     fields.nombre = name;
   }
   if (isNew || body.tipo_viatico !== undefined) {
-    if (!travelScaleService.isScaleType(body.tipo_viatico)) {
-      return {error: 'Elige el tipo de la escala de viáticos del cargo: A, B o C'};
+    if (!scaleTypes.includes(body.tipo_viatico)) {
+      return {error: `Elige el tipo de la escala de viáticos del cargo: ${scaleTypes.join(', ')}`};
     }
     fields.tipo_viatico = body.tipo_viatico;
   }
