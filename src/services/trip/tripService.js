@@ -5,6 +5,7 @@ const substitutionService = require('../approval/substitutionService');
 const hierarchyAssignmentService = require('../shared/hierarchyAssignmentService');
 const commentModerationService = require('../shared/commentModerationService');
 const vehicleService = require('../catalog/vehicleService');
+const travelScaleService = require('../catalog/travelScaleService');
 const signatureService = require('../shared/signatureService');
 
 const companyVehicle = 'Vehículo de Empresa';
@@ -98,7 +99,7 @@ const getHistory = async (userId, page, limit, filter) => {
 const getTripDetail = async (tripId, requesterId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd))')
+    .select('*, Usuario!viaje_id_usuario_foreign(nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico))')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -195,11 +196,15 @@ const validateTripData = (tripData) => {
   return null;
 };
 
-// Valida el viaje y arma los campos a guardar: el vehiculo de la empresa debe estar libre y el combustible solo va con el
-const prepareTripFields = async (tripData, tripId = null) => {
+// Valida el viaje y arma los campos a guardar: el vehiculo debe estar libre, el combustible solo va con el y las tarifas salen de la escala del cargo
+const prepareTripFields = async (tripData, ownerId, tripId = null) => {
   const tripDataError = validateTripData(tripData);
   if (tripDataError) {
     return {error: tripDataError, status: 400};
+  }
+  const rates = await travelScaleService.tripRatesFor(ownerId, tripData.tipo, tripData.pais_destino);
+  if (rates.error) {
+    return {error: rates.error, status: rates.status};
   }
   const usesCompanyVehicle = tripData.transporte === companyVehicle;
   if (usesCompanyVehicle && tripData.tipo === 'Internacional') {
@@ -235,6 +240,7 @@ const prepareTripFields = async (tripData, tripId = null) => {
       monto_asignado_usd: tripData.monto_asignado_usd || 0,
       monto_combustible: fuelAmount,
       gestion_hospedaje: tripData.gestion_hospedaje || 'Propio',
+      ...rates.rates,
     },
   };
 };
@@ -249,7 +255,7 @@ const vehicleConflictError = (error) => {
 
 // Crea un viaje en borrador con los datos validados
 const createTrip = async (userId, tripData) => {
-  const prepared = await prepareTripFields(tripData);
+  const prepared = await prepareTripFields(tripData, userId);
   if (prepared.error) {
     return prepared;
   }
@@ -278,7 +284,7 @@ const editTrip = async (tripId, userId, tripData) => {
   if (trip.estado !== 'BORRADOR' && !isEditableRejection) {
     return {error: 'Solo puedes editar viajes en borrador o rechazados antes de iniciarse', status: 400};
   }
-  const prepared = await prepareTripFields(tripData, tripId);
+  const prepared = await prepareTripFields(tripData, trip.id_usuario, tripId);
   if (prepared.error) {
     return prepared;
   }
@@ -357,7 +363,7 @@ const submitToReview = async (tripId, userId) => {
 const confirmCompletion = async (tripId, userId, justifications, {password = null, ip = null} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(Cargo(monto_diario, monto_diario_usd))')
+    .select('*, Usuario!viaje_id_usuario_foreign(Cargo(tipo_viatico))')
     .eq('id_viaje', tripId)
     .single();
   if (!trip) {

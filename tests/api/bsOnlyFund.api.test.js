@@ -14,7 +14,7 @@ beforeAll(async () => {
   const supervisor = api(await login('maria.supervisora'));
   const created = await employee.post('/trip', {
     motivo: 'Feria en Lima con fondo en Bs', origen: 'La Paz', destino: 'Lima', fecha_inicio: boliviaDate(-1), fecha_fin: boliviaDate(1),
-    tipo: 'Internacional', transporte: 'Aéreo', monto_asignado: 600, monto_asignado_usd: 100,
+    tipo: 'Internacional', pais_destino: 'Perú', transporte: 'Aéreo', monto_asignado: 600, monto_asignado_usd: 100,
   });
   tripId = created.body.id_viaje;
   await employee.put(`/trip/${tripId}/submit-review`);

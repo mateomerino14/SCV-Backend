@@ -31,6 +31,7 @@ drop table if exists
   "Categoria_Gasto",
   "Seccion",
   "Cargo",
+  "Escala_Viatico",
   "Rol",
   "Recibo",
   "Correlativo_Rendicion",

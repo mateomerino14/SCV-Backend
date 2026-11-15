@@ -31,8 +31,9 @@ const calculateExpenseSummary = (expenses, trip) => {
   const hotelExceeds = hotelAccumulated > parseFloat(trip.monto_asignado || 0);
   const hotelExceedsUsd = hotelAccumuladoUsd > parseFloat(trip.monto_asignado_usd || 0);
 
-  const dailyRate = parseFloat(trip.Usuario?.Cargo?.monto_diario || 0);
-  const dailyRateUsd = parseFloat(trip.Usuario?.Cargo?.monto_diario_usd || 0);
+  // Tarifas fijadas en el viaje al guardarlo, segun la escala del cargo y la clase del pais
+  const dailyRate = parseFloat(trip.tarifa_diaria || 0);
+  const dailyRateUsd = parseFloat(trip.tarifa_diaria_usd || 0);
   // Viaje internacional con fondo solo en Bs: todo se controla en Bs, y los dias intermedios con la tarifa en USD por el tipo de cambio del fondo
   const onlyBsFund = trip.tipo === 'Internacional' && !hasUsdFund(trip);
   const fundExchangeRate = fundExchangeRateOf(trip);
