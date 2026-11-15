@@ -84,7 +84,7 @@ Solo para entornos de prueba, nunca en una base con datos reales.
 | Correlativo_Recibo | Ultimo numero de recibo de cada mes (AAAA-MM); el recibo se muestra como `000012/10-2026` |
 | Firma | Copia de la firma con la que se firmó cada etapa (MEMORANDUM, PREPARADO, JEFE, GERENTE, REVISOR): trazo PNG, usuario, fecha, IP o aprobación automática |
 | Firma_Usuario | Firma digital que cada usuario registra en su perfil, con la fecha en que la cambió; se copia en cada documento que firma |
-| Documento_Emitido | Código y datos clave de cada PDF emitido, para verificarlo con su QR |
+| Documento_Emitido | Código y datos clave de cada PDF emitido, para verificarlo con su QR; la planilla y los recibos guardan además la huella de sus datos (`huella`) y la ruta del PDF en el bucket privado `documentos` (`ruta_archivo`), para reutilizarlo mientras los datos no cambien |
 | Correlativo_Viaje | Ultimo numero de viaje de cada año, para el codigo `VIA-numero/año` que vuelve a 1 cada año |
 | Correlativo_Rendicion | Ultimo numero de rendicion de cada mes (AAAA-MM) para la descripcion de Oracle (10-40); lo usa el trigger `viaje_numero_rendicion`; el incremento es atomico (`insert ... on conflict do update`) y un indice unico sobre `Viaje(periodo_rendicion, numero_rendicion)` impide repetir numeros aunque se aprueben varias a la vez |
 | Recibo | Numero del sistema (con su mes en `periodo`, unico por mes) de cada gasto sin factura, asignado al registrarlo, y de cada recibo agrupado; `enviado` indica si ya se mando al empleado |

@@ -517,6 +517,9 @@ create table if not exists "Documento_Emitido" (
   id_viaje integer references "Viaje"(id_viaje) on delete cascade,
   id_gasto integer references "Gasto"(id_gasto) on delete set null,
   resumen jsonb not null default '{}'::jsonb, -- datos clave del documento al emitirlo, para compararlos con el papel
+  -- planilla y recibos: huella de los datos y ruta del PDF guardado en el bucket privado documentos; se reutiliza mientras los datos no cambien
+  huella char(64),
+  ruta_archivo text,
   fecha timestamptz not null default now()
 );
 
@@ -543,6 +546,7 @@ create index if not exists idx_comentario_id_usuario on "Comentario"(id_usuario)
 create index if not exists idx_configuracion_recordatorio_usuario on "Configuracion_Recordatorio"(id_usuario_actualizacion);
 create index if not exists idx_documento_emitido_id_gasto on "Documento_Emitido"(id_gasto);
 create index if not exists idx_documento_emitido_id_viaje on "Documento_Emitido"(id_viaje);
+create index if not exists idx_documento_emitido_huella on "Documento_Emitido"(id_viaje, tipo, huella);
 create index if not exists idx_factura_impuestos_id_impuesto on "Factura_Impuestos"(id_impuesto);
 create index if not exists idx_factura_id_proveedor on "Factura"(id_proveedor);
 create index if not exists idx_firma_id_usuario on "Firma"(id_usuario);
