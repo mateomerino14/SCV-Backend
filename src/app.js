@@ -61,6 +61,7 @@ const supplierRoute = require('./routes/expense/supplier');
 const reviewRoute = require('./routes/approval/review');
 const reviewerRoute = require('./routes/approval/reviewer');
 const approverRoute = require('./routes/approval/approver');
+const inboxRoute = require('./routes/approval/inbox');
 const treasurerRoute = require('./routes/approval/treasurer');
 const deadlineAuthorizationRoute = require('./routes/approval/deadlineAuthorization');
 const substitutionRoute = require('./routes/approval/substitution');
@@ -88,6 +89,7 @@ app.use('/reviewer', reviewerRoute);
 app.use('/deadline-authorization', deadlineAuthorizationRoute);
 app.use('/substitution', substitutionRoute);
 app.use('/approver', approverRoute);
+app.use('/inbox', inboxRoute);
 
 // Traduce los errores de carga de archivos a una respuesta legible
 app.use((error, req, res, next) => {
