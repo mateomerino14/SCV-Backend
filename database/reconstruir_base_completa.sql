@@ -42,6 +42,7 @@ drop table if exists
   "Categoria_Gasto",
   "Seccion",
   "Cargo",
+  "Escala_Viatico",
   "Rol",
   "Recibo",
   "Correlativo_Rendicion",
@@ -61,7 +62,7 @@ drop function if exists asignar_numero_rendicion();
 -- ============================================================
 -- SCV · 01 ESQUEMA
 -- ============================================================
--- Crea las 30 tablas del sistema con sus relaciones, restricciones e índices.
+-- Crea las 32 tablas del sistema con sus relaciones, restricciones e índices.
 -- Primer paso para crear la base desde cero; refleja siempre el esquema final completo.
 -- ============================================================
 
@@ -74,11 +75,23 @@ create table if not exists "Rol" (
   nombre varchar(20) not null unique
 );
 
+-- Escala de viaticos de la empresa: C gerentes, B jefes de area, A el resto del personal
+create table if not exists "Escala_Viatico" (
+  tipo char(1) primary key check (tipo in ('A', 'B', 'C')),
+  descripcion varchar(100) not null,
+  -- tarifa diaria en el interior del pais (Bs) y en el exterior segun la clase del pais (USD)
+  monto_interior numeric(10, 2) not null check (monto_interior >= 0),
+  monto_clase_1_usd numeric(10, 2) not null check (monto_clase_1_usd >= 0),
+  monto_clase_2_usd numeric(10, 2) not null check (monto_clase_2_usd >= 0),
+  -- categoria de hotel permitida; es informativa
+  hospedaje varchar(40) not null
+);
+
 create table if not exists "Cargo" (
   id_cargo serial primary key,
   nombre varchar(100) not null unique,
-  monto_diario decimal(10, 2) not null,
-  monto_diario_usd numeric(10, 2) default 0,
+  -- tipo de la escala de viaticos que le corresponde al cargo
+  tipo_viatico char(1) not null default 'A' references "Escala_Viatico"(tipo),
   activo boolean not null default true
 );
 
@@ -190,6 +203,12 @@ create table if not exists "Viaje" (
   -- quien gestiona el hospedaje: la empresa lo reserva o el propio empleado
   gestion_hospedaje varchar(10) not null default 'Propio' check (gestion_hospedaje in ('Empresa', 'Propio')),
   monto_asignado_usd numeric(10, 2) default 0,
+  -- pais del viaje internacional y su clase (1 Europa, Asia, Africa y Norte America; 2 Centro, Sud America y el Caribe)
+  pais_destino varchar(60),
+  clase_pais smallint check (clase_pais in (1, 2)),
+  -- tarifas diarias que se fijan al guardar el viaje segun la escala del cargo: no cambian si despues cambia la escala
+  tarifa_diaria numeric(10, 2) not null default 0,
+  tarifa_diaria_usd numeric(10, 2) not null default 0,
   -- bolivianos por 1 USD con que Tesorería convirtió el fondo de un viaje internacional entregado solo en Bs; sin dato se usa 6.96
   tipo_cambio_fondo numeric(10, 4) check (tipo_cambio_fondo > 0),
   estado varchar(25) not null default 'BORRADOR' constraint viaje_estado_check check (estado in (
@@ -636,13 +655,20 @@ insert into "Rol" (id_rol, nombre) values
   (5, 'APROBADOR')
 on conflict (id_rol) do nothing;
 
--- Cargos de un solo usuario activo; el monto diario se configura desde el panel
-insert into "Cargo" (nombre, monto_diario, monto_diario_usd, activo) values
-  ('Asistente Administrativo de Seguros y Servicios', 0, 0, true),
-  ('Asistente Administrativo - Cargo y Descargo de Cta. Documentada', 0, 0, true),
-  ('Asistente de Caja y Tesoreria', 0, 0, true),
-  ('Gerente RRHH', 0, 0, true),
-  ('Jefe de Recursos Humanos', 0, 0, true)
+-- Escala de viaticos vigente (punto 5.3 del reglamento); el administrador la actualiza desde Cargos
+insert into "Escala_Viatico" (tipo, descripcion, monto_interior, monto_clase_1_usd, monto_clase_2_usd, hospedaje) values
+  ('C', 'Gerente General y Gerentes de Área', 460, 345, 280, 'Hasta 5 estrellas'),
+  ('B', 'Jefes de Área', 340, 280, 230, 'Hasta 3 estrellas'),
+  ('A', 'Personal no comprendido en las anteriores categorías', 230, 230, 170, 'Hasta 3 estrellas')
+on conflict (tipo) do nothing;
+
+-- Cargos de un solo usuario activo, con su tipo de la escala de viaticos
+insert into "Cargo" (nombre, tipo_viatico, activo) values
+  ('Asistente Administrativo de Seguros y Servicios', 'A', true),
+  ('Asistente Administrativo - Cargo y Descargo de Cta. Documentada', 'A', true),
+  ('Asistente de Caja y Tesoreria', 'A', true),
+  ('Gerente RRHH', 'C', true),
+  ('Jefe de Recursos Humanos', 'B', true)
 on conflict (nombre) do nothing;
 
 -- Impuesto de IVA vigente en Bolivia.
@@ -920,7 +946,7 @@ declare
     'Auditoria', 'Cargo', 'Categoria_Gasto', 'Codigo_Verificacion', 'Comentario',
     'Correlativo_Recibo', 'Correlativo_Rendicion', 'Correlativo_Viaje', 'Recibo', 'Revision_Viaje', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Imagen_Respaldo', 'Impuesto', 'Proveedor',
-    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Firma', 'Firma_Usuario', 'Documento_Emitido', 'Configuracion_Recordatorio'
+    'Rol', 'Escala_Viatico', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Firma', 'Firma_Usuario', 'Documento_Emitido', 'Configuracion_Recordatorio'
   ];
 begin
   foreach table_name in array target_tables
@@ -960,7 +986,7 @@ where schemaname = 'public'
     'Auditoria', 'Cargo', 'Categoria_Gasto', 'Codigo_Verificacion', 'Comentario',
     'Correlativo_Recibo', 'Correlativo_Rendicion', 'Correlativo_Viaje', 'Recibo', 'Revision_Viaje', 'Detalle_Factura', 'Factura', 'Factura_Impuestos', 'Gasto',
     'Gasto_Subitem', 'Gasto_Tramo_Moneda', 'Imagen', 'Imagen_Respaldo', 'Impuesto', 'Proveedor',
-    'Rol', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Firma', 'Firma_Usuario', 'Documento_Emitido', 'Configuracion_Recordatorio'
+    'Rol', 'Escala_Viatico', 'Seccion', 'Solicitud_Autorizacion_Plazo', 'Solicitud_Reemplazo', 'Usuario', 'Vehiculo', 'Viaje', 'Firma', 'Firma_Usuario', 'Documento_Emitido', 'Configuracion_Recordatorio'
   );
 -- Supabase crea rls_auto_enable() para activar RLS en las tablas nuevas; corre sola como trigger de eventos,
 -- asi que nadie de afuera necesita llamarla por la API
@@ -985,18 +1011,15 @@ end $block$;
 -- Flujo del viaje: empleado > aprobador (jefe directo, su aprobacion vale tambien como aprobador) > tesoreria
 -- Flujo de la rendicion: empleado > aprobador (jefe directo) > revisor (aprobacion final)
 -- Todos en la dependencia 900 (SEDE). Contrasena de todos: Viaticos2026 (se cambia en Ajustes de Cuenta)
--- Las tarifas diarias son de prueba: se cambian desde Cargos en el panel del administrador
+-- La tarifa de cada cargo sale de la escala de viaticos segun su tipo (A, B o C)
 -- ============================================================
 
-insert into "Cargo" (nombre, monto_diario, monto_diario_usd, activo) values
-  ('Gerente General', 300, 100, true),
-  ('Comercial', 300, 100, true),
-  ('Jefe de Administracion', 300, 100, true),
-  ('Analista de Finanzas y Administracion', 300, 100, true)
+insert into "Cargo" (nombre, tipo_viatico, activo) values
+  ('Gerente General', 'C', true),
+  ('Comercial', 'A', true),
+  ('Jefe de Administracion', 'B', true),
+  ('Analista de Finanzas y Administracion', 'A', true)
 on conflict (nombre) do nothing;
-
--- Tesoreria es un cargo unico que ya crea 03_datos_iniciales.sql; se reconoce por el nombre exacto del cargo
-update "Cargo" set monto_diario = 300, monto_diario_usd = 100 where nombre = 'Asistente de Caja y Tesoreria';
 
 -- Las secciones y los vehiculos son los reales que carga 03_datos_iniciales.sql
 

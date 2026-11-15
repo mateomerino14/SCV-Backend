@@ -43,12 +43,17 @@ const purchaseTextOf = (trip) => {
   return 'Se solicita la compra de los pasajes terrestres correspondientes al trayecto indicado.';
 };
 
-// Texto de quien reserva el hospedaje
+// Texto de quien reserva el hospedaje y la categoria de hotel que permite la escala de viaticos
 const lodgingTextOf = (trip) => {
+  let text = 'El empleado gestiona su hospedaje';
   if (trip.gestion_hospedaje === 'Empresa') {
-    return 'La empresa reserva el hospedaje';
+    text = 'La empresa reserva el hospedaje';
   }
-  return 'El empleado gestiona su hospedaje';
+  const category = trip.Usuario?.Cargo?.Escala_Viatico?.hospedaje;
+  if (category) {
+    text += ` (${category.toLowerCase()})`;
+  }
+  return text;
 };
 
 // Filas de la tabla de datos del viaje
@@ -57,8 +62,11 @@ const tripRowsOf = (trip) => {
     ['Ruta', `${trip.origen || '—'} → ${trip.destino}`],
     ['Fechas', `Del ${formatDate(trip.fecha_inicio)} al ${formatDate(trip.fecha_fin)} (${countDays(trip.fecha_inicio, trip.fecha_fin)} días)`],
     ['Tipo de viaje', trip.tipo],
-    ['Transporte', trip.transporte || 'Terrestre'],
   ];
+  if (trip.pais_destino) {
+    rows.push(['País de destino', `${trip.pais_destino} (clase ${trip.clase_pais})`]);
+  }
+  rows.push(['Transporte', trip.transporte || 'Terrestre']);
   if (trip.placa_vehiculo) {
     rows.push(['Vehículo', trip.placa_vehiculo]);
   }
@@ -68,6 +76,13 @@ const tripRowsOf = (trip) => {
     fund += ` y USD ${formatAmount(trip.monto_asignado_usd)}`;
   }
   rows.push(['Fondo asignado', fund]);
+  if (parseFloat(trip.tarifa_diaria) > 0) {
+    let rate = `Bs ${formatAmount(trip.tarifa_diaria)} en el país`;
+    if (parseFloat(trip.tarifa_diaria_usd) > 0) {
+      rate += ` y USD ${formatAmount(trip.tarifa_diaria_usd)} en el exterior`;
+    }
+    rows.push(['Tarifa diaria', rate]);
+  }
   if (parseFloat(trip.monto_combustible) > 0) {
     rows.push(['De ese fondo, combustible', `Bs ${formatAmount(trip.monto_combustible)}`]);
   }

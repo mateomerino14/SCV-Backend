@@ -10,18 +10,15 @@
 -- Flujo del viaje: empleado > aprobador (jefe directo, su aprobacion vale tambien como aprobador) > tesoreria
 -- Flujo de la rendicion: empleado > aprobador (jefe directo) > revisor (aprobacion final)
 -- Todos en la dependencia 900 (SEDE). Contrasena de todos: Viaticos2026 (se cambia en Ajustes de Cuenta)
--- Las tarifas diarias son de prueba: se cambian desde Cargos en el panel del administrador
+-- La tarifa de cada cargo sale de la escala de viaticos segun su tipo (A, B o C)
 -- ============================================================
 
-insert into "Cargo" (nombre, monto_diario, monto_diario_usd, activo) values
-  ('Gerente General', 300, 100, true),
-  ('Comercial', 300, 100, true),
-  ('Jefe de Administracion', 300, 100, true),
-  ('Analista de Finanzas y Administracion', 300, 100, true)
+insert into "Cargo" (nombre, tipo_viatico, activo) values
+  ('Gerente General', 'C', true),
+  ('Comercial', 'A', true),
+  ('Jefe de Administracion', 'B', true),
+  ('Analista de Finanzas y Administracion', 'A', true)
 on conflict (nombre) do nothing;
-
--- Tesoreria es un cargo unico que ya crea 03_datos_iniciales.sql; se reconoce por el nombre exacto del cargo
-update "Cargo" set monto_diario = 300, monto_diario_usd = 100 where nombre = 'Asistente de Caja y Tesoreria';
 
 -- Las secciones y los vehiculos son los reales que carga 03_datos_iniciales.sql
 

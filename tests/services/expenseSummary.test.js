@@ -1,10 +1,11 @@
 const expenseSummaryService = require('../../src/services/approval/expenseSummaryService');
 
-// Viaje de prueba con las tarifas diarias del cargo y los fondos indicados
+// Viaje de prueba con las tarifas diarias fijadas en el viaje y los fondos indicados
 const tripWithDailyRate = (dailyRate, dailyRateUsd = 0, monto_asignado = 0, monto_asignado_usd = 0) => ({
   monto_asignado,
   monto_asignado_usd,
-  Usuario: {Cargo: {monto_diario: dailyRate, monto_diario_usd: dailyRateUsd}},
+  tarifa_diaria: dailyRate,
+  tarifa_diaria_usd: dailyRateUsd,
 });
 
 // Verifica el calculo cuando ningun dia excede la cuota diaria
@@ -174,7 +175,7 @@ test('sigue usando el fondo en USD cuando el viaje lo tiene', () => {
   expect(result.totalExceedsUsd).toBe(true);
 });
 
-const fuelTrip = {monto_asignado: 1100, monto_asignado_usd: 0, Usuario: {Cargo: {monto_diario: 300}}};
+const fuelTrip = {monto_asignado: 1100, monto_asignado_usd: 0, tarifa_diaria: 300};
 const fuelExpenses = [
   {fecha_gasto: '2026-11-03', monto_total: 200, Categoria_Gasto: {nombre: '626040 MANUTENCION (VIAJE)'}},
   {fecha_gasto: '2026-11-03', monto_total: 400, Categoria_Gasto: {nombre: '628021 GASOLINA'}},

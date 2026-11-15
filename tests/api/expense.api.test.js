@@ -17,6 +17,7 @@ beforeAll(async () => {
     fecha_inicio: boliviaDate(-1),
     fecha_fin: boliviaDate(1),
     tipo: 'Internacional',
+    pais_destino: 'Perú',
     transporte: 'Aéreo',
     monto_asignado: 600,
     monto_asignado_usd: 40,
