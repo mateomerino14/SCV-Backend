@@ -39,11 +39,11 @@ const formatCode = (code) => code.match(/.{1,4}/g).join('-');
 // Direccion publica donde se verifica el documento
 const verifyUrlOf = (code) => `${(process.env.FRONTEND_URL || 'https://scv-frontend.vercel.app').replace(/\/$/, '')}/verificar/${code}`;
 
-// Registra el documento emitido con sus datos clave y devuelve su codigo, enlace y QR; si falla, el PDF sale sin sello
-const createSeal = async ({type, tripId = null, expenseId = null, summary = {}}) => {
+// Registra el documento emitido con sus datos clave (y la huella de sus datos si se guarda el PDF) y devuelve su codigo, enlace y QR; si falla, el PDF sale sin sello
+const createSeal = async ({type, tripId = null, expenseId = null, summary = {}, fingerprint = null}) => {
   try {
     const code = generateCode();
-    const {error} = await supabase.from('Documento_Emitido').insert({codigo: code, tipo: type, id_viaje: tripId, id_gasto: expenseId, resumen: summary});
+    const {error} = await supabase.from('Documento_Emitido').insert({codigo: code, tipo: type, id_viaje: tripId, id_gasto: expenseId, resumen: summary, huella: fingerprint});
     if (error) {
       console.warn('[Sello] No se pudo registrar el documento:', error.message);
       return null;

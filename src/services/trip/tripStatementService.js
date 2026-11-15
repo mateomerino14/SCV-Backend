@@ -1,5 +1,5 @@
 const supabase = require('../../config/supabase');
-const pdfService = require('../shared/pdfService');
+const storedPdfService = require('../shared/storedPdfService');
 const tripCodeUtil = require('../../utils/tripCode');
 const signatureService = require('../shared/signatureService');
 const documentSealService = require('../shared/documentSealService');
@@ -448,13 +448,13 @@ const generateStatementPdf = async (tripId) => {
   const dayJustifications = latestJustificationPerDay(comments || []);
   const signatures = await signatureService.getStatementSignatures(tripId);
   const statementTotals = summarizeStatement(trip, expenses || []);
-  const seal = await documentSealService.createSeal({
+  const pdfBuffer = await storedPdfService.getOrCreatePdf({
     type: documentSealService.documentTypes.statement,
     tripId: trip.id_viaje,
+    data: {trip, expenses: expenses || [], dayJustifications, signatures},
     summary: {codigo: tripCodeUtil.buildTripCode(trip), gastos: (expenses || []).length, saldos: statementTotals.balanceRows.map(([concepto, bs, usd]) => ({concepto, bs, usd}))},
+    buildHtml: (seal) => generateStatementHtml(trip, expenses || [], dayJustifications, {signatures, seal}),
   });
-  const html = generateStatementHtml(trip, expenses || [], dayJustifications, {signatures, seal});
-  const pdfBuffer = await pdfService.generatePdf(html);
   // Nombre de archivo solo con letras, numeros y guiones, como exige la cabecera de descarga
   const safeReason = (trip.motivo || 'viaje')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')

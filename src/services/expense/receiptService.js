@@ -1,7 +1,7 @@
 const supabase = require('../../config/supabase');
 const numberToWords = require('../../utils/numberToWords');
 const emailService = require('../shared/emailService');
-const pdfService = require('../shared/pdfService');
+const storedPdfService = require('../shared/storedPdfService');
 const {buildTripCode} = require('../../utils/tripCode');
 const {escapeDeep, escapeHtml: escapeText} = require('../../utils/htmlEscape');
 const {getExpenseRetentions, getExpenseLineBases, hasOriginCurrencyLines} = require('../../utils/retentions');
@@ -482,9 +482,13 @@ const sendGroupedReceipt = async (tripId, type, isInternational) => {
   if (numberError) {
     return {error: numberError, status: 500};
   }
-  const seal = await documentSealService.createSeal({type: documentSealService.documentTypes.receipt, tripId, summary: {recibo: receiptNumber, agrupado: true, gastos: expenses.length, pagado: expenses.reduce((sum, expense) => sum + (parseFloat(expense.monto_total) || 0), 0)}});
-  const html = documentSealService.withSeal(generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, buildTripCode(trip), trip.motivo, supervisor), seal);
-  const pdfBuffer = await pdfService.generatePdf(html);
+  const pdfBuffer = await storedPdfService.getOrCreatePdf({
+    type: documentSealService.documentTypes.receipt,
+    tripId,
+    data: {expenses, employee, receiptNumber, type, isInternational, trip, supervisor},
+    summary: {recibo: receiptNumber, agrupado: true, gastos: expenses.length, pagado: expenses.reduce((sum, expense) => sum + (parseFloat(expense.monto_total) || 0), 0)},
+    buildHtml: (seal) => documentSealService.withSeal(generateGroupedReceiptHtml(expenses, employee, receiptNumber, type, isInternational, buildTripCode(trip), trip.motivo, supervisor), seal),
+  });
   const pdfBase64 = pdfBuffer.toString('base64');
   let typeName = 'Compras';
   if (type === 'S') {
@@ -550,9 +554,14 @@ const sendIndividualReceipt = async (expenseId) => {
   if (numberError) {
     return {error: numberError, status: 500};
   }
-  const seal = await documentSealService.createSeal({type: documentSealService.documentTypes.receipt, tripId: expense.id_viaje, expenseId: expense.id_gasto, summary: {recibo: receiptNumber, pagado: parseFloat(expense.monto_total) || 0, fecha: expense.fecha_gasto}});
-  const html = documentSealService.withSeal(generateIndividualReceiptHtml(expense, employee, receiptNumber, buildTripCode(expense.Viaje || {}), expense.Viaje?.motivo, supervisor), seal);
-  const pdfBuffer = await pdfService.generatePdf(html);
+  const pdfBuffer = await storedPdfService.getOrCreatePdf({
+    type: documentSealService.documentTypes.receipt,
+    tripId: expense.id_viaje,
+    expenseId: expense.id_gasto,
+    data: {expense, employee, receiptNumber, supervisor},
+    summary: {recibo: receiptNumber, pagado: parseFloat(expense.monto_total) || 0, fecha: expense.fecha_gasto},
+    buildHtml: (seal) => documentSealService.withSeal(generateIndividualReceiptHtml(expense, employee, receiptNumber, buildTripCode(expense.Viaje || {}), expense.Viaje?.motivo, supervisor), seal),
+  });
   const pdfBase64 = pdfBuffer.toString('base64');
   let typeName = 'Compra';
   if (expense.tipo === 'S') {

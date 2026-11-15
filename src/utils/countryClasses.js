@@ -15,4 +15,4 @@ const countryClasses = new Map(countryRegions.flatMap((region) => region.paises.
 // Devuelve la clase (1 o 2) del pais, o null si no esta en la lista
 const countryClassOf = (country) => countryClasses.get(country) || null;
 
-module.exports = {countryRegions, countryClassOf};
+module.exports = {countryClassOf};
