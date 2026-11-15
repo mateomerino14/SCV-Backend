@@ -11,14 +11,14 @@ const getScaleTypes = async () => {
   return (data || []).map((row) => row.tipo);
 };
 
-// Devuelve la escala de viaticos, del tipo con mayor tarifa al de menor
+// Devuelve la escala de viaticos, del tipo con mayor tarifa al de menor, con cuantos cargos usan cada tipo
 const getScale = async () => {
-  const {data, error} = await supabase.from('Escala_Viatico').select('*')
+  const {data, error} = await supabase.from('Escala_Viatico').select('*, Cargo(count)')
     .order('monto_interior', {ascending: false}).order('tipo', {ascending: false});
   if (error) {
     return {error: error.message, status: 500};
   }
-  return {scale: data};
+  return {scale: data.map(({Cargo, ...row}) => ({...row, cargos: Cargo?.[0]?.count || 0}))};
 };
 
 // Toma de la peticion solo los montos, el hospedaje y la descripcion validos de un tipo de la escala

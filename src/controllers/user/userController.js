@@ -6,6 +6,7 @@ const auditLogService = require('../../services/shared/auditLogService');
 const tokenService = require('../../services/user/tokenService');
 const storageService = require('../../services/shared/storageService');
 const signatureService = require('../../services/shared/signatureService');
+const listQuery = require('../../utils/listQuery');
 const saltRounds = 10;
 
 // Columnas que se devuelven al administrar usuarios (sin hash ni datos de sesion)
@@ -336,18 +337,51 @@ const getEmployees = async (req, res) => {
   }
 };
 
-// Lista todos los usuarios con datos completos
+// Lista los usuarios con datos completos; filtra por busqueda, rol y seccion, y con "page" devuelve una pagina y el total
 const getAllUsersDetailed = async (req, res) => {
+  const {search, rol, seccion} = req.query;
+  if (seccion && seccion !== 'ninguna' && !/^\d+$/.test(seccion)) {
+    return res.status(400).json({error: 'La sección del filtro no es válida'});
+  }
+  const page = listQuery.pageOf(req.query);
+  let roleColumns = 'Rol(nombre)';
+  if (rol) {
+    roleColumns = 'Rol!inner(nombre)';
+  }
+  let count;
+  if (page) {
+    count = 'exact';
+  }
+  let query = supabase
+    .from('Usuario')
+    .select(`id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_seccion, Seccion(nombre, codigo_seccion), carnet_identidad, codigo_dependencia, id_jefe_directo, Jefe:id_jefe_directo(id_usuario, nombre, apellido_paterno, email_corporativo), Cargo(id_cargo, nombre), ${roleColumns}`, {count});
+  query = listQuery.applySearch(query, search, ['nombre', 'apellido_paterno', 'apellido_materno', 'email_corporativo']);
+  if (rol) {
+    query = query.eq('Rol.nombre', rol);
+  }
+  if (seccion === 'ninguna') {
+    query = query.is('id_seccion', null);
+  }
+  else if (seccion) {
+    query = query.eq('id_seccion', seccion);
+  }
+  query = query.order('nombre', {ascending: true}).order('apellido_paterno', {ascending: true}).order('id_usuario', {ascending: true});
+  if (page) {
+    query = query.range(page.from, page.to);
+  }
+  return listQuery.sendList(res, await query, page);
+};
+
+// Lista liviana de usuarios para elegir el jefe directo y revisar correos repetidos: nombre, correo, rol y si esta activo
+const getUserOptions = async (req, res) => {
   const {data, error} = await supabase
     .from('Usuario')
-    .select('id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, telefono, activo, foto_perfil, id_rol, id_seccion, Seccion(nombre, codigo_seccion), carnet_identidad, codigo_dependencia, id_jefe_directo, Jefe:id_jefe_directo(id_usuario, nombre, apellido_paterno, email_corporativo), Cargo(id_cargo, nombre), Rol(nombre)')
+    .select('id_usuario, nombre, apellido_paterno, email_corporativo, activo, Rol(nombre)')
     .order('nombre', {ascending: true});
   if (error) {
     return res.status(500).json({error: error.message});
   }
-  else {
-    return res.json(data || []);
-  }
+  return res.json(data || []);
 };
 
 // Activa un usuario, validando rol y cargo unicos
@@ -426,4 +460,4 @@ const updateMySignature = async (req, res) => {
   }
 };
 
-module.exports = {getMe, updateMe, updateMyPhoto, changeMyPassword, getMySignature, updateMySignature, getAllUsers, updateUser, createUser, deleteUser, checkEmail, getEmployees, getAllUsersDetailed, activateUser, suspendUser, getMyPosition, previewUserImport, importUsers};
+module.exports = {getMe, updateMe, updateMyPhoto, changeMyPassword, getMySignature, updateMySignature, getAllUsers, updateUser, createUser, deleteUser, checkEmail, getEmployees, getAllUsersDetailed, getUserOptions, activateUser, suspendUser, getMyPosition, previewUserImport, importUsers};
