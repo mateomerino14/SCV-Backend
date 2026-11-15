@@ -75,12 +75,15 @@ const sectionFieldsOf = (row) => ({nombre: row.nombre, codigo_seccion: row.codig
 const cleanPositionRow = (row) => ({nombre: textOf(row.nombre), tipo_viatico: textOf(row.tipo_viatico).toUpperCase()});
 
 // Revisa el formato de un cargo: nombre y tipo de la escala
-const checkPositionFormat = (row, errors) => {
+const checkPositionFormat = (row, errors, context) => {
   checkName(row.nombre, 'cargo', errors);
-  if (!travelScaleService.isScaleType(row.tipo_viatico)) {
-    errors.push('El tipo de viático debe ser A, B o C');
+  if (!context.scaleTypes.includes(row.tipo_viatico)) {
+    errors.push(`El tipo de viático debe ser uno de la escala: ${context.scaleTypes.join(', ')}`);
   }
 };
+
+// Datos que necesita la revision de cargos: los tipos de la escala guardados
+const loadPositionContext = async () => ({scaleTypes: await travelScaleService.getScaleTypes()});
 
 // Clave que no se puede repetir entre filas de cargos: el nombre
 const positionFileKeys = (row) => [`nombre ${keyOf(row.nombre)}`];
@@ -98,7 +101,7 @@ const sectionCatalog = {
 
 const positionCatalog = {
   table: 'Cargo', idField: 'id_cargo', columns: 'id_cargo, nombre, tipo_viatico, activo',
-  clean: cleanPositionRow, checkFormat: checkPositionFormat, fileKeys: positionFileKeys, match: matchPosition, fieldsOf: positionFieldsOf,
+  clean: cleanPositionRow, checkFormat: checkPositionFormat, loadContext: loadPositionContext, fileKeys: positionFileKeys, match: matchPosition, fieldsOf: positionFieldsOf,
 };
 
 const catalogs = {section: sectionCatalog, position: positionCatalog};
@@ -126,13 +129,13 @@ const changedFields = (fields, current) => {
 };
 
 // Valida cada fila contra el archivo y lo guardado, y decide si se crea, se actualiza o no cambia
-const validateRows = (catalog, rows, existing) => {
+const validateRows = (catalog, rows, existing, context) => {
   const seen = new Map();
   return rows.map((rawRow, index) => {
     const errors = [];
     const row = {fila: parseInt(rawRow.fila, 10) || index + 2, ...catalog.clean(rawRow)};
     const active = statusOf(rawRow.estado, errors);
-    catalog.checkFormat(row, errors);
+    catalog.checkFormat(row, errors, context);
     catalog.fileKeys(row).forEach((key) => {
       if (seen.has(key)) {
         errors.push(`Se repite con la fila ${seen.get(key)}`);
@@ -175,7 +178,11 @@ const validateCatalogFile = async (catalog, rows) => {
   if (error) {
     return {error: error.message, status: 500};
   }
-  return {results: validateRows(catalog, rows, data || [])};
+  let context = {};
+  if (catalog.loadContext) {
+    context = await catalog.loadContext();
+  }
+  return {results: validateRows(catalog, rows, data || [], context)};
 };
 
 // Valida el archivo y devuelve fila por fila lo que se crearia, se actualizaria o tiene errores
