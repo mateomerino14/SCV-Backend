@@ -34,6 +34,7 @@ router.delete('/:id', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userCon
 router.post('/check-email', sendCodeRateLimiter, userController.checkEmail);
 router.get('/employees', authMiddleware, roleMiddleware(['SUPERVISOR', 'ADMINISTRADOR', 'REVISOR', 'APROBADOR', 'EMPLEADO']), userController.getEmployees);
 router.get('/all', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.getAllUsersDetailed);
+router.get('/options', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.getUserOptions);
 router.patch('/:id/activate', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.activateUser);
 router.patch('/:id/suspend', authMiddleware, roleMiddleware(['ADMINISTRADOR']), userController.suspendUser);
 router.get('/my-position', authMiddleware, userController.getMyPosition);

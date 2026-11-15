@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
+const compression = require('compression');
 const app = express();
 
 // Confia en el proxy de Render para leer la IP real en el limite de intentos
@@ -10,6 +11,9 @@ if (process.env.RENDER === 'true' || process.env.TRUST_PROXY === 'true') {
 }
 
 app.use(helmet());
+
+// Comprime solo las respuestas grandes (listas de miles de filas); las chicas no gastan CPU en comprimirse
+app.use(compression({threshold: 8192}));
 
 // Dominios del cliente web permitidos (CORS_ORIGINS, separados por coma)
 const defaultOrigins = [

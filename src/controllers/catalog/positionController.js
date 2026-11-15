@@ -1,20 +1,27 @@
 const supabase = require('../../config/supabase');
 const positionService = require('../../services/catalog/positionService');
+const travelScaleService = require('../../services/catalog/travelScaleService');
+const listQuery = require('../../utils/listQuery');
 
-// Lista todos los cargos con las tarifas de su tipo de la escala
+// Lista los cargos con las tarifas de su tipo de la escala; filtra por nombre y con "page" devuelve una pagina y el total
 const getAllPositions = async (req, res) => {
-  const {data, error} = await supabase.from('Cargo').select('id_cargo, nombre, tipo_viatico, activo, Escala_Viatico(*)').order('nombre', {ascending: true});
-  if (error) {
-    return res.status(500).json({error: error.message});
+  const page = listQuery.pageOf(req.query);
+  let count;
+  if (page) {
+    count = 'exact';
   }
-  else {
-    return res.json(data);
+  let query = supabase.from('Cargo').select('id_cargo, nombre, tipo_viatico, activo, Escala_Viatico(*)', {count});
+  query = listQuery.applySearch(query, req.query.search, ['nombre']);
+  query = query.order('nombre', {ascending: true}).order('id_cargo', {ascending: true});
+  if (page) {
+    query = query.range(page.from, page.to);
   }
+  return listQuery.sendList(res, await query, page);
 };
 
 // Actualiza el nombre o el tipo de la escala de un cargo, validando que el nombre no este duplicado
 const updatePosition = async (req, res) => {
-  const picked = positionService.pickPositionFields(req.body, false);
+  const picked = positionService.pickPositionFields(req.body, false, await travelScaleService.getScaleTypes());
   if (picked.error) {
     return res.status(400).json({error: picked.error});
   }
@@ -35,7 +42,7 @@ const updatePosition = async (req, res) => {
 
 // Crea un nuevo cargo con su tipo de la escala, validando que el nombre no este duplicado
 const createPosition = async (req, res) => {
-  const picked = positionService.pickPositionFields(req.body, true);
+  const picked = positionService.pickPositionFields(req.body, true, await travelScaleService.getScaleTypes());
   if (picked.error) {
     return res.status(400).json({error: picked.error});
   }

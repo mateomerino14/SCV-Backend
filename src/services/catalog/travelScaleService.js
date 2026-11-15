@@ -1,20 +1,24 @@
 const supabase = require('../../config/supabase');
 const {countryClassOf} = require('../../utils/countryClasses');
 
-const scaleTypes = ['A', 'B', 'C'];
+const scaleTypePattern = /^[A-Z]$/;
 const amountFields = ['monto_interior', 'monto_clase_1_usd', 'monto_clase_2_usd'];
 const maxAmount = 99999999;
 
-// Indica si el tipo es uno de la escala (A, B o C)
-const isScaleType = (type) => scaleTypes.includes(type);
+// Devuelve las letras de los tipos guardados en la escala, en orden alfabetico
+const getScaleTypes = async () => {
+  const {data} = await supabase.from('Escala_Viatico').select('tipo').order('tipo', {ascending: true});
+  return (data || []).map((row) => row.tipo);
+};
 
-// Devuelve la escala de viaticos ordenada de C a A
+// Devuelve la escala de viaticos, del tipo con mayor tarifa al de menor, con cuantos cargos usan cada tipo
 const getScale = async () => {
-  const {data, error} = await supabase.from('Escala_Viatico').select('*').order('tipo', {ascending: false});
+  const {data, error} = await supabase.from('Escala_Viatico').select('*, Cargo(count)')
+    .order('monto_interior', {ascending: false}).order('tipo', {ascending: false});
   if (error) {
     return {error: error.message, status: 500};
   }
-  return {scale: data};
+  return {scale: data.map(({Cargo, ...row}) => ({...row, cargos: Cargo?.[0]?.count || 0}))};
 };
 
 // Toma de la peticion solo los montos, el hospedaje y la descripcion validos de un tipo de la escala
@@ -47,10 +51,32 @@ const pickScaleFields = (body) => {
   return {fields};
 };
 
+// Crea un tipo nuevo de la escala con su letra, sus montos, el hospedaje y la descripcion
+const createScale = async (body) => {
+  const type = String(body?.tipo || '').trim().toUpperCase();
+  if (!scaleTypePattern.test(type)) {
+    return {error: 'El tipo debe ser una sola letra, de la A a la Z', status: 400};
+  }
+  const required = [...amountFields, 'hospedaje', 'descripcion'];
+  const picked = pickScaleFields(Object.fromEntries(required.map((field) => [field, body[field] ?? ''])));
+  if (picked.error) {
+    return {error: picked.error, status: 400};
+  }
+  const existingTypes = await getScaleTypes();
+  if (existingTypes.includes(type)) {
+    return {error: `Ya existe el tipo ${type} en la escala`, status: 400};
+  }
+  const {data, error} = await supabase.from('Escala_Viatico').insert({tipo: type, ...picked.fields}).select().single();
+  if (error) {
+    return {error: error.message, status: 500};
+  }
+  return {scale: data};
+};
+
 // Actualiza los montos, el hospedaje o la descripcion de un tipo de la escala; los viajes ya guardados conservan su tarifa
 const updateScale = async (type, body) => {
-  if (!isScaleType(type)) {
-    return {error: 'El tipo de la escala debe ser A, B o C', status: 400};
+  if (!scaleTypePattern.test(type)) {
+    return {error: 'El tipo debe ser una sola letra, de la A a la Z', status: 400};
   }
   const picked = pickScaleFields(body || {});
   if (picked.error) {
@@ -59,11 +85,34 @@ const updateScale = async (type, body) => {
   if (Object.keys(picked.fields).length === 0) {
     return {error: 'No hay datos para actualizar', status: 400};
   }
-  const {data, error} = await supabase.from('Escala_Viatico').update(picked.fields).eq('tipo', type).select().single();
+  const {data, error} = await supabase.from('Escala_Viatico').update(picked.fields).eq('tipo', type).select().maybeSingle();
   if (error) {
     return {error: error.message, status: 500};
   }
+  if (!data) {
+    return {error: `No existe el tipo ${type} en la escala`, status: 404};
+  }
   return {scale: data};
+};
+
+// Elimina un tipo de la escala solo si ningun cargo lo usa y no es el ultimo que queda
+const deleteScale = async (type) => {
+  const existingTypes = await getScaleTypes();
+  if (!existingTypes.includes(type)) {
+    return {error: `No existe el tipo ${type} en la escala`, status: 404};
+  }
+  if (existingTypes.length === 1) {
+    return {error: 'La escala debe tener al menos un tipo', status: 400};
+  }
+  const {count} = await supabase.from('Cargo').select('id_cargo', {count: 'exact', head: true}).eq('tipo_viatico', type);
+  if (count > 0) {
+    return {error: `El tipo ${type} lo usan ${count} cargo(s); cámbiales el tipo antes de eliminarlo`, status: 400};
+  }
+  const {error} = await supabase.from('Escala_Viatico').delete().eq('tipo', type);
+  if (error) {
+    return {error: error.message, status: 500};
+  }
+  return {deleted: type};
 };
 
 // Calcula las tarifas diarias que se guardan en el viaje segun el tipo del cargo del empleado y la clase del pais
@@ -94,4 +143,4 @@ const tripRatesFor = async (userId, tripType, country) => {
   return {rates: {pais_destino: destinationCountry, clase_pais: countryClass, tarifa_diaria: scale.monto_interior, tarifa_diaria_usd: dailyRateUsd}};
 };
 
-module.exports = {isScaleType, getScale, updateScale, tripRatesFor};
+module.exports = {getScaleTypes, getScale, createScale, updateScale, deleteScale, tripRatesFor};

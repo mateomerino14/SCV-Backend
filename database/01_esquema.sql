@@ -16,7 +16,7 @@ create table if not exists "Rol" (
 
 -- Escala de viaticos de la empresa: C gerentes, B jefes de area, A el resto del personal
 create table if not exists "Escala_Viatico" (
-  tipo char(1) primary key check (tipo in ('A', 'B', 'C')),
+  tipo char(1) primary key check (tipo ~ '^[A-Z]$'),
   descripcion varchar(100) not null,
   -- tarifa diaria en el interior del pais (Bs) y en el exterior segun la clase del pais (USD)
   monto_interior numeric(10, 2) not null check (monto_interior >= 0),

@@ -1,15 +1,21 @@
 const supabase = require('../../config/supabase');
 const sectionService = require('../../services/catalog/sectionService');
+const listQuery = require('../../utils/listQuery');
 
-// Lista todas las secciones
+// Lista las secciones; filtra por nombre o codigo de Oracle y con "page" devuelve una pagina y el total
 const getAllSections = async (req, res) => {
-  const {data, error} = await supabase.from('Seccion').select('*').order('nombre', {ascending: true});
-  if (error) {
-    return res.status(500).json({error: error.message});
+  const page = listQuery.pageOf(req.query);
+  let count;
+  if (page) {
+    count = 'exact';
   }
-  else {
-    return res.json(data);
+  let query = supabase.from('Seccion').select('*', {count});
+  query = listQuery.applySearch(query, req.query.search, ['nombre', 'codigo_seccion']);
+  query = query.order('nombre', {ascending: true}).order('id_seccion', {ascending: true});
+  if (page) {
+    query = query.range(page.from, page.to);
   }
+  return listQuery.sendList(res, await query, page);
 };
 
 // Actualiza una seccion existente, validando que el nombre no este duplicado y sus codigos de Oracle
