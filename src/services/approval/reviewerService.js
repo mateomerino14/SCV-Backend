@@ -47,7 +47,7 @@ const getPreviousReviewerId = (trip) => {
 const getPendingReviews = async (reviewerId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'APROBADO_SUPERVISOR')
     .is('id_revisor_asignado', null)
     .neq('id_usuario', reviewerId);
@@ -74,7 +74,7 @@ const getPendingReviews = async (reviewerId, filters) => {
 
 // Lista las revisiones finales asignadas al revisor
 const getMyReviews = async (reviewerId, filters) => {
-  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)';
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)';
   // El revisor es unico: toda rendicion pendiente de revision final le corresponde
   await hierarchyAssignmentService.claimStageTrips(reviewerId, 'id_revisor_asignado', ['APROBADO_SUPERVISOR']);
   let query = supabase
@@ -110,7 +110,7 @@ const getMyReviews = async (reviewerId, filters) => {
 const getReviewDetail = async (tripId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, periodo, tipo, es_gasto_internacional, id_gasto)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, tipo_viatico)), Recibo(numero, periodo, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -225,7 +225,7 @@ const notifyEmployee = async (trip, tripCode, expenses) => {
 const approveReview = async (tripId, reviewerId, {selfStageSkip = false, password = null, ip = null} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, Cargo(nombre, monto_diario, monto_diario_usd))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, email_corporativo, foto_perfil, Cargo(nombre, tipo_viatico))')
     .eq('id_viaje', tripId)
     .single();
   if (!trip) {
@@ -257,7 +257,7 @@ const approveReview = async (tripId, reviewerId, {selfStageSkip = false, passwor
   }
   await reviewLogService.recordReview(tripId, reviewerId, reviewLogService.reviewStages.finalReview, 'APROBADO', {automatic: selfStageSkip});
   await signatureService.saveSignature(tripId, signatureService.signatureStages.reviewer, reviewerId, {image: signing.image, automatic: selfStageSkip, ip});
-  const {data: reviewerData} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre, monto_diario, monto_diario_usd)').eq('id_usuario', reviewerId).single();
+  const {data: reviewerData} = await supabase.from('Usuario').select('nombre, apellido_paterno, Cargo(nombre, tipo_viatico)').eq('id_usuario', reviewerId).single();
   // Si es el viaje del propio revisor, el documento indica aprobacion automatica
   const reviewer = {...reviewerData, aprobacionAutomatica: selfStageSkip};
   const {data: expenses} = await supabase

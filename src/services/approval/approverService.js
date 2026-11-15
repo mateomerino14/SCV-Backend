@@ -168,7 +168,7 @@ const getTripDetail = async (tripId) => {
 const approveTrip = async (tripId, approverId, {selfStageSkip = false, approvedAsBoss = false, password = null, ip = null} = {}) => {
   const {data: trip} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, email_corporativo, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, Escala_Viatico(hospedaje)))')
     .eq('id_viaje', tripId)
     .single();
   if (!trip) {

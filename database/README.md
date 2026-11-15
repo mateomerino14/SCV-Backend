@@ -6,7 +6,7 @@ Scripts SQL para crear la base de datos completa en Supabase (PostgreSQL) desde 
 
 ```
 database/
-├── 01_esquema.sql                  Las 31 tablas, relaciones, restricciones e índices
+├── 01_esquema.sql                  Las 32 tablas, relaciones, restricciones e índices
 ├── 02_funciones.sql                Correlativos (recibos por mes, viajes por año, rendiciones por mes) y sus triggers
 ├── 03_datos_iniciales.sql          Roles, cargos, impuesto IVA, secciones, vehículos, plan de cuentas y recordatorios por defecto
 ├── 04_seguridad_rls.sql            Seguridad por fila (RLS) en todas las tablas
@@ -21,7 +21,7 @@ database/
 
 ## Orden de ejecución
 
-1. `01_esquema.sql` - crea las 31 tablas, relaciones e índices. Cada llave foránea tiene su índice, para que los cruces y los borrados no recorran la tabla entera.
+1. `01_esquema.sql` - crea las 32 tablas, relaciones e índices. Cada llave foránea tiene su índice, para que los cruces y los borrados no recorran la tabla entera.
 2. `02_funciones.sql` - crea la función `incrementar_correlativo_recibo(periodo)`, usada por el backend para numerar recibos (el correlativo vuelve a 1 cada mes); el trigger `viaje_numero_anual`, que al crear un viaje le da el siguiente número de su año para el código `VIA-numero/año` (`Viaje.numero_viaje` y `anio_viaje`), y el trigger `viaje_numero_rendicion`, que al quedar un viaje en `APROBADO_FINAL` le asigna el siguiente número de rendición del mes de su último comprobante (`Viaje.numero_rendicion` y `periodo_rendicion`). Para empezar desde un número, por ejemplo si contabilidad ya va por la 40: `insert into "Correlativo_Rendicion" (periodo, numero) values ('2026-10', 40) on conflict (periodo) do update set numero = 40;`
 3. `03_datos_iniciales.sql` - roles, cargos, impuesto de IVA, las 43 secciones de la empresa con su código de Oracle, los 38 vehículos livianos de la flota, categorías de gasto y la configuración de recordatorios por defecto. De los vehículos, quedan activos los 14 que pueden viajar; los demás (asignados a planta, a la mina, sin viajar o por confirmar) quedan inactivos y el administrador los activa cuando corresponda. La descripción de cada uno dice a quién está asignado o dónde está. No se cargan los vendidos ni el equipo pesado.
 4. `04_seguridad_rls.sql` - activa la seguridad por fila (RLS) en todas las tablas, sin políticas: con la llave pública nadie lee ni escribe, y el backend entra con la llave de servicio. Por eso Supabase muestra el aviso informativo «RLS Enabled No Policy» en cada tabla, y es lo esperado. También quita el permiso de ejecutar por la API la función `rls_auto_enable()` que crea Supabase, porque solo la usa su trigger de eventos.
@@ -49,7 +49,7 @@ Los archivos `01` a `04` reflejan siempre el estado final y completo del esquema
 
 | Script | Uso |
 |---|---|
-| `mantenimiento/borrar_todo.sql` | Elimina las 31 tablas, las funciones y los triggers para volver a crear la base con `01` a `05`. No se puede deshacer |
+| `mantenimiento/borrar_todo.sql` | Elimina las 32 tablas, las funciones y los triggers para volver a crear la base con `01` a `05`. No se puede deshacer |
 | `mantenimiento/limpiar_datos.sql` | Borra usuarios, viajes, gastos, facturas, firmas, documentos emitidos, solicitudes y auditoría. Conserva los catálogos (roles, cargos, secciones, categorías, impuestos y vehículos) y repone la configuración de recordatorios por defecto |
 | `pruebas/organizacion_prueba.sql` | Organización de prueba completa con jerarquía de jefe directo y tres vehículos. Contraseña de todos: `Prueba1234`. La usan las pruebas automáticas de la API y de extremo a extremo |
 
@@ -60,11 +60,12 @@ Solo para entornos de prueba, nunca en una base con datos reales.
 | Tabla | Descripcion |
 |---|---|
 | Rol | Roles del sistema |
-| Cargo | Cargos/puestos de trabajo, con su monto de viatico diario en ambas monedas |
+| Escala_Viatico | Escala de viáticos de la empresa: tipos C, B y A con la tarifa diaria en el interior (Bs), en el exterior por clase de país (USD) y el hospedaje permitido |
+| Cargo | Cargos/puestos de trabajo, con su tipo de la escala de viáticos (A, B o C) |
 | Seccion | Secciones/departamentos de la empresa; se usa como respaldo intermedio en la jerarquia de revision cuando falta el jefe directo. `codigo_seccion` (3 digitos, opcional) es su codigo de Oracle para la cuenta del gasto: 76.8.dependencia.cuenta.000000.seccion.000.000 |
 | Usuario | Usuarios del sistema; `codigo_dependencia` (3 digitos, opcional) es la dependencia de Oracle que llevan los gastos de quienes lo tienen como jefe directo (y los suyos si no tiene jefe) |
 | Codigo_Verificacion | Codigos temporales de verificacion por correo |
-| Viaje | Viajes registrados (motivo de hasta 500 caracteres), con su flujo de estados, revisores asignados, monto asignado (Bs y USD, con la parte para combustible en `monto_combustible`), vehículo de la empresa (`id_vehiculo` y la placa de ese momento), gestión del hospedaje (`Empresa` o `Propio`) , número anual (`numero_viaje`, `anio_viaje`) y, con fondo internacional solo en Bs, el tipo de cambio que anota Tesorería (`tipo_cambio_fondo`) |
+| Viaje | Viajes registrados (motivo de hasta 500 caracteres), con su flujo de estados, país de destino y su clase en los internacionales (`pais_destino`, `clase_pais`), tarifas diarias fijadas al guardarlo según la escala del cargo (`tarifa_diaria` en Bs y `tarifa_diaria_usd`), revisores asignados, monto asignado (Bs y USD, con la parte para combustible en `monto_combustible`), vehículo de la empresa (`id_vehiculo` y la placa de ese momento), gestión del hospedaje (`Empresa` o `Propio`) , número anual (`numero_viaje`, `anio_viaje`) y, con fondo internacional solo en Bs, el tipo de cambio que anota Tesorería (`tipo_cambio_fondo`) |
 | Vehiculo | Flota de la empresa (placa única, descripción, activo); un índice único parcial impide que un vehículo esté en dos viajes activos |
 | Solicitud_Autorizacion_Plazo | Solicitudes de extension de plazo para seguir registrando gastos; las puede pedir el titular o su reemplazo (`id_empleado` es quien la pidio) |
 | Categoria_Gasto | Categorias de gasto: el plan de cuentas de la empresa (112 cuentas de la planilla de Castro mas OTROS), con su cuenta contable de Oracle y, en `descripcion`, la nota de cuando usarla |
@@ -150,7 +151,7 @@ Contar las tablas creadas:
 select count(*) from information_schema.tables where table_schema = 'public';
 ```
 
-Debe devolver 30.
+Debe devolver 32.
 
 Comprobar que las columnas temporales quedaron bien tipadas:
 
@@ -161,7 +162,7 @@ where table_schema = 'public' and data_type like 'timestamp%'
 order by table_name, column_name;
 ```
 
-Las quince filas deben indicar `timestamp with time zone`.
+Las dieciséis filas deben indicar `timestamp with time zone`.
 
 ## Variables de entorno necesarias
 

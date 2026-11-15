@@ -6,9 +6,9 @@
 -- Incluye tres vehículos. La usan las pruebas automáticas. Contraseña de todos: Prueba1234
 -- ============================================================
 
-insert into "Cargo" (nombre, monto_diario, monto_diario_usd, activo) values
-  ('Analista de Prueba', 300, 40, true),
-  ('Jefe de Area de Prueba', 350, 45, true)
+insert into "Cargo" (nombre, tipo_viatico, activo) values
+  ('Analista de Prueba', 'A', true),
+  ('Jefe de Area de Prueba', 'B', true)
 on conflict (nombre) do nothing;
 
 insert into "Seccion" (nombre, activo) values

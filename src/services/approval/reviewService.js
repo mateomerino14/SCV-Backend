@@ -12,7 +12,7 @@ const tripAccessService = require('../trip/tripAccessService');
 const getPendingTripReviews = async (supervisorId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico))')
     .eq('estado', 'EN_REVISION_VIAJE')
     .is('id_supervisor_asignado', null)
     .neq('id_usuario', supervisorId);
@@ -39,7 +39,7 @@ const getPendingTripReviews = async (supervisorId, filters) => {
 
 // Lista los viajes de revision previa asignados al supervisor
 const getMyTripReviews = async (supervisorId, filters) => {
-  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Comentario(*)';
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico)), Comentario(*)';
   let query = supabase
     .from('Viaje')
     .select(selectFields)
@@ -134,7 +134,7 @@ const returnTripReview = async (tripId, supervisorId) => {
 const getTripReviewDetail = async (tripId, supervisorId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico))')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {
@@ -263,7 +263,7 @@ const attachSummaryToTrips = (trips) => {
 const getPendingExpenseReviews = async (supervisorId, filters) => {
   let query = supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))')
     .eq('estado', 'EN_REVISION')
     .is('id_supervisor_asignado', null)
     .neq('id_usuario', supervisorId);
@@ -290,7 +290,7 @@ const getPendingExpenseReviews = async (supervisorId, filters) => {
 
 // Lista los viajes de revision de gastos asignados al supervisor
 const getMyExpenseReviews = async (supervisorId, filters) => {
-  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, monto_diario, monto_diario_usd)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)';
+  const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)';
   let query = supabase
     .from('Viaje')
     .select(selectFields)
@@ -386,7 +386,7 @@ const returnExpenseReview = async (tripId, supervisorId) => {
 const getExpenseReviewDetail = async (tripId, supervisorId) => {
   const {data: trip, error: tripError} = await supabase
     .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, monto_diario, monto_diario_usd)), Recibo(numero, periodo, tipo, es_gasto_internacional, id_gasto)')
+    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, apellido_materno, foto_perfil, id_seccion, codigo_dependencia, Jefe:id_jefe_directo(codigo_dependencia), Seccion(nombre, codigo_seccion), Cargo(nombre, tipo_viatico)), Recibo(numero, periodo, tipo, es_gasto_internacional, id_gasto)')
     .eq('id_viaje', tripId)
     .single();
   if (tripError) {

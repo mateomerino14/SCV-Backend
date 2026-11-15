@@ -43,6 +43,7 @@ const roleRoute = require('./routes/catalog/role');
 const taxRoute = require('./routes/catalog/tax');
 const expenseCategoryRoute = require('./routes/catalog/expenseCategory');
 const positionRoute = require('./routes/catalog/position');
+const travelScaleRoute = require('./routes/catalog/travelScale');
 const sectionRoute = require('./routes/catalog/section');
 const vehicleRoute = require('./routes/catalog/vehicle');
 const documentRoute = require('./routes/document/document');
@@ -63,6 +64,7 @@ const adminRoute = require('./routes/admin/admin');
 
 app.use('/role', roleRoute);
 app.use('/position', positionRoute);
+app.use('/travel-scale', travelScaleRoute);
 app.use('/section', sectionRoute);
 app.use('/vehicle', vehicleRoute);
 app.use('/document', documentRoute);

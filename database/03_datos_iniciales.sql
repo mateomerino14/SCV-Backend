@@ -14,13 +14,20 @@ insert into "Rol" (id_rol, nombre) values
   (5, 'APROBADOR')
 on conflict (id_rol) do nothing;
 
--- Cargos de un solo usuario activo; el monto diario se configura desde el panel
-insert into "Cargo" (nombre, monto_diario, monto_diario_usd, activo) values
-  ('Asistente Administrativo de Seguros y Servicios', 0, 0, true),
-  ('Asistente Administrativo - Cargo y Descargo de Cta. Documentada', 0, 0, true),
-  ('Asistente de Caja y Tesoreria', 0, 0, true),
-  ('Gerente RRHH', 0, 0, true),
-  ('Jefe de Recursos Humanos', 0, 0, true)
+-- Escala de viaticos vigente (punto 5.3 del reglamento); el administrador la actualiza desde Cargos
+insert into "Escala_Viatico" (tipo, descripcion, monto_interior, monto_clase_1_usd, monto_clase_2_usd, hospedaje) values
+  ('C', 'Gerente General y Gerentes de Área', 460, 345, 280, 'Hasta 5 estrellas'),
+  ('B', 'Jefes de Área', 340, 280, 230, 'Hasta 3 estrellas'),
+  ('A', 'Personal no comprendido en las anteriores categorías', 230, 230, 170, 'Hasta 3 estrellas')
+on conflict (tipo) do nothing;
+
+-- Cargos de un solo usuario activo, con su tipo de la escala de viaticos
+insert into "Cargo" (nombre, tipo_viatico, activo) values
+  ('Asistente Administrativo de Seguros y Servicios', 'A', true),
+  ('Asistente Administrativo - Cargo y Descargo de Cta. Documentada', 'A', true),
+  ('Asistente de Caja y Tesoreria', 'A', true),
+  ('Gerente RRHH', 'C', true),
+  ('Jefe de Recursos Humanos', 'B', true)
 on conflict (nombre) do nothing;
 
 -- Impuesto de IVA vigente en Bolivia.

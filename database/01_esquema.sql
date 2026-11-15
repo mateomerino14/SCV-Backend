@@ -1,7 +1,7 @@
 -- ============================================================
 -- SCV · 01 ESQUEMA
 -- ============================================================
--- Crea las 30 tablas del sistema con sus relaciones, restricciones e índices.
+-- Crea las 32 tablas del sistema con sus relaciones, restricciones e índices.
 -- Primer paso para crear la base desde cero; refleja siempre el esquema final completo.
 -- ============================================================
 
@@ -14,11 +14,23 @@ create table if not exists "Rol" (
   nombre varchar(20) not null unique
 );
 
+-- Escala de viaticos de la empresa: C gerentes, B jefes de area, A el resto del personal
+create table if not exists "Escala_Viatico" (
+  tipo char(1) primary key check (tipo in ('A', 'B', 'C')),
+  descripcion varchar(100) not null,
+  -- tarifa diaria en el interior del pais (Bs) y en el exterior segun la clase del pais (USD)
+  monto_interior numeric(10, 2) not null check (monto_interior >= 0),
+  monto_clase_1_usd numeric(10, 2) not null check (monto_clase_1_usd >= 0),
+  monto_clase_2_usd numeric(10, 2) not null check (monto_clase_2_usd >= 0),
+  -- categoria de hotel permitida; es informativa
+  hospedaje varchar(40) not null
+);
+
 create table if not exists "Cargo" (
   id_cargo serial primary key,
   nombre varchar(100) not null unique,
-  monto_diario decimal(10, 2) not null,
-  monto_diario_usd numeric(10, 2) default 0,
+  -- tipo de la escala de viaticos que le corresponde al cargo
+  tipo_viatico char(1) not null default 'A' references "Escala_Viatico"(tipo),
   activo boolean not null default true
 );
 
@@ -130,6 +142,12 @@ create table if not exists "Viaje" (
   -- quien gestiona el hospedaje: la empresa lo reserva o el propio empleado
   gestion_hospedaje varchar(10) not null default 'Propio' check (gestion_hospedaje in ('Empresa', 'Propio')),
   monto_asignado_usd numeric(10, 2) default 0,
+  -- pais del viaje internacional y su clase (1 Europa, Asia, Africa y Norte America; 2 Centro, Sud America y el Caribe)
+  pais_destino varchar(60),
+  clase_pais smallint check (clase_pais in (1, 2)),
+  -- tarifas diarias que se fijan al guardar el viaje segun la escala del cargo: no cambian si despues cambia la escala
+  tarifa_diaria numeric(10, 2) not null default 0,
+  tarifa_diaria_usd numeric(10, 2) not null default 0,
   -- bolivianos por 1 USD con que Tesorería convirtió el fondo de un viaje internacional entregado solo en Bs; sin dato se usa 6.96
   tipo_cambio_fondo numeric(10, 4) check (tipo_cambio_fondo > 0),
   estado varchar(25) not null default 'BORRADOR' constraint viaje_estado_check check (estado in (
