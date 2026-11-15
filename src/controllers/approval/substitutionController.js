@@ -36,28 +36,6 @@ const getRequestStatus = async (req, res) => {
   }
 };
 
-// Lista las solicitudes de reemplazo pendientes de revision
-const getPendingRequests = async (req, res) => {
-  const result = await substitutionService.getPendingRequests();
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.requests);
-  }
-};
-
-// Lista el historial de solicitudes de reemplazo ya procesadas
-const getRequestHistory = async (req, res) => {
-  const result = await substitutionService.getRequestHistory();
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.requests);
-  }
-};
-
 // Aprueba una solicitud de reemplazo
 const approveRequest = async (req, res) => {
   const {requestId} = req.params;
@@ -92,13 +70,4 @@ const getActiveSubstitutions = async (req, res) => {
   return res.json(trips);
 };
 
-module.exports = {
-  createRequest,
-  getRequestStatus,
-  getPendingRequests,
-  getRequestHistory,
-  approveRequest,
-  rejectRequest,
-  getActiveSubstitutions,
-  getCandidates,
-};
+module.exports = {createRequest, getRequestStatus, approveRequest, rejectRequest, getActiveSubstitutions, getCandidates};

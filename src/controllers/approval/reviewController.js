@@ -1,29 +1,5 @@
 const reviewService = require('../../services/approval/reviewService');
 
-// Lista los viajes pendientes de revision previa
-const getPendingTripReviews = async (req, res) => {
-  const supervisorId = req.user.id_usuario;
-  const result = await reviewService.getPendingTripReviews(supervisorId, req.query);
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.trips);
-  }
-};
-
-// Lista los viajes de revision previa asignados al supervisor
-const getMyTripReviews = async (req, res) => {
-  const supervisorId = req.user.id_usuario;
-  const result = await reviewService.getMyTripReviews(supervisorId, req.query);
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.trips);
-  }
-};
-
 // Toma un viaje para revision previa
 const takeTripReview = async (req, res) => {
   const {tripId} = req.params;
@@ -86,30 +62,6 @@ const rejectTripReview = async (req, res) => {
   }
   else {
     return res.json({message: result.message});
-  }
-};
-
-// Lista los viajes pendientes de revision de gastos
-const getPendingExpenseReviews = async (req, res) => {
-  const supervisorId = req.user.id_usuario;
-  const result = await reviewService.getPendingExpenseReviews(supervisorId, req.query);
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.trips);
-  }
-};
-
-// Lista los viajes de revision de gastos asignados al supervisor
-const getMyExpenseReviews = async (req, res) => {
-  const supervisorId = req.user.id_usuario;
-  const result = await reviewService.getMyExpenseReviews(supervisorId, req.query);
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.trips);
   }
 };
 
@@ -275,9 +227,4 @@ const deleteExpenseReviewComment = async (req, res) => {
   }
 };
 
-module.exports = {
-  getPendingTripReviews, getMyTripReviews, takeTripReview, returnTripReview, getTripReviewDetail, approveTripReview, rejectTripReview,
-  addTripReviewComment, editTripReviewComment, deleteTripReviewComment,
-  getPendingExpenseReviews, getMyExpenseReviews, takeExpenseReview, returnExpenseReview, getExpenseReviewDetail, approveExpenseReview, rejectExpenseReview,
-  addExpenseReviewComment, editExpenseReviewComment, deleteExpenseReviewComment,
-};
+module.exports = {takeTripReview, returnTripReview, getTripReviewDetail, approveTripReview, rejectTripReview, addTripReviewComment, editTripReviewComment, deleteTripReviewComment, takeExpenseReview, returnExpenseReview, getExpenseReviewDetail, approveExpenseReview, rejectExpenseReview, addExpenseReviewComment, editExpenseReviewComment, deleteExpenseReviewComment};

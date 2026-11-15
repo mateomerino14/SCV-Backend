@@ -121,4 +121,4 @@ const getInboxPage = async (inboxName, userId, query) => {
   return {page: {items: tabRows.slice((page - 1) * limit, page * limit), total: tabRows.length, counts, tab, page, limit}};
 };
 
-module.exports = {inboxNames: Object.keys(inboxes), getInboxPage};
+module.exports = {getInboxPage};

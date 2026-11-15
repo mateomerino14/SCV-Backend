@@ -1,14 +1,7 @@
 const supabase = require('../../src/config/supabase');
-const {login, api, boliviaDate} = require('./helpers');
+const {login, api, boliviaDate, inboxRows} = require('./helpers');
 
 jest.setTimeout(90000);
-
-const listOf = (body) => {
-  if (Array.isArray(body)) {
-    return body;
-  }
-  return Object.values(body || {}).find((value) => Array.isArray(value)) || [];
-};
 
 // Crea un viaje nacional de dos dias para el usuario y devuelve su id
 const createTrip = async (client, motivo) => {
@@ -19,7 +12,7 @@ const createTrip = async (client, motivo) => {
 };
 
 // Ids de los viajes que devuelve una bandeja de revision
-const tripIdsOf = async (client, path) => listOf((await client.get(path)).body).map((trip) => trip.id_viaje);
+const tripIdsOf = async (client, inbox) => (await inboxRows(client, inbox)).map((trip) => trip.id_viaje);
 
 // Cada viaje enviado a revision llega al jefe directo de quien viaja, y solo a el
 test('envía cada viaje al jefe directo de quien viaja', async () => {
@@ -29,8 +22,8 @@ test('envía cada viaje al jefe directo de quien viaja', async () => {
   const carlosTrip = await createTrip(api(await login('carlos.empleado')), 'Viaje de Carlos para su jefe');
   await api(await login('juan.empleado')).put(`/trip/${juanTrip}/submit-review`);
   await api(await login('carlos.empleado')).put(`/trip/${carlosTrip}/submit-review`);
-  const mariaTrips = await tripIdsOf(maria, '/review/trip-review/mine');
-  const jorgeTrips = await tripIdsOf(jorge, '/review/trip-review/mine');
+  const mariaTrips = await tripIdsOf(maria, 'jefe-historial-viajes');
+  const jorgeTrips = await tripIdsOf(jorge, 'jefe-historial-viajes');
   expect(mariaTrips).toContain(juanTrip);
   expect(mariaTrips).not.toContain(carlosTrip);
   expect(jorgeTrips).toContain(carlosTrip);
@@ -45,8 +38,8 @@ test('deja el viaje de quien no tiene jefe directo para que lo tome un superviso
   expect(submitted.status).toBe(200);
   const {data: trip} = await supabase.from('Viaje').select('id_supervisor_asignado').eq('id_viaje', tripId).single();
   expect(trip.id_supervisor_asignado).toBeNull();
-  expect(await tripIdsOf(api(await login('maria.supervisora')), '/review/trip-review/pending')).toContain(tripId);
-  expect(await tripIdsOf(api(await login('jorge.supervisor')), '/review/trip-review/pending')).toContain(tripId);
+  expect(await tripIdsOf(api(await login('maria.supervisora')), 'jefe-viajes-pendientes')).toContain(tripId);
+  expect(await tripIdsOf(api(await login('jorge.supervisor')), 'jefe-viajes-pendientes')).toContain(tripId);
 });
 
 // El reemplazo aprobado rinde el viaje junto con el titular; nadie mas puede registrar gastos
@@ -62,7 +55,7 @@ test('deja rendir el viaje al reemplazo aprobado y al titular, y a nadie más', 
 
   expect((await substitute.postForm('/expense/register', expense)).status).toBe(403);
   expect((await owner.post(`/substitution/trip/${tripId}/request`, {id_sustituto: ana.id_usuario})).status).toBe(200);
-  const request = listOf((await reviewer.get('/substitution/pending')).body).find((item) => item.id_viaje === tripId);
+  const request = (await inboxRows(reviewer, 'reemplazos', 'PENDIENTES')).find((item) => item.id_viaje === tripId);
   expect((await reviewer.post(`/substitution/${request.id_solicitud}/approve`)).status).toBe(200);
 
   expect((await substitute.postForm('/expense/register', {...expense, descripcion: 'Gasto del reemplazo'})).status).toBe(200);
@@ -86,7 +79,7 @@ test('el reemplazo corrige y reenvía la rendición que le rechazaron', async ()
   await supabase.from('Viaje').update({estado: 'EN_CURSO', fue_iniciado: true}).eq('id_viaje', tripId);
   const {data: ana} = await supabase.from('Usuario').select('id_usuario').eq('email_corporativo', 'ana.empleada@maxam.com').single();
   await owner.post(`/substitution/trip/${tripId}/request`, {id_sustituto: ana.id_usuario});
-  const request = listOf((await reviewer.get('/substitution/pending')).body).find((item) => item.id_viaje === tripId);
+  const request = (await inboxRows(reviewer, 'reemplazos', 'PENDIENTES')).find((item) => item.id_viaje === tripId);
   await reviewer.post(`/substitution/${request.id_solicitud}/approve`);
   const expense = {id_viaje: tripId, monto_total: 20, fecha_gasto: boliviaDate(), tipo: 'C', descripcion: 'Compra del reemplazo', id_categoria_gasto: 1, es_gasto_internacional: false};
   const registered = await substitute.postForm('/expense/register', expense);

@@ -72,17 +72,15 @@ test('todas las bandejas se paginan en el servidor con sus pestañas', async () 
   }
 });
 
-// La bandeja del jefe trae los viajes enviados por su equipo en la pestana de pendientes, igual que la lista de siempre
-test('la bandeja del jefe coincide con su lista de viajes revisados', async () => {
+// Los viajes que el equipo envia quedan en la pestana de pendientes del jefe, del mas reciente al mas antiguo
+test('la bandeja del jefe trae como pendientes los viajes que envió su equipo', async () => {
   const supervisor = clients['maria.supervisora'];
-  const old = await supervisor.get('/review/trip-review/mine');
-  const pendingOld = old.body.filter((trip) => trip.estado === 'EN_REVISION_VIAJE' && trip.asignado_a_mi !== false).map((trip) => trip.id_viaje);
   const {rows} = await allPagesOf(supervisor, 'jefe-historial-viajes', 'EN_REVISION_VIAJE');
-  expect(rows.map((trip) => trip.id_viaje)).toEqual(pendingOld);
-  const unassigned = await supervisor.get('/review/trip-review/pending');
-  const inbox = await allPagesOf(supervisor, 'jefe-viajes-pendientes', 'TODOS');
-  expect(inbox.rows.map((trip) => trip.id_viaje)).toEqual(unassigned.body.map((trip) => trip.id_viaje));
-  expect(pendingOld.length + unassigned.body.length).toBeGreaterThan(0);
+  const sent = rows.filter((trip) => trip.motivo.startsWith('Viaje para la bandeja'));
+  expect(sent).toHaveLength(3);
+  expect(sent.every((trip) => trip.estado === 'EN_REVISION_VIAJE' && trip.etapa === 'JEFE')).toBe(true);
+  const approved = await allPagesOf(supervisor, 'jefe-historial-viajes', 'APROBADO_VIAJE');
+  expect(approved.rows.some((trip) => trip.motivo.startsWith('Viaje para la bandeja'))).toBe(false);
 });
 
 // Cada bandeja exige el mismo rol que su lista; los filtros y el tamano de pagina se validan

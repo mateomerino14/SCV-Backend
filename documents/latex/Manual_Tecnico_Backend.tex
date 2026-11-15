@@ -516,7 +516,7 @@ Aprobador y revisor son roles únicos: todo viaje de su etapa les corresponde. E
 \subsection{Monto del viaje}
 \textbf{Listas paginadas.} \code{GET /user/all}, \code{GET /position} y \code{GET /section} aceptan \code{page} (desde 1), \code{limit} (15 por defecto, 100 como máximo) y \code{search}; \code{/user/all} además \code{rol} y \code{seccion} (el id o \code{ninguna}). Con \code{page} responden \code{\{items, total, page, limit\}}: una página y el total que cumple el filtro, para que la pantalla del administrador no descargue miles de usuarios de una vez; sin \code{page}, la lista completa con los mismos filtros (exportaciones a Excel y selectores). La búsqueda (\code{utils/listQuery.js}) separa las palabras y cada una debe aparecer en alguno de los campos, sin importar mayúsculas ni tildes, y descarta los signos que no sean letras, números, @, punto, guion o guion bajo. \code{GET /user/options} es la lista liviana para elegir el jefe directo, y \code{GET /travel-scale} trae en cada tipo cuántos cargos lo usan. La prueba \code{listPagination.api.test.js} lo verifica con 3000 usuarios.
 
-\textbf{Bandejas paginadas.} Las bandejas de revisión, sus historiales y las solicitudes de plazo y de reemplazo se piden con \code{GET /inbox/:bandeja} (\code{inboxService}; bandejas \code{jefe-viajes-pendientes}, \code{jefe-rendiciones-pendientes}, \code{jefe-historial-viajes}, \code{jefe-historial-rendiciones}, \code{aprobador-viajes}, \code{aprobador-rendiciones}, \code{revisor}, \code{tesoreria}, \code{plazos} y \code{reemplazos}), con el mismo rol que sus listas de siempre. Aceptan \code{tab}, \code{page}, \code{limit} (12 por defecto, 100 como máximo) y los filtros de fecha, empleado y sección, y responden \code{\{items, total, counts, tab, page, limit\}}: la página pedida de esa pestaña, su total y los totales de todas las pestañas. Usan los mismos servicios que las listas anteriores, marcan la etapa de cada fila, quitan los repetidos y reparten las filas en pestañas con las reglas que antes aplicaba la pantalla, así el navegador recibe 12 filas en lugar de todo el historial.
+\textbf{Bandejas paginadas.} Las bandejas de revisión, sus historiales y las solicitudes de plazo y de reemplazo se piden con \code{GET /inbox/:bandeja} (\code{inboxService}; bandejas \code{jefe-viajes-pendientes}, \code{jefe-rendiciones-pendientes}, \code{jefe-historial-viajes}, \code{jefe-historial-rendiciones}, \code{aprobador-viajes}, \code{aprobador-rendiciones}, \code{revisor}, \code{tesoreria}, \code{plazos} y \code{reemplazos}), con el mismo rol que sus listas de siempre. Aceptan \code{tab}, \code{page}, \code{limit} (12 por defecto, 100 como máximo) y los filtros de fecha, empleado y sección, y responden \code{\{items, total, counts, tab, page, limit\}}: la página pedida de esa pestaña, su total y los totales de todas las pestañas. Usan los servicios de cada etapa, marcan la etapa de cada fila, quitan los repetidos y reparten las filas en pestañas con las reglas que antes aplicaba la pantalla, así el navegador recibe 12 filas en lugar de todo el historial. Las listas sueltas que usaban antes las pantallas se quitaron.
 
 \textbf{Escala de viáticos.} Las tarifas salen de la tabla \code{Escala_Viatico} (punto 5.3 del reglamento): tipo C (Gerente General y Gerentes de Área) Bs 460 en el interior, USD 345 en países clase 1 y USD 280 en clase 2, hospedaje hasta 5 estrellas; tipo B (Jefes de Área) Bs 340, USD 280 y USD 230, hasta 3 estrellas; tipo A (el resto del personal) Bs 230, USD 230 y USD 170, hasta 3 estrellas. Cada cargo lleva su tipo en \code{tipo_viatico}. Clase 1 son Europa, Asia, África y Norte América; clase 2, Centro y Sud América y el Caribe (\code{utils/countryClasses.js}; Oceanía, que el reglamento no menciona, se toma como clase 1). El administrador edita la escala con \code{PUT /travel-scale/:tipo}, agrega tipos nuevos con \code{POST /travel-scale} (una letra de la A a la Z que no exista, con sus tres montos, el hospedaje y la descripción) y elimina con \code{DELETE /travel-scale/:tipo} un tipo que ningún cargo use, siempre que no sea el último. La escala se lista de la tarifa interior más alta a la más baja, y los cargos (al crearlos o importarlos) se validan contra los tipos guardados. Al guardar un viaje, \code{travelScaleService.tripRatesFor} exige en uno internacional un \code{pais_destino} de la lista y fija en el viaje \code{clase_pais}, \code{tarifa_diaria} y \code{tarifa_diaria_usd}; el control diario y el memorándum usan esas tarifas, así que cambiar la escala no altera los viajes ya registrados. El hospedaje es informativo: sale en el memorándum.
 
@@ -613,23 +613,18 @@ Las secciones y los cargos también se importan (\code{catalogImportService}, ha
 \subsection{Revisión y aprobación}
 {\small\begin{xltabular}{\textwidth}{L{1.45cm} L{5.4cm} L{2.4cm} Y}
 \tablaEp{}
-\ep{GET}{/review/trip-review/pending}{Supervisor}{Viajes en revisión previa sin asignar}
-\epf{GET}{/review/trip-review/mine}{Supervisor}{Asignados e historial}
-\ep{POST}{/review/trip-review/:tripId/take}{Supervisor}{Toma el viaje}
-\epf{POST}{/review/trip-review/:tripId/return}{Supervisor}{Devuelve el viaje sin revisar}
-\ep{POST}{/review/trip-review/:tripId/approve}{Supervisor}{Aprueba}
-\epf{POST}{/review/trip-review/:tripId/reject}{Supervisor}{Rechaza con observaciones}
-\ep{GET}{/review/expense-review/*}{Supervisor}{Mismas operaciones para la rendición}
-\epf{GET}{/approver/pending-trips}{Aprobador}{Viajes por aprobar}
+\ep{GET}{/inbox/:bandeja}{Según la bandeja}{Bandejas de revisión, historiales y solicitudes de plazo y de reemplazo, de a una página con los totales por pestaña}
+\epf{POST}{/review/trip-review/:tripId/take}{Supervisor}{Toma el viaje}
+\ep{POST}{/review/trip-review/:tripId/return}{Supervisor}{Devuelve el viaje sin revisar}
+\epf{POST}{/review/trip-review/:tripId/approve}{Supervisor}{Aprueba}
+\ep{POST}{/review/trip-review/:tripId/reject}{Supervisor}{Rechaza con observaciones}
+\epf{POST}{/review/expense-review/:tripId/*}{Supervisor}{Mismas operaciones para la rendición}
 \ep{POST}{/approver/trip/:tripId/approve}{Aprobador}{Aprueba y genera el memorándum}
 \epf{POST}{/approver/alcohol-review/:tripId/*}{Aprobador}{Revisión adicional de gastos no deducibles}
-\ep{GET}{/treasurer/pending-trips}{Tesorero}{Viajes esperando fondos}
-\epf{PUT}{/treasurer/:tripId/amounts}{Tesorero}{Ajusta los montos asignados y, con fondo solo en Bs, el tipo de cambio del fondo (\code{tipo_cambio_fondo})}
-\ep{POST}{/treasurer/:tripId/approve}{Tesorero}{Aprueba fondos y envía la confirmación}
-\epf{GET}{/reviewer/pending}{Revisor}{Rendiciones para revisión final}
+\ep{PUT}{/treasurer/:tripId/amounts}{Tesorero}{Ajusta los montos asignados y, con fondo solo en Bs, el tipo de cambio del fondo (\code{tipo_cambio_fondo})}
+\epf{POST}{/treasurer/:tripId/approve}{Tesorero}{Aprueba fondos y envía la confirmación}
 \ep{POST}{/reviewer/:tripId/approve}{Revisor}{Aprobación final y rendición en PDF}
 \epf{POST}{/*/:tripId/comment}{Etapa actual}{Agrega, edita o borra observaciones}
-\ep{GET}{/inbox/:bandeja}{Según la bandeja}{Una página de la bandeja de revisión o de solicitudes, con los totales por pestaña}
 \end{xltabular}}
 
 \subsection{Solicitudes}
@@ -637,12 +632,11 @@ Las secciones y los cargos también se importan (\code{catalogImportService}, ha
 \tablaEp{}
 \ep{POST}{/deadline-authorization/trip/:tripId/request}{Dueño o reemplazo}{Pide ampliación de plazo}
 \epf{GET}{/deadline-authorization/trip/:tripId/status}{Dueño o reemplazo}{Estado de la última solicitud}
-\ep{GET}{/deadline-authorization/pending}{Revisor}{Solicitudes pendientes}
-\epf{POST}{/deadline-authorization/:requestId/approve}{Revisor}{Aprueba (4 días desde la respuesta)}
-\ep{GET}{/substitution/candidates}{Sesión}{Personas de la sección que pueden rendir}
-\epf{POST}{/substitution/trip/:tripId/request}{Dueño}{Pide un reemplazo}
-\ep{GET}{/substitution/mine}{Sesión}{Viajes que rinde como reemplazo}
-\epf{POST}{/substitution/:requestId/approve}{Revisor}{Aprueba el reemplazo}
+\ep{POST}{/deadline-authorization/:requestId/approve}{Revisor}{Aprueba (4 días desde la respuesta)}
+\epf{GET}{/substitution/candidates}{Sesión}{Personas de la sección que pueden rendir}
+\ep{POST}{/substitution/trip/:tripId/request}{Dueño}{Pide un reemplazo}
+\epf{GET}{/substitution/mine}{Sesión}{Viajes que rinde como reemplazo}
+\ep{POST}{/substitution/:requestId/approve}{Revisor}{Aprueba el reemplazo}
 \end{xltabular}}
 
 \subsection{Catálogos y administración}

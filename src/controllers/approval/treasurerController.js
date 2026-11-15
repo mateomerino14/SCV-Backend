@@ -1,29 +1,5 @@
 const treasurerService = require('../../services/approval/treasurerService');
 
-// Lista los viajes pendientes de aprobacion de fondos
-const getPendingTrips = async (req, res) => {
-  const treasurerId = req.user.id_usuario;
-  const result = await treasurerService.getPendingTrips(treasurerId, req.query);
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.trips);
-  }
-};
-
-// Lista los viajes asignados al tesorero
-const getMyTrips = async (req, res) => {
-  const treasurerId = req.user.id_usuario;
-  const result = await treasurerService.getMyTrips(treasurerId, req.query);
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.trips);
-  }
-};
-
 // Obtiene el detalle de un viaje para tesoreria
 const getTripDetail = async (req, res) => {
   const {tripId} = req.params;
@@ -115,4 +91,4 @@ const deleteComment = async (req, res) => {
   }
 };
 
-module.exports = {getPendingTrips, getMyTrips, getTripDetail, updateAmounts, approveTrip, rejectTrip, addComment, editComment, deleteComment};
+module.exports = {getTripDetail, updateAmounts, approveTrip, rejectTrip, addComment, editComment, deleteComment};

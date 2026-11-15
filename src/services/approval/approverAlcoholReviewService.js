@@ -29,33 +29,6 @@ const attachSummaryToTrips = (trips) => {
   });
 };
 
-// Lista los viajes pendientes de revision adicional del aprobador por contener alcohol
-const getPendingAlcoholReviews = async (approverId, filters) => {
-  let query = supabase
-    .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))')
-    .eq('estado', 'EN_REVISION_APROBADOR')
-    .is('id_aprobador_asignado', null)
-    .neq('id_usuario', approverId);
-  if (filters.fecha_inicio) {
-    query = query.gte('fecha_inicio', filters.fecha_inicio);
-  }
-  if (filters.fecha_fin) {
-    query = query.lte('fecha_fin', filters.fecha_fin);
-  }
-  if (filters.id_empleado) {
-    query = query.eq('id_usuario', filters.id_empleado);
-  }
-  const {data, error} = await query.order('fecha_inicio', {ascending: false});
-  if (error) {
-    return {error: error.message};
-  }
-  const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
-    data || [], approverId, 'APROBADOR', (trip) => trip.id_supervisor_asignado
-  );
-  return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(trips, filters.id_seccion))};
-};
-
 // Lista los viajes de revision adicional asignados al aprobador
 const getMyAlcoholReviews = async (approverId, filters) => {
   const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))';
@@ -276,7 +249,6 @@ const rejectAlcoholReview = async (tripId, approverId) => {
 };
 
 module.exports = {
-  getPendingAlcoholReviews,
   getMyAlcoholReviews,
   takeAlcoholReview,
   returnAlcoholReview,

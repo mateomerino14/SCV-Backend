@@ -1,5 +1,5 @@
 const supabase = require('../../src/config/supabase');
-const {login, api, boliviaDate} = require('./helpers');
+const {login, api, boliviaDate, inboxRows} = require('./helpers');
 
 jest.setTimeout(90000);
 
@@ -40,10 +40,9 @@ test('el aprobador revisa el viaje de su subordinada y no lo aprueba dos veces',
   const approver = api(await login('pedro.aprobador'));
   const tripId = await submitTrip(employee, 'Viaje con el gerente como jefe');
   expect((await tripOf(tripId)).id_supervisor_asignado).toBe(approverId);
-  const mine = await approver.get('/review/trip-review/mine');
-  expect(mine.status).toBe(200);
-  expect(JSON.stringify(mine.body)).toContain(`"id_viaje":${tripId}`);
-  expect((await approver.get('/review/trip-review/pending')).status).toBe(403);
+  const mine = await inboxRows(approver, 'aprobador-viajes', 'MIS_PENDIENTES');
+  expect(mine.find((trip) => trip.id_viaje === tripId)).toMatchObject({etapa: 'JEFE'});
+  expect((await approver.get('/inbox/jefe-viajes-pendientes')).status).toBe(403);
   const approved = await approver.post(`/review/trip-review/${tripId}/approve`);
   expect(approved.status).toBe(200);
   const trip = await tripOf(tripId);

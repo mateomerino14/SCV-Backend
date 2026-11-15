@@ -27,28 +27,6 @@ const getRequestStatus = async (req, res) => {
   }
 };
 
-// Lista las solicitudes pendientes de revision
-const getPendingRequests = async (req, res) => {
-  const result = await deadlineAuthorizationService.getPendingRequests();
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.requests);
-  }
-};
-
-// Lista el historial de solicitudes ya procesadas
-const getRequestHistory = async (req, res) => {
-  const result = await deadlineAuthorizationService.getRequestHistory();
-  if (result.error) {
-    return res.status(500).json({error: result.error});
-  }
-  else {
-    return res.json(result.requests);
-  }
-};
-
 // Aprueba una solicitud de autorizacion de plazo
 const approveRequest = async (req, res) => {
   const {requestId} = req.params;
@@ -76,4 +54,4 @@ const rejectRequest = async (req, res) => {
   }
 };
 
-module.exports = {createRequest, getRequestStatus, getPendingRequests, getRequestHistory, approveRequest, rejectRequest};
+module.exports = {createRequest, getRequestStatus, approveRequest, rejectRequest};

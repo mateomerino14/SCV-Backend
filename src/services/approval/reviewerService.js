@@ -35,43 +35,6 @@ const attachSummaryToTrips = (trips) => {
   });
 };
 
-// Quien reviso antes al revisor final: el aprobador si hubo alcohol, si no el supervisor
-const getPreviousReviewerId = (trip) => {
-  if (trip.tiene_alcohol) {
-    return trip.id_aprobador_asignado;
-  }
-  return trip.id_supervisor_asignado;
-};
-
-// Lista los viajes pendientes de revision final
-const getPendingReviews = async (reviewerId, filters) => {
-  let query = supabase
-    .from('Viaje')
-    .select('*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre))')
-    .eq('estado', 'APROBADO_SUPERVISOR')
-    .is('id_revisor_asignado', null)
-    .neq('id_usuario', reviewerId);
-  if (filters.fecha_inicio) {
-    query = query.gte('fecha_inicio', filters.fecha_inicio);
-  }
-  if (filters.fecha_fin) {
-    query = query.lte('fecha_fin', filters.fecha_fin);
-  }
-  if (filters.id_empleado) {
-    query = query.eq('id_usuario', filters.id_empleado);
-  }
-  const {data, error} = await query.order('fecha_inicio', {ascending: false});
-  if (error) {
-    return {error: error.message};
-  }
-  else {
-    const trips = await hierarchyAssignmentService.filterTripsByHierarchy(
-      data || [], reviewerId, 'REVISOR', getPreviousReviewerId
-    );
-    return {trips: attachSummaryToTrips(hierarchyAssignmentService.filterBySection(trips, filters.id_seccion))};
-  }
-};
-
 // Lista las revisiones finales asignadas al revisor
 const getMyReviews = async (reviewerId, filters) => {
   const selectFields = '*, Usuario!viaje_id_usuario_foreign(id_usuario, nombre, apellido_paterno, foto_perfil, id_seccion, Seccion(nombre), Cargo(nombre, tipo_viatico)), Gasto(monto_total, es_gasto_internacional, tipo_cambio_bs, fecha_gasto, Categoria_Gasto(nombre)), Comentario(*)';
@@ -325,7 +288,7 @@ const rejectReview = async (tripId, reviewerId) => {
 };
 
 module.exports = {
-  getPendingReviews, getMyReviews, getReviewDetail, approveReview, rejectReview,
+  getMyReviews, getReviewDetail, approveReview, rejectReview,
   addComment: tripCommentService.addTripComment,
   editComment: tripCommentService.editTripComment,
   deleteComment: tripCommentService.deleteTripComment,

@@ -1,5 +1,5 @@
 const supabase = require('../../src/config/supabase');
-const {login, api, boliviaDate} = require('./helpers');
+const {login, api, boliviaDate, inboxRows} = require('./helpers');
 
 jest.setTimeout(120000);
 
@@ -53,7 +53,7 @@ test('la rendición con alcohol pasa por el aprobador antes del revisor', async 
   const atApprover = await tripOf(tripId);
   expect(atApprover.estado).toBe('EN_REVISION_APROBADOR');
   expect(atApprover.id_aprobador_asignado).toBe(await idOf('pedro.aprobador@maxam.com'));
-  expect(listOf((await approver.get('/approver/alcohol-review/mine')).body).map((trip) => trip.id_viaje)).toContain(tripId);
+  expect((await inboxRows(approver, 'aprobador-rendiciones')).map((trip) => trip.id_viaje)).toContain(tripId);
   expect((await approver.post(`/approver/alcohol-review/${tripId}/approve`, {contrasenia: ''})).status).toBe(400);
   expect((await approver.post(`/approver/alcohol-review/${tripId}/approve`)).status).toBe(200);
   const atReviewer = await tripOf(tripId);
@@ -104,7 +104,7 @@ test('el reemplazo se elige en la misma sección, no se duplica y, aprobado, pue
   expect((await owner.post(`/substitution/trip/${tripId}/request`, {id_sustituto: anaId})).status).toBe(200);
   expect((await owner.post(`/substitution/trip/${tripId}/request`, {id_sustituto: anaId})).status).toBe(400);
   expect((await registerTaxi(substitute, tripId)).status).toBe(403);
-  const pending = listOf((await reviewer.get('/substitution/pending')).body).find((request) => request.id_viaje === tripId);
+  const pending = (await inboxRows(reviewer, 'reemplazos', 'PENDIENTES')).find((request) => request.id_viaje === tripId);
   expect(pending).toBeDefined();
   expect((await reviewer.post(`/substitution/${pending.id_solicitud}/approve`)).status).toBe(200);
   expect((await registerTaxi(substitute, tripId)).status).toBe(200);

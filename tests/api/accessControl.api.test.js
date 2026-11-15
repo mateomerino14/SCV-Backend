@@ -29,7 +29,7 @@ beforeAll(async () => {
 
 // Sin sesion, o con un token alterado, ninguna ruta privada responde datos
 test('sin sesión o con un token alterado no se entra a ninguna ruta privada', async () => {
-  const privatePaths = [`/trip/${activeTripId}`, `/trip/${activeTripId}/firmas-planilla`, `/expense/${expenseId}/detail`, '/vehicle/available', '/user/me', '/approver/pending-trips'];
+  const privatePaths = [`/trip/${activeTripId}`, `/trip/${activeTripId}/firmas-planilla`, `/expense/${expenseId}/detail`, '/vehicle/available', '/user/me', '/inbox/aprobador-viajes'];
   for (const path of privatePaths) {
     expect((await request(app).get(path)).status).toBe(401);
     expect((await request(app).get(path).set('authorization', 'Bearer token.alterado.123')).status).toBe(401);
@@ -62,19 +62,19 @@ test('otro empleado no ve ni modifica el viaje ni los gastos ajenos por ruta dir
 // Un empleado no entra a las bandejas ni a la administracion de otros roles
 test('un empleado no entra a las rutas de otros roles', async () => {
   const roleOnly = [
-    await stranger.get('/approver/pending-trips'),
+    await stranger.get('/inbox/aprobador-viajes'),
     await stranger.get(`/approver/trip/${reviewTripId}`),
     await stranger.post(`/approver/trip/${reviewTripId}/approve`),
-    await stranger.get('/reviewer/pending'),
-    await stranger.get('/treasurer/pending-trips'),
-    await stranger.get('/review/trip-review/pending'),
+    await stranger.get('/inbox/revisor'),
+    await stranger.get('/inbox/tesoreria'),
+    await stranger.get('/inbox/jefe-viajes-pendientes'),
     await stranger.get(`/review/trip-review/${reviewTripId}`),
     await stranger.get('/vehicle'),
     await stranger.post('/vehicle', {placa: 'X-1'}),
     await stranger.get('/user/all'),
     await stranger.get('/admin/dashboard'),
-    await stranger.get('/substitution/pending'),
-    await stranger.get('/deadline-authorization/pending'),
+    await stranger.get('/inbox/reemplazos'),
+    await stranger.get('/inbox/plazos'),
   ];
   roleOnly.forEach((response) => expect(response.status).toBe(403));
 });
