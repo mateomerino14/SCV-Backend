@@ -265,7 +265,7 @@ npm run dev               # desarrollo con recarga automática
 npm start                 # producción
 npm test                  # pruebas unitarias
 npm run test:api          # pruebas de la API (base de prueba)
-npm run limpiar-archivos -- --prueba   # lista los archivos sueltos
+npm run limpiar-archivos -- --prueba   # lista los archivos sueltos y los PDF guardados sin documento
 npm run resumen -- --prueba   # simula el resumen de pendientes
 \end{lstlisting}
 
@@ -342,7 +342,7 @@ La carpeta \code{database/} contiene los scripts para levantar la base en Supaba
 \rowcolor{maxamFondo} \code{Vehiculo} & Flota de la empresa (placa única, descripción, activo). Un índice único parcial sobre \code{Viaje(id_vehiculo)} impide que un vehículo esté en dos viajes activos (en revisión, aprobado, en tesorería o en curso); se libera cuando el empleado termina el viaje \\
 \rowcolor{maxamFondo} \code{Firma} & Copia de la firma con la que se firmó cada etapa: etapa (MEMORANDUM, PREPARADO, JEFE, GERENTE o REVISOR), usuario, trazo PNG, fecha, IP o aprobación automática \\
 \code{Firma_Usuario} & Firma digital que cada usuario registra en su perfil, con la fecha en que la cambió; se copia en cada documento que firma \\
-\code{Documento_Emitido} & Código de 12 caracteres y datos clave de cada PDF emitido; el QR del documento lleva a la página pública de verificación \\
+\code{Documento_Emitido} & Código de 12 caracteres y datos clave de cada PDF emitido; el QR del documento lleva a la página pública de verificación. La planilla y los recibos guardan la huella de sus datos (\code{huella}) y la ruta del PDF guardado (\code{ruta_archivo}) \\
 \code{Correlativo_Viaje} & Último número de viaje de cada año, para el código \code{VIA-numero/año} que vuelve a 1 cada año \\
 \rowcolor{maxamFondo} \code{Solicitud_Autorizacion_Plazo} & Ampliaciones de plazo; las pide el titular o su reemplazo \\
 \code{Solicitud_Reemplazo} & Solicitudes para que otra persona rinda el viaje \\
@@ -703,6 +703,8 @@ Todo texto escrito por usuarios se escapa (\code{htmlEscape}) antes de insertars
 
 \subsection{Firmas y verificación}
 Cada usuario registra su firma digital en su perfil (\code{GET} y \code{PUT /user/me/signature}, con su contraseña; tabla \code{Firma_Usuario}). Las aprobaciones que firman un documento piden \code{contrasenia} y no un trazo: \code{signatureService.signatureForSigning} comprueba la contraseña y copia la firma guardada en \code{Firma}, así los documentos ya firmados no cambian si la persona cambia su firma. Firman el aprobador al aprobar el viaje (o al aprobarlo como jefe directo), el empleado al enviar la rendición, el jefe directo o supervisor al aprobarla, el gerente al aprobar los gastos no deducibles y el revisor en la revisión final. Sin firma registrada o con la contraseña equivocada la respuesta es 400 y no cambia nada; tras 10 contraseñas equivocadas en 15 minutos la respuesta es 429. La planilla tiene tres casilleros: Preparado por, Aprobado por (Gerente de Área, el jefe directo) y Revisado/Registrado por (Asistente Cargos/Descargos, el revisor); la firma del gerente a los gastos no deducibles queda registrada y aparece al verificar el documento, pero no en la planilla. Cada PDF se registra en \code{Documento_Emitido} (\code{documentSealService}) y lleva un QR con su código; \code{GET /document/verify/:code} es público, limitado por IP, y devuelve el tipo de documento, la fecha, el viaje (código, ruta y empleado), los datos clave al emitirlo y quién firmó, sin el trazo.
+
+\textbf{PDF guardados.} La planilla en PDF y los recibos, que se descargan o reenvían cuando el usuario quiere, se generan una sola vez (\code{storedPdfService.getOrCreatePdf}). Se calcula la huella (SHA-256) de los datos que aparecen en el documento; si \code{Documento_Emitido} ya tiene un PDF guardado con esa huella, se descarga del bucket privado \code{documentos} y se entrega tal cual, con el mismo código QR. Si no, se genera con un sello nuevo, se sube a \code{documentos/<tipo>/<código>.pdf} y se anota la ruta. Cualquier cambio en los datos (un gasto corregido, una firma, una justificación) cambia la huella y genera un PDF nuevo. Así una planilla descargada varias veces cuesta un solo PDF (unos 10 segundos de CPU en el plan gratuito de Render) y tiene un solo código. El bucket se crea una vez en Supabase (privado, solo PDF, hasta 10 MB); si no está, el PDF se genera igual y solo no se guarda.
 
 \subsection{Correos inmediatos}
 \begin{itemize}
